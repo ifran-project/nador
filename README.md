@@ -32,3 +32,5 @@ Previously, single-component results also required indexing, such as
 `(await ran.get_logs())["gnb"]`. Use `await ran.get_logs(components=["gnb"])`
 with this API. Container discovery and selection are supported by core, RAN, RIC and
 containerized UE managers.
+
+Monitoring and experiment artifacts: [documentation](MONITORING.md).
