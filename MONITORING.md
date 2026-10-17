@@ -18,9 +18,9 @@ Restart the notebook kernel after upgrading. An existing editable installation
 points to its local checkout; uninstall it first if switching to published code.
 The metamodel dependency is unchanged.
 
-Follow [the OAI RFsim notebook](examples/monitoring/oai-rfsim/<YOUR_PASSWORD>.ipynb) for the complete example.
+Follow [the OAI RFsim notebook](examples/monitoring/rfsim/oai-rfsim/<YOUR_PASSWORD>.ipynb) for the complete example.
 It deploys monitoring after the core and RAN and before UE attachment. Copy or
-adjust [monitoring.yaml](examples/monitoring/oai-rfsim/monitoring.yaml) for your deployment.
+adjust [monitoring.yaml](examples/monitoring/rfsim/oai-rfsim/monitoring.yaml) for your deployment.
 The sample uses `eth0` for VM packet capture; choose the interfaces appropriate
 to your deployment. The Grafana Helm chart creates and manages its credential
 Secret with username `admin` and password `admin`.
