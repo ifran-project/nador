@@ -1,0 +1,38 @@
+# Open5GS + OAI CU-CP/CU-UP/DU split with RF-simulated UEs on VMs.
+namespace: monitoring
+kubeconfig: /etc/kubernetes/admin.conf
+latency: true
+packet_pairing: true
+loki: true
+core_kpis: true
+# CU has no MAC/L1 statistics; its parser is experimental.
+ran_kpis: false
+targets:
+  - category: core
+    component: amf
+    role: amf
+    container: amf
+    interface: eth0
+    metrics_port: 9090
+  - category: core
+    component: smf
+    role: smf
+    container: smf
+    interface: eth0
+    metrics_port: 9090
+  - category: core
+    component: upf
+    role: upf
+    container: upf
+    interface: eth0
+    metrics_port: 9090
+  - category: ran
+    component: cuup
+    role: gnb
+    container: cuup
+    interface: eth0
+    metrics_port: 9090
+  - category: ran
+    component: cucp
+    container: cucp
+    metrics_port: 9090
