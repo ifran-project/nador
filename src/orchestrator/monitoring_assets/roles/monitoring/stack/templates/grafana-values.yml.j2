@@ -4,10 +4,7 @@ service:
   nodePort: {{ monitoring_grafana_node_port }}
 
 adminUser: "{{ monitoring_grafana_admin_user }}"
-admin:
-  existingSecret: "{{ monitoring_grafana_secret }}"
-  userKey: admin-user
-  passwordKey: admin-password
+adminPassword: "{{ monitoring_grafana_admin_password }}"
 
 nodeSelector:
   {{ monitoring_node_label_key }}: "{{ monitoring_node_label_value }}"

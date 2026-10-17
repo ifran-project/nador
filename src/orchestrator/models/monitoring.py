@@ -42,7 +42,8 @@ class MonitoringDeployment(StrictBaseModel):
     control_node: str | None = None
     node_name: str | None = None  # actual Kubernetes node name for scheduling
     kubeconfig: str = '/etc/kubernetes/admin.conf'  # on control_node
-    grafana_secret: str = 'grafana-admin'  # created with admin/admin when absent
+    # Accept older saved models; credentials are now managed by the Helm chart.
+    grafana_secret: str | None = Field(default=None, exclude=True)
     loki: bool = True
     latency: bool = False
     packet_pairing: bool = False

@@ -22,8 +22,8 @@ Follow [the default notebook](examples/default/<YOUR_PASSWORD>.ipynb) for the co
 It deploys monitoring after the core and RAN and before UE attachment. Copy or
 adjust [monitoring.yaml](examples/default/monitoring.yaml) for your deployment.
 The sample uses `eth0` for VM packet capture; choose the interfaces appropriate
-to your deployment. Monitoring creates Grafana's `admin` / `admin` credentials
-when the Secret is absent, preserving an existing Secret.
+to your deployment. The Grafana Helm chart creates and manages its credential
+Secret with username `admin` and password `admin`.
 
 ```python
 from orchestrator.deployment import MonitoringManagement

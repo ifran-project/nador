@@ -53,7 +53,6 @@ class MonitoringManagement(BaseManagement):
             'monitoring_node_name': cfg.node_name or name,
             'monitoring_node_label_key': 'post5g.blueprint/' + release_names(cfg.namespace)['stack'],
             'monitoring_node_label_value': cfg.namespace,
-            'monitoring_grafana_secret': cfg.grafana_secret,
             'monitoring_loki_enabled': cfg.loki,
             'monitoring_scrape_namespaces': scrape_ns,
             'monitoring_interval': cfg.interval,
@@ -68,7 +67,7 @@ class MonitoringManagement(BaseManagement):
         return {'control_node': name, 'namespace': cfg.namespace, 'targets': targets,
                 'variables': variables, 'manifests': manifests,
                 'notes': ['Trial storage is ephemeral.',
-                          'Grafana defaults to admin/admin when its Secret is absent; existing credentials are preserved.',
+                          'The Grafana Helm chart manages its admin/admin credentials.',
                           'Workload readiness does not prove that traffic metrics or UE mappings exist.']}
 
     def _play(self, tasks=None, roles=None, *, installed=False, variables=None):
@@ -221,13 +220,6 @@ class MonitoringManagement(BaseManagement):
     def _preflight(self, plan):
         cfg = self.deployment_model.monitoring
         tasks = [
-            {'name': 'Read Grafana credentials', 'kubernetes.core.k8s_info': {
-                'api_version': 'v1', 'kind': 'Secret', 'name': cfg.grafana_secret, 'namespace': cfg.namespace},
-             'register': 'grafana_credentials', 'no_log': True},
-            {'name': 'Validate Grafana Secret keys', 'ansible.builtin.assert': {'that': [
-                "'admin-user' in (grafana_credentials.resources[0].data | default({}))",
-                "'admin-password' in (grafana_credentials.resources[0].data | default({}))"]},
-             'when': 'grafana_credentials.resources | length > 0', 'no_log': True},
             {'name': 'Verify scheduling node', 'kubernetes.core.k8s_info': {
                 'api_version': 'v1', 'kind': 'Node', 'name': plan['variables']['monitoring_node_name']},
              'register': 'monitoring_node'},
@@ -243,7 +235,7 @@ class MonitoringManagement(BaseManagement):
                  'register': 'existing_releases', 'changed_when': False},
                 {'name': 'Require a separate trial namespace', 'ansible.builtin.assert': {
                     'that': ['existing_releases.stdout | from_json | length == 0'],
-                    'fail_msg': 'Use an empty trial namespace (apart from the Grafana Secret), or restore saved monitoring state.'}}]
+                    'fail_msg': 'Use a namespace without existing Helm releases, or restore saved monitoring state.'}}]
         # Inspect exact identities before mutation; do not replace somebody else's addons.
         if plan['manifests']:
             tasks += [
@@ -261,11 +253,6 @@ class MonitoringManagement(BaseManagement):
             {'name': 'Create monitoring namespace', 'kubernetes.core.k8s': {
                 'state': 'present', 'definition': {'apiVersion': 'v1', 'kind': 'Namespace',
                                                 'metadata': {'name': cfg.namespace}}}},
-            {'name': 'Create default Grafana credentials', 'kubernetes.core.k8s': {
-                'state': 'present', 'definition': {'apiVersion': 'v1', 'kind': 'Secret', 'type': 'Opaque',
-                    'metadata': {'name': cfg.grafana_secret, 'namespace': cfg.namespace},
-                    'stringData': {'admin-user': 'admin', 'admin-password': 'admin'}}},
-             'when': 'grafana_credentials.resources | length == 0', 'no_log': True},
         ]
         return self._play(tasks)
 
@@ -360,7 +347,7 @@ class MonitoringManagement(BaseManagement):
     async def remove(self, *, quiet=False):
         """Stop injected processes before removing owned monitoring resources.
 
-        Namespace, Grafana Secret, CRDs and network-function pods are retained.
+        Namespace, CRDs and network-function pods are retained.
         Failure leaves installed state available for a retry.
         """
         cfg = self.deployment_model.monitoring

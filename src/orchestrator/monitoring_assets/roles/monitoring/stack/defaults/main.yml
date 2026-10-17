@@ -19,7 +19,7 @@ monitoring_prometheus_node_port: 30095
 monitoring_grafana_node_port: 32005
 monitoring_loki_node_port: 31000
 monitoring_grafana_admin_user: admin
-monitoring_grafana_secret: grafana-admin
+monitoring_grafana_admin_password: admin
 
 monitoring_loki_enabled: true
 monitoring_loki_promtail_enabled: true
