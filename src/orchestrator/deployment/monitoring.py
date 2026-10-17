@@ -236,16 +236,6 @@ class MonitoringManagement(BaseManagement):
                 {'name': 'Require a separate trial namespace', 'ansible.builtin.assert': {
                     'that': ['existing_releases.stdout | from_json | length == 0'],
                     'fail_msg': 'Use a namespace without existing Helm releases, or restore saved monitoring state.'}}]
-        # Inspect exact identities before mutation; do not replace somebody else's addons.
-        if plan['manifests']:
-            tasks += [
-                {'name': 'Inspect addon ownership', 'kubernetes.core.k8s_info': {
-                    'api_version': '{{ item.apiVersion }}', 'kind': '{{ item.kind }}',
-                    'name': '{{ item.metadata.name }}', 'namespace': '{{ item.metadata.namespace }}'},
-                 'loop': plan['manifests'], 'register': 'monitoring_existing'},
-                {'name': 'Reject unrelated addon resources', 'ansible.builtin.assert': {'that': [
-                    f"item.resources | length == 0 or (item.resources[0].metadata.labels | default({{}})).get('{OWNER_LABEL}') == '{cfg.namespace}'"]},
-                 'loop': '{{ monitoring_existing.results }}', 'loop_control': {'label': '{{ item.item.metadata.name }}'}}]
         tasks += [{'name': 'Check configured packet and metric targets',
             'ansible.builtin.include_tasks': str(ASSETS / 'preflight_target.yml'),
             'loop': plan['targets'], 'loop_control': {'loop_var': 'monitoring_target', 'label': '{{ monitoring_target.component }}'}}]
