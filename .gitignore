@@ -36,3 +36,12 @@ examples/monitoring/**/output_*model.yaml
 examples/monitoring/**/monitoring_*model.yaml
 examples/monitoring/**/merged.yaml
 examples/monitoring/**/input/full/
+
+# Live trial outputs and local configuration
+examples/monitoring-trials/**/results/
+examples/monitoring-trials/**/output/
+examples/monitoring-trials/**/output_*model.yaml
+examples/monitoring-trials/**/monitoring_*model.yaml
+examples/monitoring-trials/**/merged.yaml
+examples/monitoring-trials/**/input/full/
+examples/monitoring-trials/local-config.json
