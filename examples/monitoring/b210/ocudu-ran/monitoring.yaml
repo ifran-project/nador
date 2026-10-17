@@ -1,0 +1,33 @@
+# Control and scheduling node are taken from the deployed Kubernetes model.
+# eth0 carries core/N3 traffic in this example; retain RU-only Multus interfaces.
+# Override a target interface here if you attach N2/N3/N4 to a different pod interface.
+namespace: monitoring
+latency: true
+packet_pairing: true
+loki: true
+core_kpis: true
+ran_kpis: false
+targets:
+- category: core
+  component: amf
+  role: amf
+  container: amf
+  interface: eth0
+  metrics_port: 9090
+- category: core
+  component: smf
+  role: smf
+  container: smf
+  interface: eth0
+  metrics_port: 9090
+- category: core
+  component: upf
+  role: upf
+  container: upf
+  interface: eth0
+  metrics_port: 9090
+- category: ran
+  component: gnb
+  role: gnb
+  container: gnb
+  interface: eth0

@@ -1,0 +1,22 @@
+network:
+  version: 2
+  ethernets:
+    rrus:
+      match:
+        macaddress: "40:a6:b7:d5:e2:59"
+      mtu: 9216
+      dhcp4: true
+    ptp:
+      match:
+        macaddress: "40:a6:b7:d5:e2:5a"
+      mtu: 9216
+      dhcp4: true
+  vlans:
+    r2lab_usrp:
+      id: 3010
+      link: rrus
+      dhcp4: true
+    r2lab_aw2s:
+      id: 3011
+      link: rrus
+      dhcp4: true

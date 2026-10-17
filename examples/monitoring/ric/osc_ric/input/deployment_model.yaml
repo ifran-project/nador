@@ -1,0 +1,13 @@
+params:
+  provisioning:
+    experiment: 5gbp_exp2
+    extra_path: "" # Use SLICES CLI from PATH
+
+core:
+  implementation: oai
+
+ran:
+  implementation: oai
+
+ric:
+  implementation: oran_sc

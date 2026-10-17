@@ -1,0 +1,41 @@
+# Default Open5GS + OAI RFSIM example.
+# Verify these node, container and interface names against your running cluster.
+# eth0 assumes the default pod network without Multus; adjust if using N2/N3/N4 interfaces.
+namespace: monitoring
+kubeconfig: /etc/kubernetes/admin.conf
+
+latency: true
+packet_pairing: true
+loki: true
+# The default notebook selects the metrics image for both SMF and UPF.
+core_kpis: true
+# The default notebook enables the OAI statistics parser before RAN deployment.
+ran_kpis: true
+
+# Namespace and pod selectors are resolved from the deployment model.
+# Open5GS built-in metrics and the gNB parser listen on port 9090.
+targets:
+  - category: core
+    component: amf
+    role: amf
+    container: amf
+    interface: eth0
+    metrics_port: 9090
+  - category: core
+    component: smf
+    role: smf
+    container: smf
+    interface: eth0
+    metrics_port: 9090
+  - category: core
+    component: upf
+    role: upf
+    container: upf
+    interface: eth0
+    metrics_port: 9090
+  - category: ran
+    component: gnb
+    role: gnb
+    container: gnb
+    interface: eth0
+    metrics_port: 9090

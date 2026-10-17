@@ -1,0 +1,25 @@
+---
+- name: Upload netplan config to remote
+  ansible.builtin.copy:
+    src: "{{ inventory_hostname }}.netplan.yaml"
+    dest: /etc/netplan/50-radio.yaml
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Generate netplan config
+  ansible.builtin.command: netplan generate
+
+- name: Apply netplan config
+  ansible.builtin.command: netplan apply
+
+- name: Install lldpd
+  ansible.builtin.package:
+    name: lldpd
+    state: present
+
+- name: Enable and start lldpd service
+  ansible.builtin.service:
+    name: lldpd
+    enabled: true
+    state: started

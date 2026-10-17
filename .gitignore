@@ -28,3 +28,11 @@ examples/default/*model*.yaml
 examples/default/merged.yaml
 
 .pip-cache/
+
+# Generated state and experiment artifacts in monitoring examples
+examples/monitoring/**/results/
+examples/monitoring/**/output/
+examples/monitoring/**/output_*model.yaml
+examples/monitoring/**/monitoring_*model.yaml
+examples/monitoring/**/merged.yaml
+examples/monitoring/**/input/full/

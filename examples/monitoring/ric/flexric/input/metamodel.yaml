@@ -1,0 +1,28 @@
+core:
+  components:
+    nrf:
+      type: nrf
+    udr:
+      type: udr
+    udm:
+      type: udm
+    ausf:
+      type: ausf
+    amf:
+      type: amf
+    smf:
+      type: smf
+    upf:
+      type: upf
+
+ran:
+  components:
+    gnb:
+      type: gnb
+      config:
+        ric: flexric
+
+ric:
+  components:
+    flexric:
+      type: ric
