@@ -1,0 +1,46 @@
+- name: Resolve component pods by exact labels
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: "{{ monitoring_target.namespace }}"
+    label_selectors: "{{ monitoring_target.label_selectors }}"
+  register: monitoring_target_pods
+
+- name: Require at least one matching pod
+  ansible.builtin.assert:
+    that:
+      - monitoring_target_pods.resources | length > 0
+    fail_msg: "No pods matched {{ monitoring_target.component }} in {{ monitoring_target.namespace }}"
+
+- name: Require the configured packet container
+  ansible.builtin.assert:
+    that:
+      - monitoring_target.container in (item.spec.containers | map(attribute='name') | list)
+      - item.status.phase == 'Running'
+      - (item.metadata.annotations | default({})).get('post5g.blueprint/packet-owner', monitoring_owner) == monitoring_owner
+  loop: "{{ monitoring_target_pods.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  when: monitoring_target.role is not none
+
+- name: Verify actual packet interface before installing probes
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - -n
+      - "{{ monitoring_target.namespace }}"
+      - exec
+      - "{{ item.metadata.name }}"
+      - -c
+      - "{{ monitoring_target.container }}"
+      - --
+      - ip
+      - link
+      - show
+      - dev
+      - "{{ monitoring_target.interface }}"
+  loop: "{{ monitoring_target_pods.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  changed_when: false
+  when: monitoring_target.role is not none

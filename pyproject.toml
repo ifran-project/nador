@@ -1,0 +1,135 @@
+[project]
+name = "orchestrator"
+version = "0.0.3"
+description = "Post-5G orchestrator"
+authors = [
+    {name = "Ziyad Mabrouk", email = "ziyad.mabrouk@inria.fr"},
+    {name = "Damien Saucez", email = "damien.saucez@inria.fr"},
+    {name = "Mohammadbagher Tavassoli", email = "mohammadbagher.tavassoli-kejani@inria.fr"},
+    {name = "Yassir Amami", email = "yassir.amami@inria.fr"},
+    {name = "Samuel DeLaughter", email = "samuel.de-laughter@inria.fr"},
+]
+license = {text = "BSD-Clear"}
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic==2.13.5",
+    "pydantic-settings==2.15.0",
+    "pydantic_core==2.46.5",
+    "ansible-core==2.21.4",
+    "ansible-runner==2.4.3",
+    "metamodel==0.0.3",
+]
+
+[tool.poetry]
+packages = [{include = "orchestrator", from = "src"}]
+include = [{path = "ansible", format = ["sdist", "wheel"]},
+           {path = "src/orchestrator/monitoring_assets", format = ["sdist", "wheel"]}]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.9.4",
+    "pyright>=1.1.0",
+]
+doc = [
+    "sphinx>=7.0.0",
+    "sphinx-rtd-theme>=2.0.0",
+]
+
+[tool.ruff]
+line-length = 120
+extend-exclude = ["examples"]
+
+[tool.ruff.lint]
+select = [
+    "ARG", # flake8-unused-arguments
+    "ASYNC", # flake8-async
+    "B", # bugbear
+    "C", # complexity
+    "COM", # flake8-commas
+    "C4", # flake8-comprehensions
+    "D", # docstrings
+    "DTZ003", # Use datetime.now(tz=) instead of datetime.utcnow()
+    "DTZ004", # Use datetime.fromtimestamp(ts, tz=) instead of datetime.utcfromtimestamp(ts)
+    "E",  # pycodestyle
+    "F", # pyflakes/autoflake
+    "G", # flake8-logging-format
+    "I", # isort
+    "ICN", # flake8-import-conventions
+    "INP", # flake8-no-pep420
+    "INT", # flake8-gettext
+    "ISC", # flake8-implicit-str-concat
+    "LOG", # flake8-logging
+    "PERF", # perflint
+    "PIE", # flake8-pie
+    "PL", # pylint
+    "PYI", # flake8-pyi
+    "PT", # flake8-py<YOUR_PASSWORD>-style
+    "PTH", # flake8-use-pathlib
+    "Q", # flake8-quotes
+    "RET", # flake8-return
+    "RSE", # flake8-raise
+    "S", # flake8-bandit
+    "SIM", # flake8-simplify
+    "TCH", # flake8-type-checking
+    "TID", # flake8-tidy-imports
+    "TRY", # tryceratops,
+    "T20", # flake8-print
+    "UP", # pyupgrade
+    "W", # pycodestyle
+]
+
+ignore = [
+    "D107", # undocumented-public-init
+    "D202", # No blank lines allowed after function docstring
+    "D203", # 1 blank line required before class docstring
+    "D213", # Multi-line docstring summary should start at the second line
+    "S101", # allow asserts
+    "TRY003", # raise-vanilla-args
+
+    # May conflict with the formatter, https://docs.astral.sh/ruff/formatter/#conflicting-lint-rules
+    "W191",
+    "E111",
+    "E114",
+    "E117",
+    "D206",
+    "D300",
+    "Q",
+    "COM812",
+    "COM819",
+    "ISC001",
+    "PLR0913",
+    "D401",
+
+    "D212",
+    "S104",
+]
+
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+
+[tool.ruff.lint.per-file-ignores]
+"<YOUR_PASSWORD>s/**/*.py" = [
+    "S101", # allow assert in <YOUR_PASSWORD>s
+]
+
+[tool.pyright]
+include = ["src"]
+exclude = [
+    "**/__pycache__",
+    "**/node_modules",
+    "**/venv",
+    "**/.*",
+    ".venv",
+    "dist",
+    "build",
+    "exclude",
+]
+pythonVersion = "3.12"
+typeCheckingMode = "basic"
+reportMissingImports = true
+reportMissingTypeStubs = false

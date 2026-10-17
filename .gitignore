@@ -1,0 +1,30 @@
+venv
+.venv
+__pycache__
+
+.vscode
+.devcontainer/devcontainer.json
+
+# macos
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Local notebook environment and user run outputs
+.ansible/
+.jupyter/
+dist/
+build/
+examples/monitoring/results/
+examples/monitoring/*model*.yaml
+examples/monitoring/monitoring.yaml
+
+examples/default/results/
+examples/default/*model*.yaml
+
+.k8s-admin.conf
+
+examples/default/merged.yaml
+
+.pip-cache/
