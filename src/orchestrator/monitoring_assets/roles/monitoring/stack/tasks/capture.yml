@@ -1,0 +1,11 @@
+---
+- name: Install attachment sniffers
+  ansible.builtin.include_tasks: capture_target.yml
+  loop: "{{ monitoring_config.state.installed_targets | selectattr('role', 'in', ['amf', 'smf']) | list }}"
+  loop_control:
+    loop_var: capture_target
+    label: "{{ capture_target.component }}"
+  vars:
+    sniffer_image: "{{ monitoring_config.images[capture_target.role ~ '_sniffer'] }}"
+    redis_host: "redis.{{ monitoring_namespace }}.svc.cluster.local"
+    monitoring_owner: "{{ monitoring_namespace }}"

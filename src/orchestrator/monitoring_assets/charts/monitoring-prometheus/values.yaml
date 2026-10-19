@@ -1,0 +1,47 @@
+prometheusStack:
+  alertmanager:
+    enabled: false
+  coreDns:
+    enabled: false
+  fullnameOverride: monitoring-prometheus
+  grafana:
+    enabled: false
+  kubeApiServer:
+    enabled: false
+  kubeControllerManager:
+    enabled: false
+  kubeEtcd:
+    enabled: false
+  kubeProxy:
+    enabled: false
+  kubeScheduler:
+    enabled: false
+  kubeStateMetrics:
+    enabled: true
+  kubelet:
+    enabled: true
+  nodeExporter:
+    enabled: false
+  prometheus:
+    enabled: true
+    prometheusSpec:
+      evaluationInterval: 1s
+      externalLabels:
+        cluster: core
+      nodeSelector: {}
+      podMonitorNamespaceSelector: {}
+      podMonitorSelectorNilUsesHelmValues: false
+      retention: 5d
+      scrapeInterval: 1s
+      serviceMonitorNamespaceSelector: {}
+      serviceMonitorSelectorNilUsesHelmValues: false
+    service:
+      nodePort: 30095
+      type: NodePort
+    serviceMonitor:
+      interval: 1s
+      selfMonitor: true
+  prometheusOperator:
+    kubeletService:
+      enabled: true
+targets: []

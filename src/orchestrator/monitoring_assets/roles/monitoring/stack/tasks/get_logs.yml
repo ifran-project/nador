@@ -1,0 +1,22 @@
+---
+- name: Find component pods
+  ansible.builtin.include_tasks: find_pods.yml
+
+- name: Fetch component logs
+  kubernetes.core.k8s_log:
+    kind: Pod
+    name: "{{ item.metadata.name }}"
+    namespace: "{{ component.namespace }}"
+    since_seconds: "{{ component.log_fetch_params.since_seconds if since_seconds is none else since_seconds }}"
+    container: "{{ log_container | default(omit, true) }}"
+    all_containers: "{{ omit if log_container | default(false, true) else true }}"
+  loop: "{{ component_pods.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  register: component_logs
+  changed_when: false
+
+- name: Return component logs
+  ansible.builtin.set_stats:
+    data:
+      logs: "{{ component_logs.results | map(attribute='log') | join('\n') }}"

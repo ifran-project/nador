@@ -1,0 +1,16 @@
+{% from '_component.yaml.j2' import settings with context %}
+{{ settings() }}
+controller:
+  watchNamespaces: {{ packet_namespaces | tojson }}
+  probeMode: {{ ('both' if packet_targets | length == 2 else (packet_targets | first | default('both'))) | tojson }}
+{% for role, target in packet_targets.items() %}
+  {{ role }}Interface: {{ target.interface | tojson }}
+  {{ role }}LatencyMode: {{ target.latency_mode | tojson }}
+{% endfor %}
+images:
+  probe: {{ monitoring.images.probe | tojson }}
+  pairer: {{ (components['packet-pairer'].image.repository ~ ':' ~ components['packet-pairer'].image.image_tag) | tojson }}
+latency:
+  packetPairing: {{ monitoring.packet_pairing | tojson }}
+targets: {{ targets | tojson }}
+operationTimeoutSeconds: {{ monitoring.operation_timeout_seconds }}

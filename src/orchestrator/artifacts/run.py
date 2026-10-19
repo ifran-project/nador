@@ -1,16 +1,17 @@
 """Python experiment windows with guaranteed timeline finalization."""
 import asyncio
+import json
+import time
 from contextlib import AsyncExitStack, contextmanager
 from datetime import UTC, datetime
-import json
 from pathlib import Path
-import time
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from . import prometheus_range_export as prometheus
-from . import timeline_finalize as timeline
 from . import split_prometheus_by_timeline as splitter
+from . import timeline_finalize as timeline
+from .connection import prometheus_connection
 
 
 class ExperimentRun:
@@ -121,7 +122,7 @@ class ExperimentRun:
             async with AsyncExitStack() as access:
                 if self.monitoring is not None:
                     try:
-                        self.prometheus_url = await access.enter_async_context(self.monitoring.prometheus_tunnel())
+                        self.prometheus_url = await access.enter_async_context(prometheus_connection(self.monitoring))
                     except Exception as exc:
                         self.prometheus_url = None
                         self.metadata['collection_errors'].append(f'prometheus access: {exc}')

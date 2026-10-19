@@ -1,0 +1,11 @@
+apiVersion: v2
+name: monitoring-grafana
+type: application
+version: 0.1.0
+dependencies:
+- name: monitoring-common
+  version: 0.1.0
+  repository: file://../monitoring-common
+- name: grafana
+  version: 8.6.0
+  repository: https://grafana.github.io/helm-charts

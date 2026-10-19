@@ -1,0 +1,40 @@
+config:
+  clients:
+    - url: http://monitoring-loki.monitoring.svc:3100/loki/api/v1/push
+  logFormat: logfmt
+  logLevel: info
+  serverPort: 3101
+  snippets:
+    extraRelabelConfigs: []
+    extraScrapeConfigs: |
+      - job_name: kubernetes-sniffer-ephemeral-containers
+        static_configs:
+          - targets:
+              - localhost
+            labels:
+              job: kubernetes-sniffer-ephemeral-containers
+              __path__: /sniffer-var-log-pods/*/*sniffer*/*.log
+        relabel_configs:
+          - source_labels: [__path__]
+            regex: .*/([^_]+)_([^_]+)_[^/]+/([^/]+)/[0-9]+\.log
+            target_label: namespace
+            replacement: $1
+          - source_labels: [__path__]
+            regex: .*/([^_]+)_([^_]+)_[^/]+/([^/]+)/[0-9]+\.log
+            target_label: pod
+            replacement: $2
+          - source_labels: [__path__]
+            regex: .*/([^_]+)_([^_]+)_[^/]+/([^/]+)/[0-9]+\.log
+            target_label: container
+            replacement: $3
+enabled: true
+extraVolumeMounts:
+  - mountPath: /sniffer-var-log-pods
+    name: sniffer-pod-logs
+    readOnly: true
+extraVolumes:
+  - hostPath:
+      path: /var/log/pods
+      type: Directory
+    name: sniffer-pod-logs
+fullnameOverride: monitoring-promtail

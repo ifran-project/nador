@@ -1,0 +1,15 @@
+---
+- name: Wait for monitoring component readiness
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: "{{ component.namespace }}"
+    label_selectors: "{{ component.pod_selector }}"
+    wait: true
+    wait_condition:
+      type: Ready
+    wait_timeout: "{{ monitoring_timeout_seconds }}"
+    wait_sleep: 1
+  register: component_pods
+  until: component_pods.resources | length > 0
+  retries: "{{ [1, monitoring_timeout_seconds | int // 2] | max }}"
+  delay: 2

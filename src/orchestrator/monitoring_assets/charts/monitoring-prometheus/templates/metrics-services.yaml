@@ -1,0 +1,23 @@
+{{- range .Values.targets }}
+{{- if .metrics_port }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ printf "metrics-%s-%s" .category .component | replace "_" "-" | lower | trunc 63 | trimSuffix "-" }}
+  namespace: {{ .namespace }}
+  labels:
+    {{- include "monitoring.labels" $ | nindent 4 }}
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: {{ .metrics_port | quote }}
+    prometheus.io/path: {{ .metrics_path | quote }}
+spec:
+  selector:
+    {{- toYaml .selector | nindent 4 }}
+  ports:
+    - name: metrics
+      port: {{ .metrics_port }}
+      targetPort: {{ .metrics_port }}
+{{- end }}
+{{- end }}

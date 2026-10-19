@@ -1,0 +1,3 @@
+{% from '_component.yaml.j2' import settings with context %}
+{{ settings() }}
+prometheusUrl: "http://monitoring-prometheus-prometheus.{{ monitoring.namespace }}.svc:9090"

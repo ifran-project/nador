@@ -1,0 +1,6 @@
+dependencies:
+- name: monitoring-common
+  repository: file://../monitoring-common
+  version: 0.1.0
+digest: sha256:f3df823f74c9b200774626a62e1b3f3bb892215239151fb0d6e55d5ef350c597
+generated: "2026-10-19T02:22:09.457772+02:00"

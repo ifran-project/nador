@@ -1,0 +1,16 @@
+{# Shared component settings; only charts with separate registry fields opt in. #}
+{% macro settings(split_registry=false, all_nodes=false) -%}
+image:
+{% if split_registry %}
+{% set registry, _, repository = component.image.repository.partition('/') %}
+{% set explicit_registry = repository and ('.' in registry or ':' in registry or registry == 'localhost') %}
+  registry: {{ (registry if explicit_registry else 'docker.io') | tojson }}
+  repository: {{ (repository if explicit_registry else component.image.repository) | tojson }}
+{% else %}
+  repository: {{ component.image.repository | tojson }}
+{% endif %}
+  tag: {{ component.image.image_tag | tojson }}
+  pullPolicy: {{ component.image.image_pull_policy | tojson }}
+nodeSelector: {{ (node_selector if node_selector is not none else ({} if all_nodes else {'monitoring.blueprint/node': monitoring.namespace})) | tojson }}
+tolerations: {{ component.tolerations | tojson }}
+{%- endmacro %}

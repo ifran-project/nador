@@ -1,0 +1,36 @@
+{% from '_component.yaml.j2' import settings with context %}
+grafana:
+{{ settings(split_registry=true) | indent(2, true) }}
+  service:
+    nodePort: {{ monitoring.grafana_node_port }}
+  datasources:
+    datasources.yaml:
+      datasources:
+        - editable: true
+          isDefault: true
+          jsonData:
+            timeInterval: '{{ monitoring.prometheus_scrape_interval }}'
+          name: Prometheus
+          type: prometheus
+          uid: prometheus
+          url: http://monitoring-prometheus-prometheus.{{ monitoring.namespace }}.svc:9090
+        - editable: true
+          isDefault: false
+          jsonData:
+            timeInterval: '{{ monitoring.prometheus_scrape_interval }}'
+          name: monitoring-prometheus
+          type: prometheus
+          uid: monitoring-prometheus
+          url: http://monitoring-prometheus-prometheus.{{ monitoring.namespace }}.svc:9090
+{% if monitoring.loki %}
+        - access: proxy
+          editable: true
+          isDefault: false
+          name: Loki
+          type: loki
+          uid: loki
+          url: http://monitoring-loki.{{ monitoring.namespace }}.svc:3100
+{% endif %}
+dashboards:
+  variant: {{ ('srsran' if model.ran.implementation | string == 'srsRAN' else 'oai') | tojson }}
+lokiEnabled: {{ monitoring.loki | tojson }}

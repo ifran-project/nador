@@ -1,0 +1,19 @@
+{{- if or .Values.dashboards.enabled (and .Values.lokiEnabled .Values.dashboards.logs) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: monitoring-dashboard-configmap
+  namespace: {{ .Release.Namespace }}
+  labels:
+    grafana_dashboard: "1"
+    {{- include "monitoring.labels" . | nindent 4 }}
+data:
+  {{- if .Values.dashboards.enabled }}
+  monitoring-dashboard.json: |-
+    {{- .Files.Get (printf "files/monitoring-dashboard-%s.json" .Values.dashboards.variant) | nindent 4 }}
+  {{- end }}
+  {{- if and .Values.lokiEnabled .Values.dashboards.logs }}
+  component-logs-dashboard.json: |-
+    {{- .Files.Get "files/component-logs-dashboard.json" | nindent 4 }}
+  {{- end }}
+{{- end }}

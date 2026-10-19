@@ -1,0 +1,4 @@
+{% from '_component.yaml.j2' import settings with context %}
+{{ settings() }}
+service:
+  nodePort: {{ monitoring.loki_node_port }}

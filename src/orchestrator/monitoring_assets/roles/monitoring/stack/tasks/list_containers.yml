@@ -1,0 +1,12 @@
+---
+- name: Find component pods
+  ansible.builtin.include_tasks: find_pods.yml
+
+- name: Return component container names
+  ansible.builtin.set_stats:
+    data:
+      container_names: >-
+        {{ ((component_pods.resources | map(attribute='spec.containers', default=[]) | flatten)
+          + (component_pods.resources | map(attribute='spec.initContainers', default=[]) | flatten)
+          + (component_pods.resources | map(attribute='spec.ephemeralContainers', default=[]) | flatten))
+          | map(attribute='name') | unique | sort | join(' ') }}

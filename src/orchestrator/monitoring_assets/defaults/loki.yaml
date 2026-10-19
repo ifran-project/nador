@@ -1,0 +1,12 @@
+config:
+  auth_enabled: false
+  table_manager:
+    retention_deletes_enabled: true
+    retention_period: 5d
+enabled: true
+fullnameOverride: monitoring-loki
+isDefault: false
+nodeSelector: {}
+service:
+  nodePort: 31000
+  type: NodePort

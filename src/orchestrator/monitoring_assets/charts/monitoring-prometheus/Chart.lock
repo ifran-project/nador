@@ -1,0 +1,9 @@
+dependencies:
+- name: monitoring-common
+  repository: file://../monitoring-common
+  version: 0.1.0
+- name: kube-prometheus-stack
+  repository: https://prometheus-community.github.io/helm-charts
+  version: 51.9.4
+digest: sha256:08886e3f1654a0128edcf1949daab82ff20716c65611955de44261ff1e139dee
+generated: "2026-10-19T02:22:12.012995+02:00"

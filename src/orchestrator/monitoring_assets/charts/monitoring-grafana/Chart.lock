@@ -1,0 +1,9 @@
+dependencies:
+- name: monitoring-common
+  repository: file://../monitoring-common
+  version: 0.1.0
+- name: grafana
+  repository: https://grafana.github.io/helm-charts
+  version: 8.6.0
+digest: sha256:de9b4dddf3d6f1a3964fe8fb51e8364d89c962708b4e1e34b9f26bd9b5dfd139
+generated: "2026-10-19T02:23:13.440124+02:00"

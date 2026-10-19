@@ -1,0 +1,89 @@
+defaults:
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+    - key: <YOUR_PASSWORD>-eviction
+      operator: Equal
+      value: 'true'
+      effect: NoSchedule
+components:
+  prometheus:
+    release_name: monitoring-prometheus
+    chart_ref: monitoring-prometheus
+    pod_selector:
+      - app.kubernetes.io/name=prometheus
+    log_fetch_params:
+      kind: StatefulSet
+    image:
+      repository: quay.io/prometheus/prometheus
+      image_tag: v2.47.1
+      image_pull_policy: IfNotPresent
+  loki:
+    release_name: monitoring-loki
+    chart_ref: grafana/loki
+    chart_version: 2.16.0
+    pod_selector:
+      - app=loki
+      - release=monitoring-loki
+    log_fetch_params:
+      kind: StatefulSet
+    image:
+      repository: grafana/loki
+      image_tag: 2.6.1
+      image_pull_policy: IfNotPresent
+  promtail:
+    release_name: monitoring-promtail
+    chart_ref: grafana/promtail
+    chart_version: 6.17.0
+    pod_selector:
+      - app.kubernetes.io/name=promtail
+      - app.kubernetes.io/instance=monitoring-promtail
+    image:
+      repository: docker.io/grafana/promtail
+      image_tag: 3.5.1
+      image_pull_policy: IfNotPresent
+    tolerations:
+      - operator: Exists
+  grafana:
+    release_name: monitoring-grafana
+    chart_ref: monitoring-grafana
+    pod_selector:
+      - app.kubernetes.io/name=grafana
+      - app.kubernetes.io/instance=monitoring-grafana
+    image:
+      repository: docker.io/grafana/grafana
+      image_tag: 11.3.0
+      image_pull_policy: IfNotPresent
+  redis:
+    image:
+      repository: redis
+      image_tag: '7'
+      image_pull_policy: IfNotPresent
+  ue-mapper-api:
+    image:
+      repository: r2labuser/ue_mapper_api
+      image_tag: 2026w10
+      image_pull_policy: IfNotPresent
+  packet-pairer:
+    image:
+      repository: r2labuser/packet-pairer
+      image_tag: '2026'
+      image_pull_policy: Always
+  kpi-calculator-open5gs:
+    chart_ref: kpi-calculator
+    image:
+      repository: ghcr.io/ziyad-mabrouk/kpi-calculator-open5gs
+      image_tag: v1.0.0-standard
+      image_pull_policy: IfNotPresent
+  kpi-calculator-oai:
+    chart_ref: kpi-calculator
+    image:
+      repository: ghcr.io/ziyad-mabrouk/kpi-calculator-oai
+      image_tag: v1.0.1-standard
+      image_pull_policy: IfNotPresent
+  monitoring-controller:
+    image:
+      repository: r2labuser/kopf-controller
+      image_tag: 2026w42
+      image_pull_policy: Always

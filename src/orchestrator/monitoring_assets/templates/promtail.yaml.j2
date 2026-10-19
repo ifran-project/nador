@@ -1,0 +1,5 @@
+{% from '_component.yaml.j2' import settings with context %}
+{{ settings(split_registry=true, all_nodes=true) }}
+config:
+  clients:
+    - url: "http://monitoring-loki.{{ monitoring.namespace }}.svc:3100/loki/api/v1/push"

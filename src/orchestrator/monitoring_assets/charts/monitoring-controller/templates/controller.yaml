@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: monitoring-controller
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "monitoring.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: monitoring-controller
+      monitoring.blueprint/owner: {{ .Release.Namespace | quote }}
+  template:
+    metadata:
+      labels:
+        app: monitoring-controller
+        {{- include "monitoring.labels" . | nindent 8 }}
+    spec:
+      {{- include "monitoring.placement" . | nindent 6 }}
+      serviceAccountName: monitoring
+      containers:
+        - name: monitoring-controller
+          image: {{ printf "%s:%s" .Values.image.repository .Values.image.tag | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            {{- include "monitoring.controllerEnv" . | nindent 12 }}
