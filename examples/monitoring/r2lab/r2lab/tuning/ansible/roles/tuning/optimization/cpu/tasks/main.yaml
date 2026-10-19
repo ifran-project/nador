@@ -1,0 +1,118 @@
+---
+- name: Configure CPU and tuned profile on Ubuntu 24.04
+  block:
+
+    - name: CPU_CHECK
+      ansible.builtin.meta: noop
+
+    - name: Install cpupower utility
+      package:
+        name:
+          - linux-tools-common
+          # - linux-tools-{{ ansible_kernel }}
+          - cpufrequtils
+        state: present
+
+    - block:
+        - name: Install tuned if needed
+          ansible.builtin.apt:
+            name: tuned
+            state: present
+            update_cache: yes
+
+        - name: Ensure tuned service is running and enabled
+          ansible.builtin.service:
+            name: tuned
+            state: started
+            enabled: true
+
+        - name: Get current tuned profile
+          ansible.builtin.command: tuned-adm active
+          register: tuned_status
+          changed_when: false
+
+        - name: Set tuned profile to throughput-performance
+          ansible.builtin.command: tuned-adm profile throughput-performance
+          when: "'Current active profile: throughput-performance' not in tuned_status.stdout"
+      become: true
+      when: inventory_hostname != "sopnode-f3"
+
+    - name: Apply sysctl tuning parameters
+      sysctl:
+        name: "{{ item.key }}"
+        value: "{{ item.val }}"
+        sysctl_set: yes
+        state: present
+        reload: yes
+      loop:
+        - { key: net.core.rmem_default,        val: '134217728' }
+        - { key: net.core.rmem_max,            val: '134217728' }
+        - { key: net.core.wmem_default,        val: '134217728' }
+        - { key: net.core.wmem_max,            val: '134217728' }
+        - { key: net.core.netdev_max_backlog,  val: '5000'      }
+        - { key: net.core.optmem_max,          val: '524288'    }
+        - { key: kernel.sched_rt_runtime_us,   val: '-1'        }
+        - { key: kernel.timer_migration,       val: '0'         }
+
+    - name: Create /etc/sysctl.d/rt.conf and apply real-time settings
+      block:
+        - name: Create /etc/sysctl.d/rt.conf
+          ansible.builtin.copy:
+            dest: /etc/sysctl.d/rt.conf
+            content: |
+              kernel.sched_rt_runtime_us=-1
+              kernel.timer_migration=0
+            owner: root
+            group: root
+            mode: '0644'
+
+        - name: Apply sysctl settings from /etc/sysctl.d/rt.conf
+          ansible.builtin.command: sysctl -p /etc/sysctl.d/rt.conf
+          register: sysctl_apply
+          changed_when: "'apply' in sysctl_apply.stdout or 'set' in sysctl_apply.stdout"
+      when: inventory_hostname == "sopnode-f3"
+
+    - block:
+        - name: Check if hyperthreading is disabled (reliable method)
+          shell: |
+            threads_per_core=$(lscpu | awk '/^Thread\(s\) per core:/ {print $4}')
+            if [ "$threads_per_core" -eq 1 ]; then
+              echo "Hyperthreading is disabled"
+              exit 0
+            else
+              echo "Hyperthreading is enabled"
+              exit 1
+            fi
+          register: ht_check
+          changed_when: false
+          failed_when: ht_check.rc != 0
+
+        - name: Show hyperthreading status
+          debug:
+            msg: "{{ ht_check.stdout }}"
+      when: inventory_hostname == "sopnode-f3"
+
+    - block:
+        - name: Get CPU idle states
+          shell: cpupower idle-info
+          register: idle_info
+          changed_when: false
+
+        - name: Disable all CPU idle states
+          shell: |
+            for state in $(cpupower idle-info | awk '/Available idle states/ {for(i=2;i<=NF;i++) print $i}'); do
+              cpupower idle-set -d $state || true
+            done
+          register: disable_idle
+          changed_when: "'disabling' in disable_idle.stdout"
+          ignore_errors: true
+
+        - name: Show CPU idle states after disabling
+          shell: cpupower idle-info
+          register: idle_info_after
+          changed_when: false
+
+        - name: Display CPU idle states
+          debug:
+            msg: "{{ idle_info_after.stdout_lines }}"
+      when: inventory_hostname == "sopnode-f3"

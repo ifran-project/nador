@@ -1,0 +1,8 @@
+---
+- name: Setup RAN nodes
+  hosts: ran_nodes
+  gather_facts: true
+  roles:
+    - role: tuning/netplan
+    - role: tuning/optimization/nic
+    - role: tuning/optimization/cpu

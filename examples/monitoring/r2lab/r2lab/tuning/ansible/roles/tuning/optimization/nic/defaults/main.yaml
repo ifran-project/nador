@@ -1,0 +1,6 @@
+---
+nic_interfaces:
+  sopnode-f1: ens2f1np1
+  sopnode-f2: ens2f1np1
+  sopnode-f3: ens15f1
+  sopnode-w3: enp59s0f1np1
