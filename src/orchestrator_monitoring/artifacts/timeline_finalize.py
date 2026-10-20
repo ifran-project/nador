@@ -241,7 +241,9 @@ def expand_iperf_tasks(windows: list[dict]) -> list[dict]:
                         window.get("step", ""),
                         task.get("direction", ""),
                         ue,
-                        f"P{task['parallel_streams']}" if task["level"] == "iperf_task" else f"count{task.get('ping_count', '')}",
+                        f"P{task['parallel_streams']}"
+                        if task["level"] == "iperf_task"
+                        else f"count{task.get('ping_count', '')}",
                     ]
                 )
             )
@@ -269,13 +271,11 @@ def recap_lines(run_id: str, tz_name: str, windows: list[dict], iperf_tasks: lis
     traffic = next((w for w in windows if w["level"] == "traffic_campaign"), None)
     if campaign:
         lines.append(
-            f"Campaign: {campaign['start_local']} -> {campaign['end_local']} "
-            f"({duration_text(campaign['duration_s'])})"
+            f"Campaign: {campaign['start_local']} -> {campaign['end_local']} ({duration_text(campaign['duration_s'])})"
         )
     if traffic:
         lines.append(
-            f"Traffic: {traffic['start_local']} -> {traffic['end_local']} "
-            f"({duration_text(traffic['duration_s'])})"
+            f"Traffic: {traffic['start_local']} -> {traffic['end_local']} ({duration_text(traffic['duration_s'])})"
         )
 
     sections = [w for w in windows if w["level"] == "section"]
@@ -304,11 +304,7 @@ def recap_lines(run_id: str, tz_name: str, windows: list[dict], iperf_tasks: lis
             f"- {scenario['scenario']}{title}: {scenario['start_local']} -> "
             f"{scenario['end_local']} ({duration_text(scenario['duration_s'])})"
         )
-        scenario_tasks = [
-            t
-            for t in iperf_tasks
-            if t.get("scenario") == scenario.get("scenario")
-        ]
+        scenario_tasks = [t for t in iperf_tasks if t.get("scenario") == scenario.get("scenario")]
         for task in scenario_tasks:
             if task.get("level") == "ping_task":
                 lines.append(

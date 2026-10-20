@@ -30,9 +30,7 @@ def window_subdir(window: dict) -> Path:
     if level == "scenario":
         return Path("scenario") / safe_name(window.get("scenario", "scenario"))
     if level == "step":
-        return Path("task") / safe_name(
-            "__".join([window.get("scenario", ""), window.get("step", "")])
-        )
+        return Path("task") / safe_name("__".join([window.get("scenario", ""), window.get("step", "")]))
     if level == "direction":
         return Path("task") / safe_name(
             "__".join(
@@ -97,12 +95,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     windows = load_windows(timeline_json, selected_levels)
-    skipped_windows = [
-        window for window in windows if is_false(window.get("prometheus_enabled", ""))
-    ]
-    windows = [
-        window for window in windows if not is_false(window.get("prometheus_enabled", ""))
-    ]
+    skipped_windows = [window for window in windows if is_false(window.get("prometheus_enabled", ""))]
+    windows = [window for window in windows if not is_false(window.get("prometheus_enabled", ""))]
     if not windows:
         summary = {
             "error": "no matching windows",
@@ -132,9 +126,7 @@ def main(argv: list[str] | None = None) -> int:
         for window in windows:
             subdir = out_dir / window_subdir(window)
             subdir.mkdir(parents=True, exist_ok=True)
-            csv_path = subdir / (
-                "prometheus_timeseries.csv.gz" if args.compress else "prometheus_timeseries.csv"
-            )
+            csv_path = subdir / ("prometheus_timeseries.csv.gz" if args.compress else "prometheus_timeseries.csv")
             fp = open_csv_text(csv_path, "wt")
             writer = csv.DictWriter(fp, fieldnames=reader.fieldnames)
             writer.writeheader()

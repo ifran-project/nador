@@ -1,4 +1,5 @@
 """Python experiment windows with guaranteed timeline finalization."""
+
 import asyncio
 import json
 import time
@@ -19,14 +20,22 @@ class ExperimentRun:
 
     Pass a monitoring manager for automatic Prometheus access during export,
     or supply a directly reachable prometheus_url. Network workloads and their
-    cleanup are owned by their caller. Pod logs/pcaps remain available in
-    the legacy scenario runner in this trial.
+    cleanup are owned by their caller.
     """
 
-    def __init__(self, directory, *, name='experiment', prometheus_url=None,
-                 queries_file=None, step='1s', timezone='Europe/Paris', monitoring=None):
+    def __init__(
+        self,
+        directory,
+        *,
+        name="experiment",
+        prometheus_url=None,
+        queries_file=None,
+        step="1s",
+        timezone="Europe/Paris",
+        monitoring=None,
+    ):
         if monitoring is not None and prometheus_url is not None:
-            raise ValueError('Supply monitoring or prometheus_url, not both')
+            raise ValueError("Supply monitoring or prometheus_url, not both")
         self.monitoring = monitoring
         self.directory = Path(directory)
         self.name = name
@@ -42,80 +51,124 @@ class ExperimentRun:
 
     def _event(self, level, phase, name, **extra):
         now = datetime.now(UTC)
-        event = {'run_id': self.run_id, 'level': level, 'phase': phase, 'name': name,
-                 'epoch': now.timestamp(), 'utc_time': now.isoformat(),
-                 'local_time': now.astimezone(self.zone).isoformat(), 'timezone': self.timezone, **extra}
-        with (self.directory / 'timeline_events.jsonl').open('a') as f:
-            f.write(json.dumps(event) + '\n')
+        event = {
+            "run_id": self.run_id,
+            "level": level,
+            "phase": phase,
+            "name": name,
+            "epoch": now.timestamp(),
+            "utc_time": now.isoformat(),
+            "local_time": now.astimezone(self.zone).isoformat(),
+            "timezone": self.timezone,
+            **extra,
+        }
+        with (self.directory / "timeline_events.jsonl").open("a") as f:
+            f.write(json.dumps(event) + "\n")
 
     async def __aenter__(self):
         if self.entered:
-            raise RuntimeError('ExperimentRun cannot be entered twice')
+            raise RuntimeError("ExperimentRun cannot be entered twice")
         self.directory.mkdir(parents=True, exist_ok=False)
         self.entered = True
         self.started = time.time()
-        self._event('campaign', 'start', self.name)
-        self.metadata = {'run_id': self.run_id, 'name': self.name, 'timezone': self.timezone,
-                         'status': 'running', 'collection_errors': []}
+        self._event("campaign", "start", self.name)
+        self.metadata = {
+            "run_id": self.run_id,
+            "name": self.name,
+            "timezone": self.timezone,
+            "status": "running",
+            "collection_errors": [],
+        }
         self._save_metadata()
         return self
 
     def _save_metadata(self):
-        (self.directory / 'experiment_metadata.json').write_text(json.dumps(self.metadata, indent=2))
+        (self.directory / "experiment_metadata.json").write_text(json.dumps(self.metadata, indent=2))
 
     def save_json(self, filename, data):
         """Save a JSON artifact inside the active experiment directory."""
-        if not self.entered or getattr(self, 'closed', False):
-            raise RuntimeError('Save artifacts inside async with ExperimentRun(...)')
+        if not self.entered or getattr(self, "closed", False):
+            raise RuntimeError("Save artifacts inside async with ExperimentRun(...)")
         (self.directory / filename).write_text(json.dumps(data, indent=2))
 
     @contextmanager
     def section(self, name):
-        if not self.entered or getattr(self, 'closed', False):
-            raise RuntimeError('Use sections inside async with ExperimentRun(...)')
+        if not self.entered or getattr(self, "closed", False):
+            raise RuntimeError("Use sections inside async with ExperimentRun(...)")
         if name in self.names:
-            raise ValueError(f'Duplicate section {name!r}')
+            raise ValueError(f"Duplicate section {name!r}")
         if not name or not name.strip():
-            raise ValueError('Section name cannot be empty')
+            raise ValueError("Section name cannot be empty")
         self.names.add(name)
         self.active_sections += 1
-        self._event('section', 'start', name)
-        status = 'completed'
+        self._event("section", "start", name)
+        status = "completed"
         try:
             yield
         except BaseException:
-            status = 'failed'
+            status = "failed"
             raise
         finally:
-            self._event('section', 'end', name, status=status)
+            self._event("section", "end", name, status=status)
             self.active_sections -= 1
 
     def _collect(self, ended):
-        errors = self.metadata['collection_errors']
+        errors = self.metadata["collection_errors"]
         try:
-            timeline.main(['--timeline-jsonl', str(self.directory/'timeline_events.jsonl'),
-                           '--out-dir', str(self.directory), '--run-id', self.run_id, '--timezone', self.timezone])
+            timeline.main(
+                [
+                    "--timeline-jsonl",
+                    str(self.directory / "timeline_events.jsonl"),
+                    "--out-dir",
+                    str(self.directory),
+                    "--run-id",
+                    self.run_id,
+                    "--timezone",
+                    self.timezone,
+                ]
+            )
         except Exception as exc:
-            errors.append(f'timeline: {exc}')
+            errors.append(f"timeline: {exc}")
         if self.prometheus_url:
             try:
-                summary = self.directory/'prometheus_export_summary.json'
-                args = ['--prometheus-url', self.prometheus_url, '--start', str(self.started),
-                        '--end', str(max(ended, self.started + .001)), '--step', self.step,
-                        '--out', str(self.directory/'prometheus_timeseries.csv'),
-                        '--summary-json', str(summary), '--no-discover-metrics']
+                summary = self.directory / "prometheus_export_summary.json"
+                args = [
+                    "--prometheus-url",
+                    self.prometheus_url,
+                    "--start",
+                    str(self.started),
+                    "--end",
+                    str(max(ended, self.started + 0.001)),
+                    "--step",
+                    self.step,
+                    "--out",
+                    str(self.directory / "prometheus_timeseries.csv"),
+                    "--summary-json",
+                    str(summary),
+                    "--no-discover-metrics",
+                ]
                 if self.queries_file:
-                    args += ['--queries-json', str(self.queries_file)]
+                    args += ["--queries-json", str(self.queries_file)]
                 prometheus.main(args)
-                queries = json.loads(summary.read_text())['queries']
-                errors.extend(f"{q['name']}: {q['error']}" for q in queries if q.get('error'))
-                if not any(q.get('rows') for q in queries):
-                    errors.append('Prometheus returned no samples')
-                splitter.main(['--full-csv', str(self.directory/'prometheus_timeseries.csv'),
-                    '--timeline-json', str(self.directory/'timeline_summary.json'),
-                    '--out-dir', str(self.directory/'by_window'), '--window-types', 'campaign,section', '--compress'])
+                queries = json.loads(summary.read_text())["queries"]
+                errors.extend(f"{q['name']}: {q['error']}" for q in queries if q.get("error"))
+                if not any(q.get("rows") for q in queries):
+                    errors.append("Prometheus returned no samples")
+                splitter.main(
+                    [
+                        "--full-csv",
+                        str(self.directory / "prometheus_timeseries.csv"),
+                        "--timeline-json",
+                        str(self.directory / "timeline_summary.json"),
+                        "--out-dir",
+                        str(self.directory / "by_window"),
+                        "--window-types",
+                        "campaign,section",
+                        "--compress",
+                    ]
+                )
             except Exception as exc:
-                errors.append(f'prometheus: {exc}')
+                errors.append(f"prometheus: {exc}")
 
     async def _finalize(self, ended):
         try:
@@ -125,27 +178,27 @@ class ExperimentRun:
                         self.prometheus_url = await access.enter_async_context(prometheus_connection(self.monitoring))
                     except Exception as exc:
                         self.prometheus_url = None
-                        self.metadata['collection_errors'].append(f'prometheus access: {exc}')
+                        self.metadata["collection_errors"].append(f"prometheus access: {exc}")
                 await asyncio.to_thread(self._collect, ended)
         except Exception as exc:
-            self.metadata['collection_errors'].append(f'collection: {exc}')
+            self.metadata["collection_errors"].append(f"collection: {exc}")
 
     async def __aexit__(self, exc_type, exc, tb):
         self.closed = True
-        self._event('campaign', 'end', self.name, status='failed' if exc else 'completed')
-        self.metadata['status'] = 'failed' if exc else 'completed'
+        self._event("campaign", "end", self.name, status="failed" if exc else "completed")
+        self.metadata["status"] = "failed" if exc else "completed"
         if exc:
-            self.metadata['error'] = str(exc) or type(exc).__name__
+            self.metadata["error"] = str(exc) or type(exc).__name__
         ended = time.time()
         collection = asyncio.create_task(self._finalize(ended))
         try:
             await asyncio.shield(collection)
         except asyncio.CancelledError:
             await collection
-            self.metadata['status'] = 'cancelled'
+            self.metadata["status"] = "cancelled"
             raise
         finally:
             self._save_metadata()
-        if not exc and self.metadata['collection_errors']:
-            raise RuntimeError(f"Artifact collection incomplete; see {self.directory/'experiment_metadata.json'}")
+        if not exc and self.metadata["collection_errors"]:
+            raise RuntimeError(f"Artifact collection incomplete; see {self.directory / 'experiment_metadata.json'}")
         return False
