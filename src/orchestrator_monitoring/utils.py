@@ -5,7 +5,6 @@ from pathlib import Path
 
 import yaml
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
-from orchestrator.models.ansible import AnsibleParams
 from orchestrator.models.k8s import MultusNetworkStatus
 from orchestrator.models.provisioning import ProvisionableNode
 from orchestrator.utils.ansible import get_ansible_inventory_line, run_ansible_role
@@ -91,7 +90,7 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
         raise ValueError("Core KPI calculator requires Open5GS")
     if monitoring.ran_kpis and str(model.ran.implementation) != "oai":
         raise ValueError("RAN KPI calculator requires OAI")
-    enabled = {"prometheus", "grafana"}
+    enabled = {"integration", "prometheus", "grafana"}
     if monitoring.loki:
         enabled.update(("loki", "promtail"))
     if monitoring.latency:
@@ -102,12 +101,10 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
         enabled.add("kpi-calculator-open5gs")
     if monitoring.ran_kpis:
         enabled.add("kpi-calculator-oai")
-    if monitoring.state.installed_namespace and set(monitoring.components) != enabled:
-        raise ValueError("Remove monitoring before changing enabled components")
     components = {}
     for name, definition in defaults["components"].items():
         data = (
-            {"type": name, "release_name": name, "chart_ref": name, "pod_selector": ["app=" + name]}
+            {"release_name": name, "chart_ref": name, "pod_selector": ["app=" + name]}
             | defaults["defaults"]
             | definition
         )
@@ -116,15 +113,13 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
                 data, monitoring.components[name].model_dump(mode="json", exclude_unset=True, exclude_none=True)
             )
         component = DeployedMonitoringComponent.model_validate(data)
-        component.type = name
         component.pod_selector = component.pod_selector or definition.get("pod_selector", ["app=" + name])
-        component.namespace = monitoring.state.installed_namespace or monitoring.namespace
+        component.namespace = monitoring.namespace
         components[name] = component
     for name in enabled:
         component = components[name]
         component.chart_values = _component_values(component, model, targets, components)
-        component.build_dependencies = not bool(component.chart_version)
-        if component.build_dependencies:
+        if not component.chart_version:
             component.chart_ref = f"{REMOTE_CHARTS}/{Path(component.chart_ref).name}"
     return {name: component for name, component in components.items() if name in enabled}
 
@@ -132,69 +127,68 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
 # Execute monitoring's chart role without changing the orchestrator's 5G executor.
 async def run_monitoring_component_action(
     *,
+    model: MonitoringModel,
+    component: DeployedMonitoringComponent,
     component_name: str,
-    component_deployment: DeployedMonitoringComponent,
+    node: tuple[str, ProvisionableNode],
     action: str,
-    node_name: str,
-    node_data: ProvisionableNode,
-    ansible_params: AnsibleParams,
-    command_to_run: list[str] | None = None,
-    force: bool = False,
+    command: list[str] | None = None,
+    force: bool = True,
     quiet: bool = False,
-    log_container: str | None = None,
-    since_seconds: int | None = None,
-    kubeconfig: str | None = None,
-    timeout_seconds: int = 300,
-) -> str | None:
+    containers: list[str] | None = None,
+    since_seconds: int = 3600,
+) -> str | dict[str, str] | None:
     """Run one monitoring component action and record successful installation/removal."""
-    component = component_deployment
+    cfg = model.monitoring
+    component.namespace = cfg.namespace
+    ansible = model.params.ansible
+    node_name, node_data = node
     if not force:
         if action == "install" and component.is_installed:
             raise InvalidResourceStateError(f"Monitoring component {component_name!r} is already installed")
         if action in ("uninstall", "get_logs", "run_cmd") and not component.is_installed:
             raise InvalidResourceStateError(f"Monitoring component {component_name!r} is not installed")
-    if action == "run_cmd" and not command_to_run:
+    if action in ("get_logs", "run_cmd") and not component.pod_selector:
+        raise ValueError(f"Monitoring component {component_name!r} has no workload")
+    if action == "run_cmd" and not command:
         raise ValueError("A command is required for run_cmd")
 
     chart_name = component.release_name or component_name
-    payload = component.model_dump(mode="json")
-    payload["pod_selector"] = component.pod_selector or [f"app.kubernetes.io/instance={chart_name}"]
+    payload = component.model_dump(mode="json", exclude_none=True)
     output_key = {
         "install": "network_info",
         "get_logs": "logs",
         "run_cmd": "command_output",
     }.get(action)
-    try:
-        result = await run_ansible_role(
-            role="monitoring/component",
-            hosts=node_name,
-            inventory=get_ansible_inventory_line(node_name, node_data),
-            become=True,
-            inputs={
-                "helm_action": action,
-                "component": payload,
-                "chart_name": chart_name,
-                "output_with_multus": component.multus.enabled,
-                "kubeconfig": kubeconfig,
-                "timeout_seconds": timeout_seconds,
-                "since_seconds": since_seconds,
-                "log_container": log_container,
-                "command": command_to_run,
-            },
-            output_keys=[output_key] if output_key else None,
-            runner_path=f"{ansible_params.runner_path}/monitoring/{component_name}/{action}",
-            roles_paths=[str(ASSETS / "roles"), *ansible_params.roles_paths],
-            quiet=quiet,
-        )
-    except Exception as error:
-        raise RuntimeError(f"Monitoring component {component_name!r} Helm {action} not successful") from error
+    result = await run_ansible_role(
+        role="monitoring/component",
+        hosts=node_name,
+        inventory=get_ansible_inventory_line(node_name, node_data),
+        become=True,
+        inputs={
+            "helm_action": action,
+            "component": payload,
+            "chart_name": chart_name,
+            "output_with_multus": component.multus.enabled,
+            "kubeconfig": cfg.kubeconfig,
+            "timeout_seconds": cfg.operation_timeout_seconds,
+            "since_seconds": since_seconds,
+            "containers": containers or [],
+            "command": command,
+        },
+        output_keys=[output_key] if output_key else None,
+        runner_path=f"{ansible.runner_path}/monitoring/{component_name}/{action}",
+        roles_paths=[str(ASSETS / "roles"), *ansible.roles_paths],
+        quiet=quiet,
+    )
 
     if action == "install":
-        component.network_info = (
-            [MultusNetworkStatus.model_validate(item) for item in result["network_info"]]
-            if component.multus.enabled
-            else ip_address(result["network_info"])
-        )
+        if component.pod_selector:
+            component.network_info = (
+                [MultusNetworkStatus.model_validate(item) for item in result["network_info"]]
+                if component.multus.enabled
+                else ip_address(result["network_info"])
+            )
         component.is_installed = True
     elif action == "uninstall":
         component.is_installed = False

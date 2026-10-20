@@ -12,7 +12,7 @@ async def prometheus_connection(monitoring):
     """Open a temporary SSH forward to Prometheus and close it when finished."""
     model = monitoring.deployment_model
     cfg = model.monitoring
-    name = cfg.state.installed_control_node or model.params.k8s.master_node
+    name = model.params.k8s.master_node
     node = model.nodes[name]
     ssh = node.ssh_info
     host = ssh.hostname or name

@@ -1,6 +1,15 @@
 ---
-- name: Build local chart dependencies
-  ansible.builtin.command:
-    argv: [helm, dependency, build, "{{ component.chart_ref }}"]
-  changed_when: false
-  when: component.build_dependencies
+- name: Copy local monitoring chart
+  ansible.builtin.copy:
+    src: "{{ role_path }}/../../../charts/{{ component.chart_ref | basename }}/"
+    dest: "{{ component.chart_ref }}/"
+    mode: preserve
+    directory_mode: "0755"
+  when: component.chart_version | default('', true) | length == 0
+
+- name: Copy shared monitoring templates
+  ansible.builtin.copy:
+    src: "{{ role_path }}/../../../helpers/_monitoring.tpl"
+    dest: "{{ component.chart_ref }}/templates/_monitoring.tpl"
+    mode: "0644"
+  when: component.chart_version | default('', true) | length == 0

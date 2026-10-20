@@ -4,13 +4,6 @@
     argv: [kubectl, label, node, "{{ monitoring_config.node_name or monitoring_control_node }}", "monitoring.blueprint/node={{ monitoring_namespace }}", --overwrite]
   changed_when: false
 
-- name: Copy monitoring charts
-  ansible.builtin.copy:
-    src: "{{ role_path }}/../../../charts/"
-    dest: "{{ monitoring_charts_directory }}/"
-    mode: preserve
-    directory_mode: "0755"
-
 - name: Add prometheus-community Helm repository
   kubernetes.core.helm_repository:
     name: prometheus-community

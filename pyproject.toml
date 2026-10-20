@@ -7,7 +7,7 @@ license = {text = "BSD-Clear"}
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "orchestrator @ git+https://gitlab.inria.fr/slices-ri/blueprints/post-5g/orchestrator.git@6c60317a6cba054775a6620086c4d31141212b20",
+    "orchestrator @ git+https://gitlab.inria.fr/slices-ri/blueprints/post-5g/orchestrator.git@2e1425ee1aa0122fb28a51a20d53b971ec33bdc7",
     "Jinja2>=3.1,<4",
     "PyYAML>=6,<7",
 ]

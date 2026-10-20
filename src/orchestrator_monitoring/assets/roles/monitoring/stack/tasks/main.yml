@@ -1,9 +1,9 @@
 ---
 - name: Run monitoring action
   vars:
-    monitoring_namespace: "{{ monitoring_config.state.installed_namespace or monitoring_config.namespace }}"
+    monitoring_namespace: "{{ monitoring_config.namespace }}"
     monitoring_timeout_seconds: "{{ monitoring_config.operation_timeout_seconds }}"
-    monitoring_kubeconfig: "{{ monitoring_config.state.installed_kubeconfig or monitoring_config.kubeconfig }}"
+    monitoring_kubeconfig: "{{ monitoring_config.kubeconfig }}"
   environment:
     KUBECONFIG: "{{ monitoring_kubeconfig }}"
   module_defaults:

@@ -2,7 +2,3 @@ apiVersion: v2
 name: kpi-calculator
 type: application
 version: 0.1.0
-dependencies:
-- name: monitoring-common
-  version: 0.1.0
-  repository: file://../monitoring-common

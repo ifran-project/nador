@@ -12,17 +12,17 @@ from orchestrator.models.k8s import K8SComponent
 class DeployedMonitoringComponent(K8SComponent):
     """Helm release with optional monitoring configuration overrides."""
 
-    type: str = "helm"
-    namespace: str = "default"
     release_name: str | None = None
     chart_ref: str | None = None
     chart_version: str | None = None
     chart_values: dict[str, Any] = Field(default_factory=dict)
-    pod_selector: list[str] = Field(default_factory=list)
-    build_dependencies: bool = False
-    log_since_seconds: int = 3600
-    tolerations: list[dict[str, Any]] | None = None
+    pod_selector: list[str] = Field(default_factory=list)  # empty for charts without workloads
     advanced_config: dict[str, Any] = Field(default_factory=dict)
+
+    # Resource-only charts have no pod IP; workloads retain upstream validation.
+    @model_validator(mode="after")
+    def ensure_network_info(self) -> Self:
+        return super().ensure_network_info() if self.pod_selector else self
 
 
 class MonitoringTarget(StrictBaseModel):
@@ -44,10 +44,6 @@ class MonitoringTarget(StrictBaseModel):
             raise ValueError("component must not be empty")
         if self.role and (not self.interface or not self.container):
             raise ValueError("Monitoring targets require explicit interface and container")
-        if self.interface and any(c.isspace() for c in self.interface):
-            raise ValueError("interface must not contain whitespace")
-        if not self.metrics_path.startswith("/"):
-            raise ValueError("metrics_path must start with /")
         return self
 
 
@@ -59,20 +55,8 @@ class MonitoringImages(StrictBaseModel):
     smf_sniffer: str = "r2labuser/smf-sniffer:2026w10"
 
 
-class MonitoringState(StrictBaseModel):
-    """Runtime status and resources recorded for inspection and removal."""
-
-    status: Literal["not_deployed", "deploying", "deployed", "failed", "removing"] = "not_deployed"
-    last_error: str | None = None
-    installed_namespace: str | None = None
-    installed_control_node: str | None = None
-    installed_kubeconfig: str | None = None
-    installed_latency: bool = False
-    installed_targets: list[dict] = Field(default_factory=list)
-
-
 class MonitoringDeployment(StrictBaseModel):
-    """Monitoring configuration with separate container images and runtime state."""
+    """Monitoring configuration and component deployment information."""
 
     namespace: str = Field(default="monitoring", pattern=r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", max_length=63)
     node_name: str | None = None  # actual Kubernetes node name for scheduling
@@ -85,7 +69,6 @@ class MonitoringDeployment(StrictBaseModel):
     targets: list[MonitoringTarget] = Field(default_factory=list)
     images: MonitoringImages = Field(default_factory=MonitoringImages)
     components: dict[str, DeployedMonitoringComponent] = Field(default_factory=dict)
-    state: MonitoringState = Field(default_factory=MonitoringState)
     prometheus_scrape_interval: str = "1s"
     prometheus_retention_period: str = "5d"
     operation_timeout_seconds: int = Field(default=300, ge=1)

@@ -48,3 +48,19 @@
   loop_control:
     label: "{{ item.metadata.name }}"
   when: existing | map(attribute='name') | select('match', '^' ~ prefix) | difference(terminated) | length == 0
+
+- name: Wait for attachment sniffer on {{ capture_target.component }}
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: "{{ capture_target.namespace }}"
+    label_selectors: "{{ capture_target.label_selectors }}"
+  register: capture_pods
+  until:
+    - capture_pods.resources | length == 1
+    - >-
+      (capture_pods.resources | first | default({})).get('status', {}).get('ephemeralContainerStatuses', [])
+      | selectattr('name', 'match', '^' ~ capture_target.role ~ '-sniffer-')
+      | selectattr('state.running', 'defined') | list | length > 0
+  retries: "{{ [1, monitoring_timeout_seconds | int // 2] | max }}"
+  delay: 2
