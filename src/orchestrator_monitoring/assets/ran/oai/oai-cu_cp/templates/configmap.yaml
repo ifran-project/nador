@@ -1,0 +1,11 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Chart.Name }}-configmap
+  labels:
+    app: {{ .Release.Name }}
+    {{- include "oai-cu_cp.labels" . | nindent 4 }}
+data:
+  gnb.yaml: |-
+{{ .Files.Get "config.yaml" | nindent 4 }}

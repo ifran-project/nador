@@ -6,9 +6,14 @@ It depends on an upstream revision; it does not ship or modify the `orchestrator
 Python package or its Ansible roles.
 
 `orchestrator_monitoring` provides monitoring deployment, component logs and
-Prometheus artifact collection. Temporary OAI/Open5GS
-chart patches are explicit notebook cells, outside the package. The custom examples live under `examples/monitoring`; physical trials
+Prometheus artifact collection. OAI statistics parsers use local custom RAN charts;
+temporary Open5GS patches remain explicit notebook cells. The custom examples live under `examples/monitoring`; physical trials
 live separately under `examples/monitoring-trials`.
+
+Prometheus, Grafana, Loki and Promtail use pinned published Helm charts. Local
+charts provide the custom monitoring components; `monitoring-integration` contains
+our dashboards and metrics Services. Shared Helm helpers are copied during local
+chart preparation, without chart dependencies or dependency builds.
 
 The existing `orchestrator` imports for core, RAN, provisioning and Kubernetes
 remain upstream imports. Monitoring imports use `orchestrator_monitoring`.

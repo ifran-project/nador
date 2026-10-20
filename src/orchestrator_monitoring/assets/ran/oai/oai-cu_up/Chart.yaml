@@ -1,0 +1,4 @@
+apiVersion: v2
+name: oai-cu_up
+type: application
+version: 0.1.0

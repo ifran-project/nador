@@ -1,0 +1,6 @@
+{# Keep upstream values, adding only the statistics-parser configuration. #}
+{% include 'ran/oai/oai-' ~ component.type ~ '/values.yaml.j2' %}
+
+metricsParser:
+  enabled: true
+  image: ghcr.io/ziyad-mabrouk/oai-gnb-metrics-parser@sha256:f68a171932a8ae49ced8ec3ea2d0c2cefd76c2b1cdd94c589ec254ea612c67b5

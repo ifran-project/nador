@@ -1,22 +1,26 @@
 {{- $parser := .Values.metricsParser | default dict -}}
+{{- $workdir := "/opt/oai-gnb" -}}
+{{- if eq .Values.config.radio "aw2s" -}}
+{{- $workdir = "/opt/oai-gnb-aw2s" -}}
+{{- end -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Chart.Name }}
   labels:
     app: {{ .Release.Name }}
-    {{- include "oai-cu.labels" . | nindent 4 }}
+    {{- include "oai-gnb.labels" . | nindent 4 }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      {{- include "oai-cu.selectorLabels" . | nindent 6 }}
+      {{- include "oai-gnb.selectorLabels" . | nindent 6 }}
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        {{- include "oai-cu.selectorLabels" . | nindent 8 }}
+        {{- include "oai-gnb.selectorLabels" . | nindent 8 }}
         app: {{ .Release.Name }}
     {{- if or .Values.staticPodIp (and .Values.multus.enabled .Values.multus.interfaces) }}
       annotations:
@@ -60,13 +64,13 @@ spec:
       {{- end }}
       {{- if $parser.enabled }}
       initContainers:
-        - name: prepare-cu-metrics
+        - name: prepare-gnb-metrics
           image: "{{ .Values.nfimage.repository }}:{{ .Values.nfimage.version }}"
           imagePullPolicy: {{ .Values.nfimage.pullPolicy }}
           command: ["/bin/sh", "-ec"]
           args:
             - |
-              cp -a /opt/oai-gnb/. /metrics-workdir/
+              cp -a {{ $workdir }}/. /metrics-workdir/
               for file in nrMAC_stats.log nrL1_stats.log nrRRC_stats.log; do
                 touch /shared-logs/$file
                 ln -sf /shared-logs/$file /metrics-workdir/$file
@@ -78,29 +82,63 @@ spec:
               mountPath: /shared-logs
       {{- end }}
       containers:
-        - name: cu
+        - name: gnb
           image: "{{ .Values.nfimage.repository }}:{{ .Values.nfimage.version }}"
           imagePullPolicy: {{ .Values.nfimage.pullPolicy }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
+          {{- if eq .Values.config.radio "vrtsim" }}
+          hostIPC: true
+          {{- end }}
           {{- if $parser.enabled }}
-          workingDir: /opt/oai-gnb
+          workingDir: {{ $workdir }}
           {{- end }}
           volumeMounts:
           {{- if $parser.enabled }}
             - name: metrics-workdir
-              mountPath: /opt/oai-gnb
+              mountPath: {{ $workdir }}
             - name: metrics-logs
               mountPath: /shared-logs
           {{- end }}
+          {{- if eq .Values.config.radio "aw2s" }}
+            - name: configuration
+              mountPath: /opt/oai-gnb-aw2s/etc
+          {{- else }}
             - name: configuration
               mountPath: /opt/oai-gnb/etc
-          {{- if .Values.resources.define }}
+          {{- end }}
+          {{- if eq .Values.config.radio "b2xx" }}
+            - name: radio
+              mountPath: /dev/bus/usb/
+          {{- end }}
+          {{- if eq .Values.config.radio "vrtsim" }}
+            - name: shared-data
+              mountPath: /tmp
+          {{- end }}
           env:
-          - name: TZ
-            value: {{ .Values.config.timeZone }}
-          - name: USE_ADDITIONAL_OPTIONS
-            value: {{ .Values.config.useAdditionalOptions }}
+            - name: TZ
+              value: {{ .Values.config.timeZone | quote }}
+            - name: USE_ADDITIONAL_OPTIONS
+              value: {{ .Values.config.useAdditionalOptions | quote }}
+            - name: OAI_GDBSTACKS
+              value: "{{ .Values.config.gdbstack }}"
+          {{- if eq .Values.config.radio "b2xx" }}
+            - name: USE_B2XX
+              value: "yes"
+          {{- end }}
+          {{- if eq .Values.config.radio "x3xx" }}
+            - name: USE_X3XX
+              value: "yes"
+          {{- end }}
+          {{- if eq .Values.config.radio "n3xx" }}
+            - name: USE_N3XX
+              value: "yes"
+          {{- end }}
+          {{- range $key, $value := .Values.extraEnvVars }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+          {{- end }}
+          {{- if .Values.resources.define }}
           resources:
             requests:
               cpu: {{ .Values.resources.requests.nf.cpu | quote }}
@@ -117,16 +155,13 @@ spec:
             protocol: {{ $port.protocol }}
             {{- end }}
           {{- end }}
-          {{- if not .Values.start.cu }}
+          {{- if .Values.customEntrypointCommand}}
+          command:
+            {{- toYaml .Values.customEntrypointCommand | nindent 12 }}
+          {{- else if not .Values.start.gnb }}
           command: [ "/bin/sleep", "infinity" ]
           {{- end }}
-          env:
-            - name: TZ
-              value: {{ .Values.config.timeZone | quote }}
-            - name: USE_ADDITIONAL_OPTIONS
-              value: {{ .Values.config.useAdditionalOptions | quote }}
-            - name: OAI_GDBSTACKS
-              value: "{{ .Values.config.gdbstack }}"
+
         {{- if $parser.enabled }}
         - name: metrics-parser
           image: {{ required "metricsParser.image is required" $parser.image | quote }}
@@ -185,6 +220,18 @@ spec:
         - name: configuration
           configMap:
             name: {{ .Chart.Name }}-configmap
+        - name: shared-data
+          emptyDir: {}
+        {{- if eq .Values.config.radio "b2xx" }}
+        - name: radio
+          hostPath:
+            path: /dev/bus/usb/
+        {{- end }}
+        {{- if eq .Values.config.radio "vrtsim" }}
+        - name: shared-volume
+          persistentVolumeClaim:
+            claimName: shared-pvc
+        {{- end }}
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
@@ -205,3 +252,4 @@ spec:
       {{- if .Values.nodeName }}
       nodeName: {{ .Values.nodeName }}
       {{- end }}
+

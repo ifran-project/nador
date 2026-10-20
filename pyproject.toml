@@ -16,7 +16,6 @@ dependencies = [
 packages = [{include = "orchestrator_monitoring", from = "src"}]
 include = [
     {path = "src/orchestrator_monitoring/assets", format = ["sdist", "wheel"]},
-    {path = "src/orchestrator_monitoring/temporary_network_patches", format = ["sdist", "wheel"]},
 ]
 
 [build-system]

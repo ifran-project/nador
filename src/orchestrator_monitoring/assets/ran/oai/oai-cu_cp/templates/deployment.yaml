@@ -5,18 +5,18 @@ metadata:
   name: {{ .Chart.Name }}
   labels:
     app: {{ .Release.Name }}
-    {{- include "oai-cu_up.labels" . | nindent 4 }}
+    {{- include "oai-cu_cp.labels" . | nindent 4 }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      {{- include "oai-cu_up.selectorLabels" . | nindent 6 }}
+      {{- include "oai-cu_cp.selectorLabels" . | nindent 6 }}
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        {{- include "oai-cu_up.selectorLabels" . | nindent 8 }}
+        {{- include "oai-cu_cp.selectorLabels" . | nindent 8 }}
         app: {{ .Release.Name }}
     {{- if or .Values.staticPodIp (and .Values.multus.enabled .Values.multus.interfaces) }}
       annotations:
@@ -78,116 +78,116 @@ spec:
               mountPath: /shared-logs
       {{- end }}
       containers:
-        - name: cuup
-          image: "{{ .Values.nfimage.repository }}:{{ .Values.nfimage.version }}"
-          imagePullPolicy: {{ .Values.nfimage.pullPolicy }}
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
-          {{- if $parser.enabled }}
-          workingDir: /opt/oai-gnb
+      - name: cucp
+        image: "{{ .Values.nfimage.repository }}:{{ .Values.nfimage.version }}"
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        {{- if $parser.enabled }}
+        workingDir: /opt/oai-gnb
+        {{- end }}
+        volumeMounts:
+        {{- if $parser.enabled }}
+          - name: metrics-workdir
+            mountPath: /opt/oai-gnb
+          - name: metrics-logs
+            mountPath: /shared-logs
+        {{- end }}
+          - name: configuration
+            mountPath: /opt/oai-gnb/etc
+        {{- if .Values.resources.define}}
+        resources:
+          requests:
+            memory: {{ .Values.resources.requests.nf.memory | quote }}
+            cpu: {{ .Values.resources.requests.nf.cpu | quote }}
+          limits:
+            memory: {{ .Values.resources.limits.nf.memory | quote }}
+            cpu: {{ .Values.resources.limits.nf.cpu | quote }}
+        {{- end}}
+        securityContext:
+           privileged: true
+        ports:
+        {{- range $name, $port := .Values.exposedPorts }}
+        - containerPort: {{ $port.port }}
+          name: {{ $name }}
+          {{- if $port.protocol }}
+          protocol: {{ $port.protocol }}
           {{- end }}
-          volumeMounts:
-          {{- if $parser.enabled }}
-            - name: metrics-workdir
-              mountPath: /opt/oai-gnb
-            - name: metrics-logs
-              mountPath: /shared-logs
-          {{- end }}
-            - name: configuration
-              mountPath: /opt/oai-gnb/etc/
-          {{- if .Values.resources.define }}
-          env:
+        {{- end }}
+        {{- if .Values.customEntrypointCommand}}
+        command:
+          {{- toYaml .Values.customEntrypointCommand | nindent 10 }}
+        {{- else if not .Values.start.cu_cp }}
+        command: [ "/bin/sleep", "infinity" ]
+        {{- end }}
+        env:
           - name: TZ
             value: {{ .Values.config.timeZone | quote }}
           - name: USE_ADDITIONAL_OPTIONS
             value: {{ .Values.config.useAdditionalOptions | quote }}
           - name: OAI_GDBSTACKS
             value: {{ .Values.config.gdbstack | quote }}
-          resources:
-            requests:
-              cpu: {{ .Values.resources.requests.nf.cpu | quote }}
-              memory: {{ .Values.resources.requests.nf.memory | quote }}
-            limits:
-              cpu: {{ .Values.resources.limits.nf.cpu | quote }}
-              memory: {{ .Values.resources.limits.nf.memory | quote }}
+          {{- range $key, $value := .Values.extraEnvVars }}
+          - name: {{ $key }}
+            value: {{ $value | quote }}
           {{- end }}
-          ports:
-          {{- range $name, $port := .Values.exposedPorts }}
-          - containerPort: {{ $port.port }}
-            name: {{ $name }}
-            {{- if $port.protocol }}
-            protocol: {{ $port.protocol }}
-            {{- end }}
-          {{- end }}
-          {{- if not .Values.start.cu_up }}
-          command: [ "/bin/sleep", "infinity" ]
-          {{- end }}
-        {{- if $parser.enabled }}
-        - name: metrics-parser
-          image: {{ required "metricsParser.image is required" $parser.image | quote }}
-          imagePullPolicy: IfNotPresent
-          ports:
-            - name: metrics
-              containerPort: 9090
-          volumeMounts:
-            - name: metrics-logs
-              mountPath: /oai-gnb-logs
-              readOnly: true
-          readinessProbe:
-            httpGet:
-              path: /metrics
-              port: metrics
-            initialDelaySeconds: 2
-            periodSeconds: 5
-          resources:
-            requests:
-              cpu: 50m
-              memory: 50Mi
-            limits:
-              cpu: 100m
-              memory: 100Mi
-        {{- end }}
+      {{- if $parser.enabled }}
+      - name: metrics-parser
+        image: {{ required "metricsParser.image is required" $parser.image | quote }}
+        imagePullPolicy: IfNotPresent
+        ports:
+          - name: metrics
+            containerPort: 9090
+        volumeMounts:
+          - name: metrics-logs
+            mountPath: /oai-gnb-logs
+            readOnly: true
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: metrics
+          initialDelaySeconds: 2
+          periodSeconds: 5
+        resources:
+          requests:
+            cpu: 50m
+            memory: 50Mi
+          limits:
+            cpu: 100m
+            memory: 100Mi
+      {{- end }}
       {{- if .Values.includeTcpDumpContainer }}
       - name: tcpdump
         image: "{{ .Values.tcpdumpimage.repository }}:{{ .Values.tcpdumpimage.version }}"
         imagePullPolicy: {{ .Values.tcpdumpimage.pullPolicy }}
-        {{- if .Values.resources.define}}
+        securityContext:
+          capabilities:
+            add: [ "NET_ADMIN", "NET_RAW" ]
+            drop: [ "ALL" ]
+        {{- if .Values.resources.define }}
         resources:
           requests:
-            memory: {{ .Values.resources.requests.tcpdump.memory | quote }}
             cpu: {{ .Values.resources.requests.tcpdump.cpu | quote }}
+            memory: {{ .Values.resources.requests.tcpdump.memory | quote }}
           limits:
-            memory: {{ .Values.resources.limits.tcpdump.memory | quote }}
             cpu: {{ .Values.resources.limits.tcpdump.cpu | quote }}
-        {{- end}}
-        securityContext:
-           capabilities:
-              add:
-               - NET_ADMIN
-               - NET_RAW
-              drop:
-               - ALL
-        {{- if .Values.start.tcpdump}}
-        command:
-          - /bin/sh
-          - -c
-          - /usr/bin/tcpdump -i any -w /tmp/pcap/{{ .Chart.Name }}_`date +%Y-%m-%d_%H_%M-%S-%Z`.pcap
-        {{- else}}
-        command:
-          - /bin/sleep
-          - infinity
-        {{- end}}
-      {{- end}}
-      volumes:
-      {{- if $parser.enabled }}
-      - name: metrics-workdir
-        emptyDir: {}
-      - name: metrics-logs
-        emptyDir: {}
+            memory: {{ .Values.resources.limits.tcpdump.memory | quote }}
+        {{- end }}
+        {{- if .Values.start.tcpdump }}
+        command: [ "/bin/sh", "-c", "/usr/bin/tcpdump -i any -w /tmp/pcap/{{ .Chart.Name }}_$(date +%Y-%m-%d_%H_%M-%S-%Z).pcap" ]
+        {{- else }}
+        command: [ "/bin/sleep", "infinity" ]
+        {{- end }}
       {{- end }}
-      - configMap:
-          name: {{ .Chart.Name }}-configmap
-        name: configuration
+      volumes:
+        {{- if $parser.enabled }}
+        - name: metrics-workdir
+          emptyDir: {}
+        - name: metrics-logs
+          emptyDir: {}
+        {{- end }}
+        - name: configuration
+          configMap:
+            name: {{ .Chart.Name }}-configmap
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
@@ -208,4 +208,3 @@ spec:
       {{- if .Values.nodeName }}
       nodeName: {{ .Values.nodeName }}
       {{- end }}
-
