@@ -1,0 +1,8 @@
+---
+- name: Find Helm application pods
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: "{{ component.namespace }}"
+    label_selectors: "{{ component.pod_selector }}"
+  register: component_pods
+  failed_when: component_pods.resources | length == 0

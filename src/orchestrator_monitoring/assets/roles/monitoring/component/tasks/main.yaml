@@ -1,0 +1,12 @@
+# Helm execution for monitoring components.
+---
+- name: Run Helm application action
+  environment: "{{ {'KUBECONFIG': kubeconfig} if kubeconfig else {} }}"
+  module_defaults:
+    kubernetes.core.k8s:
+      kubeconfig: "{{ kubeconfig | default(omit, true) }}"
+    kubernetes.core.k8s_info:
+      kubeconfig: "{{ kubeconfig | default(omit, true) }}"
+  block:
+    - name: Execute Helm action
+      ansible.builtin.include_tasks: "{{ helm_action }}.yaml"

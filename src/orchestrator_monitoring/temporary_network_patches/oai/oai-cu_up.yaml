@@ -1,0 +1,211 @@
+{{- $parser := .Values.metricsParser | default dict -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Chart.Name }}
+  labels:
+    app: {{ .Release.Name }}
+    {{- include "oai-cu_up.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "oai-cu_up.selectorLabels" . | nindent 6 }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        {{- include "oai-cu_up.selectorLabels" . | nindent 8 }}
+        app: {{ .Release.Name }}
+    {{- if or .Values.staticPodIp (and .Values.multus.enabled .Values.multus.interfaces) }}
+      annotations:
+
+        {{- if .Values.staticPodIp }}
+        cni.projectcalico.org/ipAddrs: '["{{ .Values.staticPodIp }}"]'
+        {{- end }}
+
+        {{- if and .Values.multus.enabled .Values.multus.interfaces }}
+        k8s.v1.cni.cncf.io/networks: |-
+          [
+          {{- $first := true }}
+          {{- range .Values.multus.interfaces }}
+          {{- if .enabled }}
+            {{- if not $first }},{{- end }}
+            {
+              "name": "{{ $.Release.Name }}-{{ .name }}",
+              "interface": "{{ .name }}"
+              {{- if .mac }},
+              "mac": "{{ .mac }}"
+              {{- end }}
+              {{- if .defaultRoute }},
+              "default-route": ["{{ .defaultRoute }}"]
+              {{- end }}
+              {{- if .gateway }},
+              "gateway": "{{ .gateway }}"
+              {{- end }}
+            }
+            {{- $first = false }}
+          {{- end }}
+          {{- end }}
+          ]
+        {{- end }}
+    {{- end }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.imagePullSecrets | nindent 8 }}
+      {{- end }}
+      {{- if $parser.enabled }}
+      initContainers:
+        - name: prepare-cu-metrics
+          image: "{{ .Values.nfimage.repository }}:{{ .Values.nfimage.version }}"
+          imagePullPolicy: {{ .Values.nfimage.pullPolicy }}
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              cp -a /opt/oai-gnb/. /metrics-workdir/
+              for file in nrMAC_stats.log nrL1_stats.log nrRRC_stats.log; do
+                touch /shared-logs/$file
+                ln -sf /shared-logs/$file /metrics-workdir/$file
+              done
+          volumeMounts:
+            - name: metrics-workdir
+              mountPath: /metrics-workdir
+            - name: metrics-logs
+              mountPath: /shared-logs
+      {{- end }}
+      containers:
+        - name: cuup
+          image: "{{ .Values.nfimage.repository }}:{{ .Values.nfimage.version }}"
+          imagePullPolicy: {{ .Values.nfimage.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          {{- if $parser.enabled }}
+          workingDir: /opt/oai-gnb
+          {{- end }}
+          volumeMounts:
+          {{- if $parser.enabled }}
+            - name: metrics-workdir
+              mountPath: /opt/oai-gnb
+            - name: metrics-logs
+              mountPath: /shared-logs
+          {{- end }}
+            - name: configuration
+              mountPath: /opt/oai-gnb/etc/
+          {{- if .Values.resources.define }}
+          env:
+          - name: TZ
+            value: {{ .Values.config.timeZone | quote }}
+          - name: USE_ADDITIONAL_OPTIONS
+            value: {{ .Values.config.useAdditionalOptions | quote }}
+          - name: OAI_GDBSTACKS
+            value: {{ .Values.config.gdbstack | quote }}
+          resources:
+            requests:
+              cpu: {{ .Values.resources.requests.nf.cpu | quote }}
+              memory: {{ .Values.resources.requests.nf.memory | quote }}
+            limits:
+              cpu: {{ .Values.resources.limits.nf.cpu | quote }}
+              memory: {{ .Values.resources.limits.nf.memory | quote }}
+          {{- end }}
+          ports:
+          {{- range $name, $port := .Values.exposedPorts }}
+          - containerPort: {{ $port.port }}
+            name: {{ $name }}
+            {{- if $port.protocol }}
+            protocol: {{ $port.protocol }}
+            {{- end }}
+          {{- end }}
+          {{- if not .Values.start.cu_up }}
+          command: [ "/bin/sleep", "infinity" ]
+          {{- end }}
+        {{- if $parser.enabled }}
+        - name: metrics-parser
+          image: {{ required "metricsParser.image is required" $parser.image | quote }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: metrics
+              containerPort: 9090
+          volumeMounts:
+            - name: metrics-logs
+              mountPath: /oai-gnb-logs
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 50Mi
+            limits:
+              cpu: 100m
+              memory: 100Mi
+        {{- end }}
+      {{- if .Values.includeTcpDumpContainer }}
+      - name: tcpdump
+        image: "{{ .Values.tcpdumpimage.repository }}:{{ .Values.tcpdumpimage.version }}"
+        imagePullPolicy: {{ .Values.tcpdumpimage.pullPolicy }}
+        {{- if .Values.resources.define}}
+        resources:
+          requests:
+            memory: {{ .Values.resources.requests.tcpdump.memory | quote }}
+            cpu: {{ .Values.resources.requests.tcpdump.cpu | quote }}
+          limits:
+            memory: {{ .Values.resources.limits.tcpdump.memory | quote }}
+            cpu: {{ .Values.resources.limits.tcpdump.cpu | quote }}
+        {{- end}}
+        securityContext:
+           capabilities:
+              add:
+               - NET_ADMIN
+               - NET_RAW
+              drop:
+               - ALL
+        {{- if .Values.start.tcpdump}}
+        command:
+          - /bin/sh
+          - -c
+          - /usr/bin/tcpdump -i any -w /tmp/pcap/{{ .Chart.Name }}_`date +%Y-%m-%d_%H_%M-%S-%Z`.pcap
+        {{- else}}
+        command:
+          - /bin/sleep
+          - infinity
+        {{- end}}
+      {{- end}}
+      volumes:
+      {{- if $parser.enabled }}
+      - name: metrics-workdir
+        emptyDir: {}
+      - name: metrics-logs
+        emptyDir: {}
+      {{- end }}
+      - configMap:
+          name: {{ .Chart.Name }}-configmap
+        name: configuration
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      serviceAccountName: {{ .Chart.Name }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+         {{- toYaml .Values.nodeSelector | nindent 12 }}
+      {{- end }}
+      {{- if .Values.affinity }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 12 }}
+      {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 12 }}
+      {{- end }}
+      {{- if .Values.nodeName }}
+      nodeName: {{ .Values.nodeName }}
+      {{- end }}
+

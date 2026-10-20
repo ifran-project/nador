@@ -1,0 +1,8 @@
+---
+- name: Remove Helm application
+  kubernetes.core.helm:
+    name: "{{ chart_name }}"
+    release_namespace: "{{ component.namespace }}"
+    state: absent
+    wait: true
+    wait_timeout: "{{ timeout_seconds }}s"

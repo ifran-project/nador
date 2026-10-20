@@ -1,0 +1,16 @@
+---
+- name: Run monitoring action
+  vars:
+    monitoring_namespace: "{{ monitoring_config.state.installed_namespace or monitoring_config.namespace }}"
+    monitoring_timeout_seconds: "{{ monitoring_config.operation_timeout_seconds }}"
+    monitoring_kubeconfig: "{{ monitoring_config.state.installed_kubeconfig or monitoring_config.kubeconfig }}"
+  environment:
+    KUBECONFIG: "{{ monitoring_kubeconfig }}"
+  module_defaults:
+    kubernetes.core.k8s:
+      kubeconfig: "{{ monitoring_kubeconfig }}"
+    kubernetes.core.k8s_info:
+      kubeconfig: "{{ monitoring_kubeconfig }}"
+  block:
+    - name: Execute monitoring action
+      ansible.builtin.include_tasks: "{{ monitoring_action }}.yml"

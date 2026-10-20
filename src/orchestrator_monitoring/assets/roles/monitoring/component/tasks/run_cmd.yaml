@@ -1,0 +1,15 @@
+---
+- name: Find component pods
+  ansible.builtin.include_tasks: find_pods.yaml
+
+- name: Execute command in the first matching pod
+  kubernetes.core.k8s_exec:
+    namespace: "{{ component.namespace }}"
+    pod: "{{ component_pods.resources[0].metadata.name }}"
+    command: "{{ command | map('quote') | join(' ') }}"
+  register: component_command
+
+- name: Return command output
+  ansible.builtin.set_stats:
+    data:
+      command_output: "{{ component_command.stdout }}"

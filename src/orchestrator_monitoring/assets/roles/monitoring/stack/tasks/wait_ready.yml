@@ -1,0 +1,32 @@
+---
+- name: Wait for monitoring components
+  ansible.builtin.include_role:
+    name: monitoring/component
+    tasks_from: wait_ready
+  loop: "{{ monitoring_components | dict2items }}"
+  loop_control:
+    loop_var: component_entry
+    label: "{{ component_entry.key }}"
+  vars:
+    component: "{{ component_entry.value }}"
+    timeout_seconds: "{{ monitoring_timeout_seconds }}"
+
+- name: Wait for attachment capture
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: "{{ item.namespace }}"
+    label_selectors: "{{ item.label_selectors }}"
+  loop: "{{ monitoring_config.state.installed_targets | selectattr('role', 'in', ['amf', 'smf']) | list }}"
+  loop_control:
+    label: "{{ item.component }}"
+  register: capture_pods
+  until:
+    - capture_pods.resources | length == 1
+    - >-
+      (capture_pods.resources | first | default({})).get('status', {}).get('ephemeralContainerStatuses', [])
+      | selectattr('name', 'match', '^' ~ item.role ~ '-sniffer-')
+      | selectattr('state.running', 'defined') | list | length > 0
+  retries: "{{ [1, monitoring_timeout_seconds | int // 2] | max }}"
+  delay: 2
+  when: monitoring_config.state.installed_latency

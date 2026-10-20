@@ -1,8 +1,0 @@
----
-- name: Remove monitoring component
-  kubernetes.core.helm:
-    name: "{{ component.release_name }}"
-    release_namespace: "{{ component.namespace }}"
-    state: absent
-    wait: true
-    wait_timeout: "{{ monitoring_timeout_seconds }}s"

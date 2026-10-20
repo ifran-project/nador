@@ -1,3 +1,0 @@
----
-- name: Run monitoring action
-  ansible.builtin.include_tasks: "{{ monitoring_action }}.yml"

@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ue-mapper-api
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "monitoring.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ue-mapper-api
+      monitoring.blueprint/owner: {{ .Release.Namespace | quote }}
+  template:
+    metadata:
+      labels:
+        app: ue-mapper-api
+        {{- include "monitoring.labels" . | nindent 8 }}
+    spec:
+      {{- include "monitoring.placement" . | nindent 6 }}
+      containers:
+        - name: ue-mapper-api
+          image: {{ printf "%s:%s" .Values.image.repository .Values.image.tag | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          env:
+            - name: REDIS_HOST
+              value: {{ printf "redis.%s.svc.cluster.local" .Release.Namespace | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ue-mapper-api
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "monitoring.labels" . | nindent 4 }}
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: /metrics
+spec:
+  selector:
+    app: ue-mapper-api
+  ports:
+    - name: transport
+      port: 8080
+      targetPort: 8080

@@ -1,22 +1,4 @@
-# Monitoring fork
-
-The `monitoring` branch combines the container logging contribution with local
-monitoring and experiment artifacts. Keep upstream contributions on their own
-branches; merge them here when needed. The original `container-log-selection`
-branch remains suitable for its upstream merge request.
-
-## Use the library
-
-Use Python 3.13 and install this branch into your notebook's environment:
-
-```bash
-python -m pip install --upgrade "git+https://gitlab.inria.fr/yamami/orchestrator.git@monitoring" \
-  --extra-index-url https://gitlab.inria.fr/api/v4/projects/70914/packages/pypi/simple
-```
-
-Restart the notebook kernel after upgrading. An existing editable installation
-points to its local checkout; uninstall it first if switching to published code.
-The metamodel dependency is unchanged.
+# Monitoring extension
 
 Follow [the OAI RFsim notebook](examples/monitoring/rfsim/oai-rfsim/<YOUR_PASSWORD>.ipynb) for the complete example.
 It deploys monitoring after the core and RAN and before UE attachment. Copy or
@@ -26,8 +8,8 @@ to your deployment. The Grafana Helm chart creates and manages its credential
 Secret with username `admin` and password `admin`.
 
 ```python
-from orchestrator.deployment import MonitoringManagement
-from orchestrator.models.monitoring import MonitoringDeployment
+from orchestrator_monitoring import MonitoringManagement
+from orchestrator_monitoring.models import MonitoringDeployment
 
 monitoring = MonitoringManagement(preceding=ran)
 monitoring.deployment_model.monitoring = MonitoringDeployment.from_yaml_file("monitoring.yaml")
@@ -36,10 +18,9 @@ await monitoring.deploy()
 
 Pass the la<YOUR_PASSWORD> manager so SSH addresses and component namespaces are current.
 Save the deployment model in a `finally` block to retain cleanup state after a
-partial failure. Logs and container discovery are available on monitoring too:
+partial failure. Component logs are available on monitoring too:
 
 ```python
-print(await monitoring.list_containers(component="ue-mapper-api"))
 print(await monitoring.get_logs(component="ue-mapper-api"))
 ```
 
@@ -49,7 +30,7 @@ the Prometheus tunnel during final collection and closes it afterwards;
 Prometheus itself scrapes continuously in the cluster.
 
 ```python
-from orchestrator.artifacts import ExperimentRun
+from orchestrator_monitoring.artifacts import ExperimentRun
 
 async with ExperimentRun(
     "results/my-run",
@@ -65,6 +46,10 @@ async with ExperimentRun(
 Use a new result directory for each experiment. Workload failures still finalize
 the timeline; collection failures are recorded in experiment metadata. The
 collector does not automatically collect pcaps or every pod's logs.
+
+Temporary image and chart adaptations are visible notebook cells between
+`prepare()` and `install()`, tagged `temporary-network-patch`. The library does
+not apply them automatically.
 
 The example custom Open5GS SMF image must export
 `fivegs_smffunction_sm_seid_session{seid,snssai}` for slice throughput joins with
