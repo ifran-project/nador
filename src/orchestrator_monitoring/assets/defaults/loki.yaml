@@ -7,6 +7,8 @@ enabled: true
 fullnameOverride: monitoring-loki
 isDefault: false
 nodeSelector: {}
+podAnnotations:
+  prometheus.io/port: "3100"
 service:
   nodePort: 31000
   type: NodePort
