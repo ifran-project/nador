@@ -24,12 +24,6 @@ installed again with `await monitoring.deploy()`.
 print(await monitoring.get_logs(components=["ue-mapper-api"], quiet=True))
 ```
 
-`throughput: true` enables the N3 throughput probe. It exports cumulative inner-IP
-byte counters attributed to UE, slice and PFCP session. Throughput in bits/s is
-`8 * rate(gtp_throughput_bytes_total[5s])`. This includes IP/transport headers and
-is not the same as application goodput. Stock core images work with this probe;
-legacy Open5GS KPI-calculator profiles use their explicit custom SMF/UPF images.
-
 `ExperimentRun` saves a traffic timeline, JSON reports and Prometheus exports.
 It opens Prometheus access for final collection; Prometheus scrapes continuously.
 
