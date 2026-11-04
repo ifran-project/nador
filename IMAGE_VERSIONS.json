@@ -46,7 +46,7 @@
   },
   "upstream": {
     "orchestrator_version": "0.0.5",
-    "upstream_commit": "08817f2a121ad798693b2b64f283d1a0f3674125",
+    "upstream_commit": "c3f8953363367a6d58c115c22af46d7badbcff1d",
     "metamodel_version": "0.0.5"
   },
   "multi_gnb_profile": {
