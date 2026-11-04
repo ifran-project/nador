@@ -3,10 +3,10 @@ namespace: monitoring
 operation_timeout_seconds: 600
 images:
   probe: r2labuser/ebpf-latency-probe:2026w43
-components:
-  ue-mapper-api:
-    image:
-      image_pull_policy: Always
+#components:
+#  ue-mapper-api:
+#    image:
+#      image_pull_policy: Always
 kubeconfig: /etc/kubernetes/admin.conf
 latency: true
 packet_pairing: true
