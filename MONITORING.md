@@ -3,10 +3,10 @@
 Follow the [minimal tutorial](examples/quickstart/tutorial.ipynb) for installation,
 configuration, deployment and artifact collection in one notebook.
 
-Install the released library in your notebook:
+Install the latest merged library from GitHub `main` in your notebook:
 
 ```python
-%pip install "git+https://github.com/yassir63/fiveg-lens.git@v0.1.0"
+%pip install --upgrade "git+https://github.com/yassir63/fiveg-lens.git@main"
 ```
 
 Restart the kernel after installation, then run your core/RAN setup before

@@ -12,7 +12,7 @@ timelines and metrics. Network deployment remains handled by upstream managers.
 Install from GitHub:
 
 ```bash
-python -m pip install "git+https://github.com/yassir63/fiveg-lens.git@v0.1.0"
+python -m pip install --upgrade "git+https://github.com/yassir63/fiveg-lens.git@main"
 ```
 
 ```python
