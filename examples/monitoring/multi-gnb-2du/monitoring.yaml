@@ -5,7 +5,7 @@ images:
   probe: r2labuser/ebpf-latency-probe:2026w43
   amf_sniffer: r2labuser/amf-sniffer:2026w43
   smf_sniffer: r2labuser/smf-sniffer:2026w43
-  throughput: r2labuser/ebpf-throughput-probe:2026w44-mapping
+  throughput: r2labuser/ebpf-throughput-probe:2026w44
 components:
   monitoring-controller:
     image:

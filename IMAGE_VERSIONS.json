@@ -11,7 +11,7 @@
       "changes": "Shared image for latency and throughput workers in one controller pod; separate modes, exporter ports, TC settings and Kopf markers. Discovery predicates preserved."
     },
     "throughput": {
-      "image": "r2labuser/ebpf-throughput-probe:2026w44-mapping",
+      "image": "r2labuser/ebpf-throughput-probe:2026w44",
       "digest": "sha256:1c5f36303fc652eae1a0370098e1f519f4ac8f5328a15842b3fac6b31901b294",
       "source_sha256": {
         "throughput-probe/Dockerfile": "058e06ba22c1c09f8a104bfb34915280a04526731e8391ca8c136b98ebafc7d6",
@@ -23,7 +23,10 @@
         "throughput-probe/entrypoint-throughput.sh": "e7e773ad391037cd7925d610e5f6b3550773189c8cb9032a8ce4fdee4f8e85a3",
         "common/tunnel_identity.py": "bcc961a9fd6e89e8705c67bad5905ec62404e26ec85d053045150a520857d1ef"
       },
-      "changes": "Adds procps/pkill for probe replacement when UE mappings change. Keeps endpoint-scoped counters and first-fragment accounting from 2026w43-fragments."
+      "changes": "Adds procps/pkill for probe replacement when UE mappings change. Keeps endpoint-scoped counters and first-fragment accounting from 2026w43-fragments.",
+      "previous_tags": [
+        "r2labuser/ebpf-throughput-probe:2026w44-mapping"
+      ]
     },
     "latency_fragment_fix": {
       "image": "r2labuser/ebpf-latency-probe:2026w43-fragments",
@@ -54,6 +57,6 @@
       "image_pull_policy": "Always"
     },
     "latency": "r2labuser/ebpf-latency-probe:2026w43",
-    "throughput": "r2labuser/ebpf-throughput-probe:2026w44-mapping"
+    "throughput": "r2labuser/ebpf-throughput-probe:2026w44"
   }
 }
