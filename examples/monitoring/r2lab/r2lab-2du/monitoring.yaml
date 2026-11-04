@@ -32,3 +32,12 @@ targets:
   role: gnb
   container: cuup
   interface: eth0
+- category: ran
+  component: cucp
+  metrics_port: 9090
+- category: ran
+  component: du01
+  metrics_port: 9090
+- category: ran
+  component: du02
+  metrics_port: 9090

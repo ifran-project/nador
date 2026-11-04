@@ -1,0 +1,43 @@
+flowchart TD
+    subgraph node_core["node10 — Core (Open5GS)"]
+        amf[AMF]
+        ausf[AUSF]
+        nrf[NRF]
+        nssf[NSSF]
+        pcf[PCF]
+        bsf[BSF]
+        udm[UDM]
+        udr[UDR]
+        smf1[SMF1]
+        upf1["UPF1 — slice1"]
+        smf2[SMF2]
+        upf2["UPF2 — slices2/3"]
+    end
+    subgraph node_gnb["node2 — RAN (OAI)"]
+        gnb[gNB]
+    end
+    subgraph node_cu["node3 — RAN (OAI)"]
+        cu[CU]
+    end
+    subgraph node_du1["node4"]
+        du1[DU1]
+    end
+    subgraph node_du2["node5"]
+        du2[DU2]
+    end
+    subgraph node_ues["node6–node9 — UEs (OAI)"]
+        mono["10 UEs — slice1"]
+        first["5 UEs — slice2"]
+        second["5 UEs — slice3"]
+    end
+    subgraph node_monitoring["node11 — Monitoring"]
+        monitoring[Monitoring components]
+    end
+    node_core --> gnb
+    node_core --> cu
+    cu -.- du1
+    cu -.- du2
+    gnb -- RFsim --> mono
+    du1 -- RFsim --> first
+    du2 -- RFsim --> second
+    node_core -.-> node_monitoring

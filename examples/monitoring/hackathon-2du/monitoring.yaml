@@ -1,0 +1,76 @@
+# Hackathon demo: three slices, two UPFs, stock Open5GS and eBPF measurements.
+namespace: monitoring
+operation_timeout_seconds: 600
+images:
+  probe: r2labuser/ebpf-latency-probe:2026w43
+  amf_sniffer: r2labuser/amf-sniffer:2026w43
+  smf_sniffer: r2labuser/smf-sniffer:2026w43
+  throughput: r2labuser/ebpf-throughput-probe:2026w44-mapping
+components:
+  monitoring-controller:
+    image:
+      repository: r2labuser/kopf-controller
+      image_tag: 2026w44
+      image_pull_policy: Always
+  ue-mapper-api:
+    image:
+      repository: r2labuser/ue_mapper_api
+      image_tag: 2026w43
+      image_pull_policy: Always
+  packet-pairer:
+    image:
+      repository: r2labuser/packet-pairer
+      image_tag: 2026w43
+      image_pull_policy: Always
+kubeconfig: /etc/kubernetes/admin.conf
+latency: true
+packet_pairing: true
+loki: true
+core_kpis: false
+ran_kpis: true
+targets:
+- category: core
+  component: amf
+  role: amf
+  container: amf
+  interface: eth0
+- category: core
+  component: smf1
+  role: smf
+  container: smf
+  interface: eth0
+- category: core
+  component: smf2
+  role: smf
+  container: smf
+  interface: eth0
+- category: core
+  component: upf1
+  role: upf
+  container: upf
+  interface: eth0
+- category: core
+  component: upf2
+  role: upf
+  container: upf
+  interface: eth0
+- category: ran
+  component: gnb
+  role: gnb
+  container: gnb
+  interface: eth0
+  metrics_port: 9090
+- category: ran
+  component: cu
+  role: gnb
+  container: cu
+  interface: eth0
+  metrics_port: 9090
+- category: ran
+  component: du1
+  metrics_port: 9090
+- category: ran
+  component: du2
+  metrics_port: 9090
+node_name: node11
+throughput: true

@@ -36,3 +36,6 @@ targets:
     component: cucp
     container: cucp
     metrics_port: 9090
+  - category: ran
+    component: du
+    metrics_port: 9090

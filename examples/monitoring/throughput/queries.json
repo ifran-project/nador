@@ -1,0 +1,22 @@
+[
+  {
+    "name": "n3_throughput_bps",
+    "query": "8 * rate(gtp_throughput_bytes_total{probe_role=\"upf\"}[5s])"
+  },
+  {
+    "name": "n3_throughput_bytes",
+    "query": "gtp_throughput_bytes_total{probe_role=\"upf\"}"
+  },
+  {
+    "name": "latency_observations",
+    "query": "gtp_teid_latency_observed_ns_count"
+  },
+  {
+    "name": "latency_la<YOUR_PASSWORD>_ms",
+    "query": "gtp_teid_latency_ns / 1000000"
+  },
+  {
+    "name": "ue_pfcp_session_mappings",
+    "query": "fiveg_ue_session_info"
+  }
+]

@@ -24,6 +24,7 @@ examples/default/results/
 examples/default/*model*.yaml
 
 .k8s-admin.conf
+.k8s-*.conf
 
 examples/default/merged.yaml
 
