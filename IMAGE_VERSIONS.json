@@ -46,8 +46,8 @@
     "upstream_commit": "08817f2a121ad798693b2b64f283d1a0f3674125",
     "metamodel_version": "0.0.5"
   },
-  "hackathon_profile": {
-    "path": "examples/monitoring/hackathon-2du/monitoring.yaml",
+  "multi_gnb_profile": {
+    "path": "examples/monitoring/multi-gnb-2du/monitoring.yaml",
     "controller": {
       "repository": "r2labuser/kopf-controller",
       "image_tag": "2026w44",

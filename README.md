@@ -22,7 +22,7 @@ from fiveg_lens import MonitoringManagement, MonitoringDeployment
 Examples are under [examples/monitoring](examples/monitoring):
 
 - [RFsim](examples/monitoring/rfsim): monolithic and split OAI radios.
-- [Hackathon](examples/monitoring/hackathon-2du/test.ipynb): 20 UEs, a monolithic
+- [Multi-gNB](examples/monitoring/multi-gnb-2du/test.ipynb): 20 UEs, a monolithic
   gNB plus a CU/two DUs, three slices and two UPFs; includes on-demand traffic.
 - [Open5GS throughput](examples/monitoring/throughput/test.ipynb) and
   [OAI throughput](examples/monitoring/throughput-oai/test.ipynb): small deployments

@@ -1,4 +1,4 @@
-# Hackathon demo: three slices, two UPFs, stock Open5GS and eBPF measurements.
+# Multi-gNB scenario: three slices, two UPFs, stock Open5GS and eBPF measurements.
 namespace: monitoring
 operation_timeout_seconds: 600
 images:

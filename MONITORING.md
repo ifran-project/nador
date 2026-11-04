@@ -1,6 +1,6 @@
 # Monitoring
 
-The [hackathon notebook](examples/monitoring/hackathon-2du/test.ipynb) shows the
+The [multi-gnb notebook](examples/monitoring/multi-gnb-2du/test.ipynb) shows the
 complete deployment and interactive traffic flow. Deploy monitoring after the
 core/RAN and before UE attachment, so the sniffers observe session establishment.
 Profiles select the interfaces and components appropriate to each deployment.
