@@ -6,7 +6,11 @@ controller:
   gnbLatencyMode: BOTH
   upfLatencyMode: BOTH
 images: {}
+throughput:
+  enabled: false
+  probeImage: ""
 latency:
+  enabled: true
   packetPairing: false
 targets: []
 operationTimeoutSeconds: 300

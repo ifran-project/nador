@@ -3,15 +3,18 @@
 import asyncio
 import shlex
 import socket
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from orchestrator_monitoring.deployment import MonitoringManagement
+
 
 @asynccontextmanager
-async def prometheus_connection(monitoring):
+async def prometheus_connection(monitoring: MonitoringManagement) -> AsyncIterator[str]:
     """Open a temporary SSH forward to Prometheus and close it when finished."""
     model = monitoring.deployment_model
-    cfg = model.monitoring
+    config = model.monitoring
     name = model.params.k8s.master_node
     node = model.nodes[name]
     ssh = node.ssh_info
@@ -37,7 +40,7 @@ async def prometheus_connection(monitoring):
         "-p",
         str(ssh.port),
         "-L",
-        f"127.0.0.1:{port}:{host}:{cfg.prometheus_node_port}",
+        f"127.0.0.1:{port}:{host}:{config.prometheus_node_port}",
         f"{ssh.user}@{host}",
     ]
     process = await asyncio.create_subprocess_exec(

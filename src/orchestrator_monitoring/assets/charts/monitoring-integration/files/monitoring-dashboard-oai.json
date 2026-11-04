@@ -702,8 +702,8 @@
             "uid": "monitoring-prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (direction, snssai, seid) (slice_throughput{snssai!=\"unknown\",snssai!=\"\",snssai=~\"${snssai:regex}\"})",
-          "legendFormat": "{{direction}} seid={{seid}}",
+          "expr": "sum by (direction, slice, upf_pfcp_ip, upf_seid) (8 * rate(gtp_throughput_bytes_total{probe_role=\"upf\",slice!=\"unknown\",slice!=\"\",slice=~\"${snssai:regex}\"}[5s]))",
+          "legendFormat": "{{direction}} UPF={{upf_pfcp_ip}} SEID={{upf_seid}}",
           "range": true,
           "refId": "A"
         }
@@ -714,7 +714,7 @@
     {
       "id": 46,
       "title": "UE / PFCP session mapping (IMSI ↔ SEID)",
-      "description": "Current mapper inventory. Compare SMF and UPF SEIDs with the throughput SEID. SEIDs are local to their PFCP endpoint; use the endpoint IP to distinguish reused numbers. The throughput calculator currently omits that endpoint, so this table does not make an automatic SEID-only join.",
+      "description": "Current mapper inventory. Match throughput UPF SEIDs together with the UPF PFCP endpoint IP; SEIDs are local to each endpoint. The throughput probe also exposes IMSI and slice labels.",
       "type": "table",
       "pluginVersion": "11.3.0",
       "datasource": {
@@ -917,10 +917,10 @@
         {
           "editorMode": "code",
           "exemplar": false,
-          "expr": "oai_gnb_l1_i0_noise_offset_db",
+          "expr": "oai_gnb_l1_i0_noise_offset_db{service=~\"${ran_component:regex}\"}",
           "format": "heatmap",
           "instant": true,
-          "legendFormat": "PRB {{prb}}",
+          "legendFormat": "{{service}} · PRB {{prb}}",
           "range": false,
           "refId": "A"
         }
@@ -1013,17 +1013,17 @@
         {
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "oai_gnb_mac_dl_goodput_mbps * 1e6 > 0",
+          "expr": "oai_gnb_mac_dl_goodput_mbps{service=~\"${ran_component:regex}\"} * 1e6 > 0",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "interval": "",
-          "legendFormat": "ue_rnti={{rnti}}",
+          "legendFormat": "{{service}} · ue_rnti={{rnti}}",
           "range": true,
           "refId": "A",
           "useBackend": false
         }
       ],
-      "title": "MAC Downlink Throughput from gNB",
+      "title": "MAC Downlink Throughput by RAN component",
       "type": "timeseries"
     },
     {
@@ -1111,16 +1111,16 @@
         {
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "oai_gnb_mac_ul_goodput_mbps * 1e6 > 0",
+          "expr": "oai_gnb_mac_ul_goodput_mbps{service=~\"${ran_component:regex}\"} * 1e6 > 0",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
-          "legendFormat": "ue_rnti={{rnti}}",
+          "legendFormat": "{{service}} · ue_rnti={{rnti}}",
           "range": true,
           "refId": "A",
           "useBackend": false
         }
       ],
-      "title": "MAC Uplink Throughput from gNB",
+      "title": "MAC Uplink Throughput by RAN component",
       "type": "timeseries"
     },
     {
@@ -1160,8 +1160,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "oai_gnb_mac_ph{rnti!=\"\"}",
-          "legendFormat": "ue_rnti={{rnti}}",
+          "expr": "oai_gnb_mac_ph{rnti!=\"\",service=~\"${ran_component:regex}\"}",
+          "legendFormat": "{{service}} · ue_rnti={{rnti}}",
           "range": true,
           "refId": "A"
         }
@@ -1225,17 +1225,17 @@
           "disableTextWrap": false,
           "editorMode": "code",
           "exemplar": false,
-          "expr": "oai_gnb_mac_nprb * on(rnti) group_left oai_gnb_mac_lcid_active{lcid=\"4\"} / scalar(oai_gnb_l1_total_prbs) * 100 > 0",
+          "expr": "oai_gnb_mac_nprb{service=~\"${ran_component:regex}\"} * on(namespace, service, rnti) group_left oai_gnb_mac_lcid_active{lcid=\"4\",service=~\"${ran_component:regex}\"} / on(namespace, service) group_left oai_gnb_l1_total_prbs{service=~\"${ran_component:regex}\"} * 100 > 0",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": true,
-          "legendFormat": "ue_rnti={{rnti}}",
+          "legendFormat": "{{service}} · ue_rnti={{rnti}}",
           "range": false,
           "refId": "A",
           "useBackend": false
         }
       ],
-      "title": "gNB Uplink PRB Saturation",
+      "title": "Uplink PRB Saturation",
       "type": "gauge"
     },
     {
@@ -1294,10 +1294,10 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "count(oai_gnb_mac_lcid_active{lcid=\"4\"}) or vector(0)",
+          "expr": "count by (namespace, service) (oai_gnb_mac_lcid_active{lcid=\"4\",service=~\"${ran_component:regex}\"})",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
-          "legendFormat": "__auto",
+          "legendFormat": "{{service}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -1391,10 +1391,10 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "oai_gnb_mac_dl_bler",
+          "expr": "oai_gnb_mac_dl_bler{service=~\"${ran_component:regex}\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
-          "legendFormat": "ue_rnti={{rnti}}",
+          "legendFormat": "{{service}} · ue_rnti={{rnti}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -1492,11 +1492,11 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "oai_gnb_mac_ul_bler",
+          "expr": "oai_gnb_mac_ul_bler{service=~\"${ran_component:regex}\"}",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": true,
-          "legendFormat": "ue_rnti={{rnti}}",
+          "legendFormat": "{{service}} · ue_rnti={{rnti}}",
           "range": true,
           "refId": "B",
           "useBackend": false
@@ -1591,10 +1591,10 @@
         {
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "oai_gnb_l1_prach_i0_db",
+          "expr": "oai_gnb_l1_prach_i0_db{service=~\"${ran_component:regex}\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
-          "legendFormat": "__auto",
+          "legendFormat": "{{service}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -1687,10 +1687,10 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "oai_gnb_mac_dl_mcs",
+          "expr": "oai_gnb_mac_dl_mcs{service=~\"${ran_component:regex}\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
-          "legendFormat": "ue_rnti={{rnti}}",
+          "legendFormat": "{{service}} · ue_rnti={{rnti}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -1787,11 +1787,11 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "oai_gnb_mac_ul_mcs",
+          "expr": "oai_gnb_mac_ul_mcs{service=~\"${ran_component:regex}\"}",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": true,
-          "legendFormat": "ue_rnti={{rnti}}",
+          "legendFormat": "{{service}} · ue_rnti={{rnti}}",
           "range": true,
           "refId": "B",
           "useBackend": false
@@ -1888,9 +1888,9 @@
             "uid": "monitoring-prometheus"
           },
           "editorMode": "code",
-          "expr": "oai_gnb_mac_cqi",
+          "expr": "oai_gnb_mac_cqi{service=~\"${ran_component:regex}\"}",
           "instant": false,
-          "legendFormat": "ue_rnti={{rnti}}",
+          "legendFormat": "{{service}} · ue_rnti={{rnti}}",
           "range": true,
           "refId": "A"
         }
@@ -1982,10 +1982,10 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "oai_gnb_mac_dlsch_errors",
+          "expr": "oai_gnb_mac_dlsch_errors{service=~\"${ran_component:regex}\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
-          "legendFormat": "ue_rnti={{rnti}}",
+          "legendFormat": "{{service}} · ue_rnti={{rnti}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -2082,12 +2082,12 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "oai_gnb_mac_ulsch_errors",
+          "expr": "oai_gnb_mac_ulsch_errors{service=~\"${ran_component:regex}\"}",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": true,
           "instant": false,
-          "legendFormat": "ue_rnti={{rnti}}",
+          "legendFormat": "{{service}} · ue_rnti={{rnti}}",
           "range": true,
           "refId": "B",
           "useBackend": false
@@ -2095,14 +2095,168 @@
       ],
       "title": "Uplink HARQ Errors per RNTI",
       "type": "timeseries"
+    },
+    {
+      "id": 47,
+      "title": "RRC SSB ARFCN",
+      "description": "RRC settings from the selected gNB/CU parser. DUs export MAC/L1 statistics instead.",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "monitoring-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 75,
+        "w": 8,
+        "h": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "displayName": "${__field.labels.service}"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "expr": "oai_gnb_rrc_ssb_arfcn{service=~\"${ran_component:regex}\"}",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{service}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 48,
+      "title": "RRC ARFCN",
+      "description": "RRC settings from the selected gNB/CU parser. DUs export MAC/L1 statistics instead.",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "monitoring-prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 75,
+        "w": 8,
+        "h": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "displayName": "${__field.labels.service}"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "expr": "oai_gnb_rrc_arfcn{service=~\"${ran_component:regex}\"}",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{service}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 49,
+      "title": "RRC Subcarrier Spacing (kHz)",
+      "description": "RRC settings from the selected gNB/CU parser. DUs export MAC/L1 statistics instead.",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "monitoring-prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 75,
+        "w": 8,
+        "h": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "displayName": "${__field.labels.service}"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "expr": "oai_gnb_rrc_scs_khz{service=~\"${ran_component:regex}\"}",
+          "instant": true,
+          "range": false,
+          "legendFormat": "{{service}}",
+          "refId": "A"
+        }
+      ]
     }
   ],
   "preload": false,
-  "refresh": "1s",
+  "refresh": "5s",
   "schemaVersion": 40,
   "tags": [],
   "templating": {
     "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "monitoring-prometheus"
+        },
+        "definition": "label_values({__name__=~\"oai_gnb_.*\"}, service)",
+        "hide": 0,
+        "includeAll": true,
+        "allValue": ".*",
+        "label": "RAN component",
+        "multi": true,
+        "name": "ran_component",
+        "options": [],
+        "query": "label_values({__name__=~\"oai_gnb_.*\"}, service)",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
       {
         "current": {
           "selected": true,
@@ -2137,14 +2291,14 @@
           "type": "prometheus",
           "uid": "monitoring-prometheus"
         },
-        "definition": "label_values(slice_throughput{snssai!=\"unknown\",snssai!=\"\"}, snssai)",
+        "definition": "label_values(gtp_throughput_bytes_total{probe_role=\"upf\",slice!=\"unknown\",slice!=\"\"}, slice)",
         "hide": 0,
         "includeAll": true,
         "label": "S-NSSAI",
         "multi": true,
         "name": "snssai",
         "options": [],
-        "query": "label_values(slice_throughput{snssai!=\"unknown\",snssai!=\"\"}, snssai)",
+        "query": "label_values(gtp_throughput_bytes_total{probe_role=\"upf\",slice!=\"unknown\",slice!=\"\"}, slice)",
         "refresh": 1,
         "regex": "/^(?!unknown$).+/",
         "skipUrlSync": false,

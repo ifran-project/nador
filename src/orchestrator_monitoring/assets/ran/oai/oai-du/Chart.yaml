@@ -1,0 +1,4 @@
+apiVersion: v2
+name: oai-du
+type: application
+version: 0.1.0

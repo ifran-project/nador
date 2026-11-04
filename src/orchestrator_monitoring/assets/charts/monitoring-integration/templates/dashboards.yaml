@@ -12,6 +12,10 @@ data:
   monitoring-dashboard.json: |-
     {{- .Files.Get (printf "files/monitoring-dashboard-%s.json" .Values.dashboards.variant) | nindent 4 }}
   {{- end }}
+  {{- if and .Values.dashboards.enabled .Values.throughputEnabled }}
+  n3-throughput-dashboard.json: |-
+    {{- .Files.Get "files/n3-throughput-dashboard.json" | nindent 4 }}
+  {{- end }}
   {{- if and .Values.lokiEnabled .Values.dashboards.logs }}
   component-logs-dashboard.json: |-
     {{- .Files.Get "files/component-logs-dashboard.json" | nindent 4 }}

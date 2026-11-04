@@ -1,1 +1,1 @@
-"""Packaged monitoring roles and controller sources."""
+"""Packaged Helm charts, configuration templates and Ansible roles."""

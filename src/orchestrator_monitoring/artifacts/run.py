@@ -3,11 +3,16 @@
 import asyncio
 import json
 import time
+from collections.abc import Iterator
 from contextlib import AsyncExitStack, contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+from types import TracebackType
+from typing import Any, Self
 from uuid import uuid4
 from zoneinfo import ZoneInfo
+
+from orchestrator_monitoring.deployment import MonitoringManagement
 
 from . import prometheus_range_export as prometheus
 from . import split_prometheus_by_timeline as splitter
@@ -25,15 +30,15 @@ class ExperimentRun:
 
     def __init__(
         self,
-        directory,
+        directory: str | Path,
         *,
-        name="experiment",
-        prometheus_url=None,
-        queries_file=None,
-        step="1s",
-        timezone="Europe/Paris",
-        monitoring=None,
-    ):
+        name: str = "experiment",
+        prometheus_url: str | None = None,
+        queries_file: str | Path | None = None,
+        step: str = "1s",
+        timezone: str = "Europe/Paris",
+        monitoring: MonitoringManagement | None = None,
+    ) -> None:
         if monitoring is not None and prometheus_url is not None:
             raise ValueError("Supply monitoring or prometheus_url, not both")
         self.monitoring = monitoring
@@ -49,7 +54,7 @@ class ExperimentRun:
         self.entered = False
         self.active_sections = 0
 
-    def _event(self, level, phase, name, **extra):
+    def _event(self, level: str, phase: str, name: str, **extra: Any) -> None:
         now = datetime.now(UTC)
         event = {
             "run_id": self.run_id,
@@ -65,7 +70,7 @@ class ExperimentRun:
         with (self.directory / "timeline_events.jsonl").open("a") as f:
             f.write(json.dumps(event) + "\n")
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> Self:
         if self.entered:
             raise RuntimeError("ExperimentRun cannot be entered twice")
         self.directory.mkdir(parents=True, exist_ok=False)
@@ -82,17 +87,18 @@ class ExperimentRun:
         self._save_metadata()
         return self
 
-    def _save_metadata(self):
+    def _save_metadata(self) -> None:
         (self.directory / "experiment_metadata.json").write_text(json.dumps(self.metadata, indent=2))
 
-    def save_json(self, filename, data):
+    def save_json(self, filename: str | Path, data: Any) -> None:
         """Save a JSON artifact inside the active experiment directory."""
         if not self.entered or getattr(self, "closed", False):
             raise RuntimeError("Save artifacts inside async with ExperimentRun(...)")
         (self.directory / filename).write_text(json.dumps(data, indent=2))
 
     @contextmanager
-    def section(self, name):
+    def section(self, name: str) -> Iterator[None]:
+        """Record the start, end and outcome of one named experiment section."""
         if not self.entered or getattr(self, "closed", False):
             raise RuntimeError("Use sections inside async with ExperimentRun(...)")
         if name in self.names:
@@ -112,7 +118,7 @@ class ExperimentRun:
             self._event("section", "end", name, status=status)
             self.active_sections -= 1
 
-    def _collect(self, ended):
+    def _collect(self, ended: float) -> None:
         errors = self.metadata["collection_errors"]
         try:
             timeline.main(
@@ -170,7 +176,7 @@ class ExperimentRun:
             except Exception as exc:
                 errors.append(f"prometheus: {exc}")
 
-    async def _finalize(self, ended):
+    async def _finalize(self, ended: float) -> None:
         try:
             async with AsyncExitStack() as access:
                 if self.monitoring is not None:
@@ -183,7 +189,9 @@ class ExperimentRun:
         except Exception as exc:
             self.metadata["collection_errors"].append(f"collection: {exc}")
 
-    async def __aexit__(self, exc_type, exc, tb):
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None
+    ) -> bool:
         self.closed = True
         self._event("campaign", "end", self.name, status="failed" if exc else "completed")
         self.metadata["status"] = "failed" if exc else "completed"

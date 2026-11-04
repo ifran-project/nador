@@ -1,0 +1,15 @@
+{# Open5GS 2.7 reserves the gateway through the address in session.subnet. #}
+{% set upstream_config %}
+{% include 'core/open5gs/open5gs-' ~ component.type ~ '/config.yaml.j2' %}
+{% endset %}
+{% if component.plain_text_config %}
+{{ upstream_config }}
+{% else %}
+{% set config = upstream_config | from_yaml %}
+{% for session in config[component.type].session %}
+{% if session.gateway %}
+{% set _ = session.update({'subnet': session.gateway ~ '/' ~ session.subnet.split('/')[1]}) %}
+{% endif %}
+{% endfor %}
+{{ config | to_nice_yaml(indent=2) }}
+{% endif %}

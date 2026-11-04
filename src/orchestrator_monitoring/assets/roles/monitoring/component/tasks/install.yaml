@@ -16,11 +16,3 @@
 - name: Wait for application pods
   ansible.builtin.include_tasks: wait_ready.yaml
   when: component.pod_selector | length > 0
-
-- name: Return component network information
-  ansible.builtin.set_stats:
-    data:
-      network_info: >-
-        {{ ((component_pods.resources[0].metadata.annotations['k8s.v1.cni.cncf.io/network-status']
-            | default('[]', true) | from_json) if output_with_multus
-           else component_pods.resources[0].status.podIP) if component.pod_selector else none }}

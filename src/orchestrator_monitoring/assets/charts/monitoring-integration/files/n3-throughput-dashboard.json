@@ -1,0 +1,223 @@
+{
+  "uid": "monitoring-n3-throughput",
+  "title": "N3 Throughput",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "tags": [
+    "5g",
+    "ebpf",
+    "throughput"
+  ],
+  "timezone": "browser",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "slice",
+        "label": "Slice",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "monitoring-prometheus"
+        },
+        "query": {
+          "query": "label_values(gtp_throughput_bytes_total{probe_role=\"upf\"}, slice)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "imsi",
+        "label": "IMSI",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "monitoring-prometheus"
+        },
+        "query": {
+          "query": "label_values(gtp_throughput_bytes_total{probe_role=\"upf\"}, imsi)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "upf",
+        "label": "UPF probe",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "monitoring-prometheus"
+        },
+        "query": {
+          "query": "label_values(gtp_throughput_bytes_total{probe_role=\"upf\"}, probe_pod)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Per-UE throughput (inner IP bytes)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "monitoring-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "8 * rate(gtp_throughput_bytes_total{probe_role=\"upf\",imsi=~\"${imsi:regex}\",slice=~\"${slice:regex}\",probe_pod=~\"${upf:regex}\"}[5s])",
+          "legendFormat": "{{probe_pod}} \u00b7 {{imsi}} \u00b7 {{direction}}"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Slice throughput by UPF",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "monitoring-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (slice, direction, probe_pod) (8 * rate(gtp_throughput_bytes_total{probe_role=\"upf\",imsi=~\"${imsi:regex}\",slice=~\"${slice:regex}\",probe_pod=~\"${upf:regex}\"}[5s]))",
+          "legendFormat": "{{probe_pod}} \u00b7 {{slice}} \u00b7 {{direction}}"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "title": "Session throughput by UPF",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "monitoring-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 9,
+        "w": 12,
+        "h": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "8 * rate(gtp_throughput_bytes_total{probe_role=\"upf\",imsi=~\"${imsi:regex}\",slice=~\"${slice:regex}\",probe_pod=~\"${upf:regex}\"}[5s])",
+          "legendFormat": "{{probe_pod}} \u00b7 SEID {{upf_seid}} \u00b7 {{direction}}"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "IMSI / PFCP session mapping",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "monitoring-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "fiveg_ue_session_info{imsi=~\"${imsi:regex}\"}",
+          "instant": true,
+          "format": "table"
+        }
+      ]
+    }
+  ]
+}

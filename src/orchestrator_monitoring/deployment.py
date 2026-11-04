@@ -20,7 +20,7 @@ class MonitoringManagement(HelmManagement):
     """Deploy monitoring components and attachment sniffers."""
 
     # Take an extension-owned snapshot of an existing orchestrator deployment.
-    def __init__(self, preceding: BaseManagement, *, config: MonitoringDeployment | None = None):
+    def __init__(self, preceding: BaseManagement, *, config: MonitoringDeployment | None = None) -> None:
         super().__init__(preceding=preceding)
         self.deployment_model = MonitoringModel.model_validate(self.deployment_model.model_dump(mode="python"))
         if config is not None:
@@ -28,8 +28,10 @@ class MonitoringManagement(HelmManagement):
 
     # Resolve monitoring targets and assemble the Helm installation inputs.
     def plan(self) -> dict[str, Any]:
-        """Validate and return the complete deployment plan without contacting a host."""
+        """Resolve targets and chart values without contacting deployment hosts."""
         monitoring = self.deployment_model.monitoring
+        if monitoring.throughput and not monitoring.targets:
+            raise ValueError("Throughput requires AMF, SMF and UPF packet targets")
         node_name, _ = self._get_deployment_node(None)
         targets = resolve_targets(self.deployment_model)
         monitoring.components = resolve_components(self.deployment_model, targets)
@@ -38,10 +40,11 @@ class MonitoringManagement(HelmManagement):
             "targets": targets,
         }
 
-    # Prepare chart files through the same asynchronous API as core and RAN.
+    # Resolve configuration and prepare the Kubernetes node and Helm repositories.
     async def prepare(self, *, quiet: bool = False) -> None:
+        """Resolve chart values, label the monitoring node and add Helm repositories."""
         self.plan()
-        await self._run("prepare", quiet=quiet)
+        await self._run_tasks("prepare", quiet=quiet)
 
     # Run monitoring charts in installation order, reversing it for removal.
     async def run_action(
@@ -49,23 +52,27 @@ class MonitoringManagement(HelmManagement):
         action: str,
         *,
         components: list[str] | None = None,
-        **kwargs,
-    ) -> dict[str, Any]:
-        cfg = self.deployment_model.monitoring
-        names = list(cfg.components) if components is None else list(components)
-        unknown = set(names) - cfg.components.keys()
+        **kwargs: Any,
+    ) -> dict[str, str | dict[str, str]]:
+        """Run a Helm action on selected monitoring components."""
+        available = self.deployment_model.monitoring.components
+        names = available if components is None else components
+        unknown = set(names) - available.keys()
         if unknown:
             raise ValueError(f"Unknown monitoring components: {sorted(unknown)}")
+        selected = [(name, available[name]) for name in names]
         if components is None and action in ("get_logs", "run_cmd"):
-            names = [name for name in names if cfg.components[name].is_installed and cfg.components[name].pod_selector]
+            selected = [
+                (name, component) for name, component in selected if component.is_installed and component.pod_selector
+            ]
         if action == "uninstall":
-            names.reverse()
+            selected.reverse()
         node = self._get_deployment_node(None)
         output = {}
-        for name in names:
+        for name, component in selected:
             result = await run_monitoring_component_action(
                 model=self.deployment_model,
-                component=cfg.components[name],
+                component=component,
                 component_name=name,
                 node=node,
                 action=action,
@@ -76,21 +83,24 @@ class MonitoringManagement(HelmManagement):
         return output
 
     # Execute a monitoring Ansible action using the selected control node.
-    async def _run(
+    async def _run_tasks(
         self,
-        action: Literal["prepare", "capture"],
+        action: Literal["prepare", "inject_sniffers"],
         *,
         targets: list[dict] | None = None,
         quiet: bool = False,
     ) -> None:
-        """Run preparation or capture tasks using the Kubernetes master's inventory."""
+        """Run preparation or sniffer tasks using the Kubernetes master's inventory."""
         monitoring = self.deployment_model.monitoring
         node_name, control_node = self._get_deployment_node(None)
         await run_ansible_role(
+            # The role selects prepare.yml or inject_sniffers.yml from the action.
             role="monitoring/stack",
             hosts=node_name,
             inventory=get_ansible_inventory_line(node_name, control_node),
+            # Node preparation and sniffer injection run with elevated privileges.
             become=True,
+            # Pass configuration and capture targets to the Ansible tasks.
             inputs={
                 "monitoring_action": action,
                 "monitoring_control_node": node_name,
@@ -107,10 +117,10 @@ class MonitoringManagement(HelmManagement):
     async def deploy(self, *, quiet: bool = False) -> None:
         """Deploy monitoring and wait for its components and sniffers."""
         plan = self.plan()
-        await self._run("prepare", quiet=quiet)
+        await self._run_tasks("prepare", quiet=quiet)
         await self.install(quiet=quiet)
-        if self.deployment_model.monitoring.latency:
-            await self._run("capture", targets=plan["targets"], quiet=quiet)
+        if self.deployment_model.monitoring.latency or self.deployment_model.monitoring.throughput:
+            await self._run_tasks("inject_sniffers", targets=plan["targets"], quiet=quiet)
 
     # Uninstall monitoring releases in reverse installation order.
     async def remove(self, *, quiet: bool = False) -> None:

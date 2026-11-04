@@ -78,6 +78,32 @@ prometheus:
           - __meta_kubernetes_pod_name
           target_label: pod
         scrape_interval: '{{ monitoring.prometheus_scrape_interval }}'
+{% if monitoring.throughput %}
+      - job_name: throughput-probes
+        kubernetes_sd_configs:
+        - namespaces:
+            names: {{ target_namespaces | tojson }}
+          role: pod
+        metrics_path: /metrics
+        relabel_configs:
+        - action: keep
+          regex: '{{ monitoring.namespace }}'
+          source_labels:
+          - __meta_kubernetes_pod_annotation_monitoring_blueprint_throughput_owner
+        - regex: (.+);([0-9]+)
+          replacement: $1:$2
+          source_labels:
+          - __meta_kubernetes_pod_ip
+          - __meta_kubernetes_pod_annotation_monitoring_blueprint_throughput_port
+          target_label: __address__
+        - source_labels:
+          - __meta_kubernetes_namespace
+          target_label: namespace
+        - source_labels:
+          - __meta_kubernetes_pod_name
+          target_label: pod
+        scrape_interval: '{{ monitoring.prometheus_scrape_interval }}'
+{% endif %}
       - job_name: kubernetes-annotated-pods
         kubernetes_sd_configs:
         - namespaces:

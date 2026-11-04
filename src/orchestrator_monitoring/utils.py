@@ -1,15 +1,13 @@
 """Resolve model components and prepare monitoring Helm values."""
 
-from ipaddress import ip_address
 from pathlib import Path
 
 import yaml
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
-from orchestrator.models.k8s import MultusNetworkStatus
 from orchestrator.models.provisioning import ProvisionableNode
 from orchestrator.utils.ansible import get_ansible_inventory_line, run_ansible_role
 from orchestrator.utils.k8s import build_k8s_safe
-from orchestrator.utils.utils import InvalidResourceStateError, deep_merge
+from orchestrator.utils.utils import deep_merge
 
 from orchestrator_monitoring.models import DeployedMonitoringComponent, MonitoringModel
 
@@ -54,12 +52,13 @@ def resolve_targets(model: MonitoringModel) -> list[dict]:
 
 
 # Render this chart's dynamic values, then apply explicit user overrides.
-def _component_values(
+def _render_chart_values(
     component: DeployedMonitoringComponent,
     model: MonitoringModel,
     targets: list[dict],
     components: dict[str, DeployedMonitoringComponent],
 ) -> dict:
+    """Render Helm values from chart defaults, deployment settings and user overrides."""
     chart = component.chart_ref.rsplit("/", 1)[-1]
     defaults = ASSETS / "defaults" / f"{chart}.yaml" if component.chart_version else CHARTS / chart / "values.yaml"
     node_selector = component.node_selector
@@ -84,6 +83,7 @@ def _component_values(
 
 # Resolve enabled component models once, then build values directly for each chart.
 def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str, DeployedMonitoringComponent]:
+    """Build enabled monitoring components and their Helm values."""
     monitoring = model.monitoring
     defaults = yaml.safe_load((ASSETS / "components.yaml").read_text())
     if monitoring.core_kpis and str(model.core.implementation) != "open5gs":
@@ -93,7 +93,7 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
     enabled = {"integration", "prometheus", "grafana"}
     if monitoring.loki:
         enabled.update(("loki", "promtail"))
-    if monitoring.latency:
+    if monitoring.latency or monitoring.throughput:
         enabled.update(("redis", "ue-mapper-api", "monitoring-controller"))
         if monitoring.packet_pairing:
             enabled.add("packet-pairer")
@@ -103,6 +103,9 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
         enabled.add("kpi-calculator-oai")
     components = {}
     for name, definition in defaults["components"].items():
+        # The controller also needs the pairer image when pairing is disabled.
+        if name not in enabled and not ((monitoring.latency or monitoring.throughput) and name == "packet-pairer"):
+            continue
         data = (
             {"release_name": name, "chart_ref": name, "pod_selector": ["app=" + name]}
             | defaults["defaults"]
@@ -113,12 +116,11 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
                 data, monitoring.components[name].model_dump(mode="json", exclude_unset=True, exclude_none=True)
             )
         component = DeployedMonitoringComponent.model_validate(data)
-        component.pod_selector = component.pod_selector or definition.get("pod_selector", ["app=" + name])
         component.namespace = monitoring.namespace
         components[name] = component
     for name in enabled:
         component = components[name]
-        component.chart_values = _component_values(component, model, targets, components)
+        component.chart_values = _render_chart_values(component, model, targets, components)
         if not component.chart_version:
             component.chart_ref = f"{REMOTE_CHARTS}/{Path(component.chart_ref).name}"
     return {name: component for name, component in components.items() if name in enabled}
@@ -133,30 +135,21 @@ async def run_monitoring_component_action(
     node: tuple[str, ProvisionableNode],
     action: str,
     command: list[str] | None = None,
-    force: bool = True,
     quiet: bool = False,
     containers: list[str] | None = None,
     since_seconds: int = 3600,
 ) -> str | dict[str, str] | None:
-    """Run one monitoring component action and record successful installation/removal."""
-    cfg = model.monitoring
-    component.namespace = cfg.namespace
+    """Run a component action and record whether its Helm release is installed."""
+    monitoring = model.monitoring
+    component.namespace = monitoring.namespace
     ansible = model.params.ansible
     node_name, node_data = node
-    if not force:
-        if action == "install" and component.is_installed:
-            raise InvalidResourceStateError(f"Monitoring component {component_name!r} is already installed")
-        if action in ("uninstall", "get_logs", "run_cmd") and not component.is_installed:
-            raise InvalidResourceStateError(f"Monitoring component {component_name!r} is not installed")
     if action in ("get_logs", "run_cmd") and not component.pod_selector:
         raise ValueError(f"Monitoring component {component_name!r} has no workload")
     if action == "run_cmd" and not command:
         raise ValueError("A command is required for run_cmd")
 
-    chart_name = component.release_name or component_name
-    payload = component.model_dump(mode="json", exclude_none=True)
     output_key = {
-        "install": "network_info",
         "get_logs": "logs",
         "run_cmd": "command_output",
     }.get(action)
@@ -167,11 +160,10 @@ async def run_monitoring_component_action(
         become=True,
         inputs={
             "helm_action": action,
-            "component": payload,
-            "chart_name": chart_name,
-            "output_with_multus": component.multus.enabled,
-            "kubeconfig": cfg.kubeconfig,
-            "timeout_seconds": cfg.operation_timeout_seconds,
+            "component": component.model_dump(mode="json", exclude_none=True),
+            "chart_name": component.release_name or component_name,
+            "kubeconfig": monitoring.kubeconfig,
+            "timeout_seconds": monitoring.operation_timeout_seconds,
             "since_seconds": since_seconds,
             "containers": containers or [],
             "command": command,
@@ -182,17 +174,8 @@ async def run_monitoring_component_action(
         quiet=quiet,
     )
 
-    if action == "install":
-        if component.pod_selector:
-            component.network_info = (
-                [MultusNetworkStatus.model_validate(item) for item in result["network_info"]]
-                if component.multus.enabled
-                else ip_address(result["network_info"])
-            )
-        component.is_installed = True
-    elif action == "uninstall":
-        component.is_installed = False
-        component.network_info = None
+    if action in ("install", "uninstall"):
+        component.is_installed = action == "install"
     elif output_key:
         return result[output_key]
     return None

@@ -16,6 +16,7 @@ tolerations:
 {{- end }}
 
 {{- define "monitoring.controllerEnv" -}}
+{{- $throughput := eq (.Values.probeKind | default "latency") "throughput" }}
 - name: MONITORING_NS
   value: {{ .Release.Namespace | quote }}
 - name: CORE_NS
@@ -23,15 +24,25 @@ tolerations:
 - name: WATCH_NAMESPACES
   value: {{ join "," .Values.controller.watchNamespaces | quote }}
 - name: PROBE_MODE
-  value: {{ .Values.controller.probeMode | quote }}
+  value: {{ ternary "upf" .Values.controller.probeMode $throughput | quote }}
 - name: PROBE_NAME_PREFIX
-  value: latency-probe
+  value: {{ ternary "throughput-probe" "latency-probe" $throughput | quote }}
+- name: PROBE_KIND
+  value: {{ ternary "throughput" "latency" $throughput | quote }}
+- name: BASE_HANDLE
+  value: {{ ternary "1000" "1" $throughput | quote }}
+- name: BASE_PRIO
+  value: {{ ternary "1000" "1" $throughput | quote }}
+- name: BASE_EXPORTER_PORT
+  value: {{ ternary "9300" "9100" $throughput | quote }}
+- name: EXPORTER_PATH
+  value: {{ ternary "/metrics" "/latency" $throughput | quote }}
 - name: UE_MAPPER_URL
   value: {{ printf "http://ue-mapper-api.%s.svc.cluster.local:8080" .Release.Namespace | quote }}
 - name: PROBE_IMAGE
-  value: {{ .Values.images.probe | quote }}
+  value: {{ ternary .Values.throughput.probeImage .Values.images.probe $throughput | quote }}
 - name: PACKET_PAIRING
-  value: {{ ternary "1" "0" .Values.latency.packetPairing | quote }}
+  value: {{ ternary "1" "0" (and (not $throughput) .Values.latency.packetPairing) | quote }}
 - name: PACKET_PAIRER_IMAGE
   value: {{ .Values.images.pairer | quote }}
 - name: PACKET_PAIRER_NAME

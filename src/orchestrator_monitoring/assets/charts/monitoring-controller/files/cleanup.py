@@ -57,16 +57,16 @@ for path in pathlib.Path('/proc').glob('[0-9]*/environ'):
             time.sleep(1)
 
 
-def stop_controller(api, namespace):
+def stop_controller(api, namespace, name="monitoring-controller"):
     """Prevent reconciliation from recreating probes while the release is removed."""
     apps = kubernetes.client.AppsV1Api()
     try:
-        apps.patch_namespaced_deployment("monitoring-controller", namespace, {"spec": {"replicas": 0}})
+        apps.patch_namespaced_deployment(name, namespace, {"spec": {"replicas": 0}})
     except kubernetes.client.exceptions.ApiException as exc:
         if exc.status != 404:
             raise
     deadline = time.monotonic() + int(os.environ["CLEANUP_TIMEOUT_SECONDS"])
-    while api.list_namespaced_pod(namespace, label_selector="app=monitoring-controller").items:
+    while api.list_namespaced_pod(namespace, label_selector=f"app={name}").items:
         if time.monotonic() >= deadline:
             raise RuntimeError("Monitoring controller did not stop before cleanup")
         time.sleep(1)
@@ -78,14 +78,17 @@ if __name__ == "__main__":
     logger = logging.getLogger("monitoring-cleanup")
     owner = os.environ["MONITORING_NS"]
     stop_controller(api, owner)
+    throughput = os.environ.get("THROUGHPUT_ENABLED") == "true"
     namespaces = sorted(set(filter(None, os.environ["CAPTURE_NAMESPACES"].split(","))))
     for namespace in namespaces:
         for pod in api.list_namespaced_pod(namespace).items:
             if pod.status.phase in ("Succeeded", "Failed"):
                 continue
             ephemerals = pod.spec.ephemeral_containers or []
-            has_probes = any(c.name.startswith(controller.PROBE_NAME_PREFIX) for c in ephemerals)
-            owned = (pod.metadata.annotations or {}).get("monitoring.blueprint/packet-owner") == owner
+            has_probes = any(c.name.startswith((controller.PROBE_NAME_PREFIX, "throughput-probe")) for c in ephemerals)
+            annotations = pod.metadata.annotations or {}
+            owned = any(annotations.get(f"monitoring.blueprint/{kind}-owner") == owner
+                        for kind in ("packet", "latency", "throughput"))
             has_sniffers = any(
                 any(e.name == "MONITORING_SNIFFER_OWNER" and e.value == owner for e in c.env or []) for c in ephemerals
             )
@@ -99,6 +102,16 @@ if __name__ == "__main__":
                 if time.monotonic() > deadline:
                     raise RuntimeError(f"Probe did not stop: {namespace}/{pod.metadata.name}")
                 time.sleep(1)
+            if throughput:
+                if not controller.kill_probe_container(pod.metadata.name, namespace, logger,
+                                                       prefix="throughput-probe", stop_pattern="[/]app/exporter.py"):
+                    raise RuntimeError(f"Throughput cleanup failed: {namespace}/{pod.metadata.name}")
+                deadline = time.monotonic() + 30
+                while controller.list_active_probe_containers(pod.metadata.name, namespace, logger,
+                                                               prefix="throughput-probe"):
+                    if time.monotonic() > deadline:
+                        raise RuntimeError(f"Throughput probe did not stop: {namespace}/{pod.metadata.name}")
+                    time.sleep(1)
             if owned:
                 api.patch_namespaced_pod(
                     pod.metadata.name,
@@ -109,6 +122,8 @@ if __name__ == "__main__":
                                 "monitoring.blueprint/latency-port": None,
                                 "monitoring.blueprint/latency-owner": None,
                                 "monitoring.blueprint/packet-owner": None,
+                                "monitoring.blueprint/throughput-owner": None,
+                                "monitoring.blueprint/throughput-port": None,
                             }
                         }
                     },
@@ -119,7 +134,10 @@ if __name__ == "__main__":
     for namespace in namespaces:
         for pod in api.list_namespaced_pod(namespace).items:
             finalizers = pod.metadata.finalizers or []
-            if "kopf.zalando.org/KopfFinalizerMarker" in finalizers:
+            markers = {"kopf.zalando.org/KopfFinalizerMarker"}
+            if throughput:
+                markers.add("monitoring.blueprint/throughput")
+            if markers.intersection(finalizers):
                 api.patch_namespaced_pod(
                     pod.metadata.name,
                     namespace,
@@ -128,7 +146,7 @@ if __name__ == "__main__":
                         {
                             "op": "replace",
                             "path": "/metadata/finalizers",
-                            "value": [f for f in finalizers if f != "kopf.zalando.org/KopfFinalizerMarker"],
+                            "value": [f for f in finalizers if f not in markers],
                         },
                     ],
                 )

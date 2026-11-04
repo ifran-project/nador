@@ -4,3 +4,4 @@ dashboards:
   logs: true
   variant: oai
 lokiEnabled: true
+throughputEnabled: false

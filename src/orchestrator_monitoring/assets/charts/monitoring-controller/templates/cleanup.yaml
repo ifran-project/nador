@@ -49,6 +49,8 @@ spec:
             - name: PYTHONPATH
               value: /app
             {{- include "monitoring.controllerEnv" . | nindent 12 }}
+            - name: THROUGHPUT_ENABLED
+              value: {{ .Values.throughput.enabled | quote }}
             - name: CAPTURE_NAMESPACES
               {{- $namespaces := .Values.controller.watchNamespaces }}
               {{- range .Values.targets }}
