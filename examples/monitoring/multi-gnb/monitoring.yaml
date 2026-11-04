@@ -3,23 +3,9 @@ namespace: monitoring
 operation_timeout_seconds: 600
 images:
   probe: r2labuser/ebpf-latency-probe:2026w43
-  amf_sniffer: r2labuser/amf-sniffer:2026w43
-  smf_sniffer: r2labuser/smf-sniffer:2026w43
 components:
-  monitoring-controller:
-    image:
-      repository: r2labuser/kopf-controller
-      image_tag: 2026w44
-      image_pull_policy: Always
   ue-mapper-api:
     image:
-      repository: r2labuser/ue_mapper_api
-      image_tag: 2026w43
-      image_pull_policy: Always
-  packet-pairer:
-    image:
-      repository: r2labuser/packet-pairer
-      image_tag: 2026w43
       image_pull_policy: Always
 kubeconfig: /etc/kubernetes/admin.conf
 latency: true

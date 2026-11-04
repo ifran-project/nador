@@ -56,3 +56,7 @@ async with ExperimentRun(
 Each experiment needs a new result directory. The collector finalizes artifacts
 on workload failure; it does not automatically save packet captures or every
 pod's logs. Building this package does not rebuild its container images.
+
+Default image versions are selected in `src/fiveg_lens/assets/images.json`.
+Standard profiles inherit them; `images` and `components.<name>.image` remain available
+for deliberate overrides. Image-update pull requests change only that manifest.

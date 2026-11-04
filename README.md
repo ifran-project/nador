@@ -22,6 +22,10 @@ from fiveg_lens import MonitoringManagement, MonitoringDeployment
 Start with the [minimal tutorial](examples/quickstart/tutorial.ipynb): installation,
 imports, monitoring deployment and one experiment with artifact collection.
 
+Default monitoring image versions live in [`assets/images.json`](src/fiveg_lens/assets/images.json).
+Image builds can propose updates through a pull request; deployments change after you merge it.
+Explicit scenario overrides still take precedence.
+
 Examples are under [examples/monitoring](examples/monitoring):
 
 - [RFsim](examples/monitoring/rfsim): monolithic and split OAI radios.

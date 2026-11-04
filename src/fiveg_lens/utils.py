@@ -9,7 +9,7 @@ from orchestrator.utils.ansible import get_ansible_inventory_line, run_ansible_r
 from orchestrator.utils.k8s import build_k8s_safe
 from orchestrator.utils.utils import deep_merge
 
-from fiveg_lens.models import DeployedMonitoringComponent, MonitoringModel
+from fiveg_lens.models import DEFAULT_IMAGES, DeployedMonitoringComponent, MonitoringModel
 
 ASSETS = Path(__file__).resolve().parent / "assets"
 CHARTS = ASSETS / "charts"
@@ -111,6 +111,8 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
             | defaults["defaults"]
             | definition
         )
+        if name in DEFAULT_IMAGES["components"]:
+            data["image"] = DEFAULT_IMAGES["components"][name].copy()
         if name in monitoring.components:
             data = deep_merge(
                 data, monitoring.components[name].model_dump(mode="json", exclude_unset=True, exclude_none=True)

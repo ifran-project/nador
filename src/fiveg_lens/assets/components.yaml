@@ -62,16 +62,8 @@ components:
       repository: redis
       image_tag: '7'
       image_pull_policy: IfNotPresent
-  ue-mapper-api:
-    image:
-      repository: r2labuser/ue_mapper_api
-      image_tag: 2026w10
-      image_pull_policy: IfNotPresent
-  packet-pairer:
-    image:
-      repository: r2labuser/packet-pairer
-      image_tag: '2026'
-      image_pull_policy: Always
+  ue-mapper-api: {}
+  packet-pairer: {}
   kpi-calculator-open5gs:
     chart_ref: kpi-calculator
     image:
@@ -80,14 +72,6 @@ components:
       image_pull_policy: IfNotPresent
   kpi-calculator-oai:
     chart_ref: kpi-calculator
-    image:
-      repository: r2labuser/kpi-calculator-oai
-      image_tag: 2026w43-radio-scoped
-      image_pull_policy: IfNotPresent
   monitoring-controller:
     pod_selector:
     - app.kubernetes.io/instance=monitoring-controller
-    image:
-      repository: r2labuser/kopf-controller
-      image_tag: 2026w44
-      image_pull_policy: Always

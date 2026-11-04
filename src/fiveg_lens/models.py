@@ -1,11 +1,16 @@
 """Monitoring configuration and Helm component models."""
 
+import json
+from pathlib import Path
 from typing import Any, Literal, Self
 
 from metamodel.models.base import StrictBaseModel
 from orchestrator.models.deployment import DeploymentModel
 from orchestrator.models.k8s import ContainerImage
 from pydantic import Field, model_validator
+
+
+DEFAULT_IMAGES = json.loads((Path(__file__).parent / "assets" / "images.json").read_text())
 
 
 class DeployedMonitoringComponent(StrictBaseModel):
@@ -51,10 +56,10 @@ class MonitoringTarget(StrictBaseModel):
 class MonitoringImages(StrictBaseModel):
     """Container versions for probes and sniffers injected into network-function pods."""
 
-    probe: str = "r2labuser/ebpf-latency-probe:2026e2eLatestDebug"
-    throughput: str = "r2labuser/ebpf-throughput-probe:2026w44"
-    amf_sniffer: str = "r2labuser/amf-sniffer:2026w40-tmsi-correlation"
-    smf_sniffer: str = "r2labuser/smf-sniffer:2026w10"
+    probe: str = DEFAULT_IMAGES["probes"]["probe"]
+    throughput: str = DEFAULT_IMAGES["probes"]["throughput"]
+    amf_sniffer: str = DEFAULT_IMAGES["probes"]["amf_sniffer"]
+    smf_sniffer: str = DEFAULT_IMAGES["probes"]["smf_sniffer"]
 
 
 class MonitoringDeployment(StrictBaseModel):
