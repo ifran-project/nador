@@ -12,12 +12,15 @@ timelines and metrics. Network deployment remains handled by upstream managers.
 Install from GitHub:
 
 ```bash
-python -m pip install "git+https://github.com/yassir63/fiveg-lens.git"
+python -m pip install "git+https://github.com/yassir63/fiveg-lens.git@v0.1.0"
 ```
 
 ```python
 from fiveg_lens import MonitoringManagement, MonitoringDeployment
 ```
+
+Start with the [minimal tutorial](examples/quickstart/tutorial.ipynb): installation,
+imports, monitoring deployment and one experiment with artifact collection.
 
 Examples are under [examples/monitoring](examples/monitoring):
 

@@ -1,5 +1,17 @@
 # Monitoring
 
+Follow the [minimal tutorial](examples/quickstart/tutorial.ipynb) for installation,
+configuration, deployment and artifact collection in one notebook.
+
+Install the released library in your notebook:
+
+```python
+%pip install "git+https://github.com/yassir63/fiveg-lens.git@v0.1.0"
+```
+
+Restart the kernel after installation, then run your core/RAN setup before
+creating the monitoring manager below.
+
 The [multi-gnb notebook](examples/monitoring/multi-gnb-2du/test.ipynb) shows the
 complete deployment and interactive traffic flow. Deploy monitoring after the
 core/RAN and before UE attachment, so the sniffers observe session establishment.

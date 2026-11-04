@@ -1,0 +1,14 @@
+[
+  {
+    "name": "scrape_targets",
+    "query": "up"
+  },
+  {
+    "name": "n3_throughput_bps",
+    "query": "8 * rate(gtp_throughput_bytes_total{probe_role=\"upf\"}[5s])"
+  },
+  {
+    "name": "ue_sessions",
+    "query": "fiveg_ue_session_info"
+  }
+]
