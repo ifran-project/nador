@@ -12,7 +12,7 @@
     "query": "gtp_teid_latency_observed_ns_count"
   },
   {
-    "name": "latency_la<YOUR_PASSWORD>_ms",
+    "name": "latency_latest_ms",
     "query": "gtp_teid_latency_ns / 1000000"
   },
   {

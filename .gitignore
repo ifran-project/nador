@@ -1,48 +1,22 @@
-venv
-.venv
-__pycache__
-
-.vscode
-.devcontainer/devcontainer.json
-
-# macos
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
 .DS_Store
-.AppleDouble
-.LSOverride
-._*
-
-# Local notebook environment and user run outputs
+.vscode/
 .ansible/
 .jupyter/
+.ipynb_checkpoints/
 dist/
 build/
-examples/monitoring/results/
-examples/monitoring/*model*.yaml
-examples/monitoring/monitoring.yaml
+.k8s*.conf
+**/results/
+**/output/
+**/output_*model.yaml
+**/monitoring_*model.yaml
+**/merged.yaml
 
-examples/default/results/
-examples/default/*model*.yaml
-
-.k8s-admin.conf
-.k8s-*.conf
-
-examples/default/merged.yaml
-
-.pip-cache/
-
-# Generated state and experiment artifacts in monitoring examples
-examples/monitoring/**/results/
-examples/monitoring/**/output/
-examples/monitoring/**/output_*model.yaml
-examples/monitoring/**/monitoring_*model.yaml
-examples/monitoring/**/merged.yaml
-examples/monitoring/**/input/full/
-
-# Live trial outputs and local configuration
-examples/monitoring-trials/**/results/
-examples/monitoring-trials/**/output/
-examples/monitoring-trials/**/output_*model.yaml
-examples/monitoring-trials/**/monitoring_*model.yaml
-examples/monitoring-trials/**/merged.yaml
-examples/monitoring-trials/**/input/full/
-examples/monitoring-trials/local-config.json
+# Private validation belongs in the development repository.
+/tests/
+/examples/monitoring-trials/

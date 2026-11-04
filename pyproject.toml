@@ -1,9 +1,9 @@
 [project]
 name = "orchestrator-monitoring"
 version = "0.1.0"
-description = "Monitoring and experiment artifacts for the unmodified 5G orchestrator"
+description = "5G Lens: monitoring and experiment artifacts for the SLICES 5G orchestrator"
 authors = [{name = "Yassir Amami"}]
-license = {text = "BSD-Clear"}
+license = {text = "BSD-3-Clause-Clear"}
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -16,6 +16,7 @@ dependencies = [
 packages = [{include = "orchestrator_monitoring", from = "src"}]
 include = [
     {path = "src/orchestrator_monitoring/assets", format = ["sdist", "wheel"]},
+    {path = "LICENSES", format = ["sdist", "wheel"]},
 ]
 
 [build-system]
@@ -23,7 +24,8 @@ requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [project.optional-dependencies]
-dev = ["py<YOUR_PASSWORD>>=8", "py<YOUR_PASSWORD>-asyncio>=0.24", "ruff>=0.9.4", "nbformat>=5.10", "nbclient>=0.10", "ipykernel>=6,<8"]
+dev = ["ruff>=0.9.4"]
+notebooks = ["ipykernel>=6,<8"]
 
 [tool.ruff]
 line-length = 120
@@ -53,7 +55,7 @@ select = [
     "PIE", # flake8-pie
     "PL", # pylint
     "PYI", # flake8-pyi
-    "PT", # flake8-py<YOUR_PASSWORD>-style
+    "PT", # flake8-pytest-style
     "PTH", # flake8-use-pathlib
     "Q", # flake8-quotes
     "RET", # flake8-return
@@ -97,10 +99,6 @@ ignore = [
 # Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]
 
-[tool.ruff.lint.per-file-ignores]
-"<YOUR_PASSWORD>s/**/*.py" = [
-    "S101", # allow assert in <YOUR_PASSWORD>s
-]
 
 [tool.pyright]
 include = ["src"]

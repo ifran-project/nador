@@ -1,0 +1,59 @@
+{
+  "images": {
+    "controller": {
+      "image": "r2labuser/kopf-controller:2026w44",
+      "digest": "sha256:10dd92b4a6066d1a73130dbf0eae26f9f5ee0471cfeae11a59c84a7ef8f00053",
+      "source_sha256": {
+        "controller/Dockerfile": "672a873e47b5c74989484f5f49b043e025f83dc3b97a1f485ba4c7d1fbdb7201",
+        "controller/k8scontroller.py": "5bd2631aeff06b9b537d45e691e36970d702bf0906efe611cdd537ac1444d28c",
+        "common/tunnel_identity.py": "bcc961a9fd6e89e8705c67bad5905ec62404e26ec85d053045150a520857d1ef"
+      },
+      "changes": "Shared image for latency and throughput workers in one controller pod; separate modes, exporter ports, TC settings and Kopf markers. Discovery predicates preserved."
+    },
+    "throughput": {
+      "image": "r2labuser/ebpf-throughput-probe:2026w44-mapping",
+      "digest": "sha256:1c5f36303fc652eae1a0370098e1f519f4ac8f5328a15842b3fac6b31901b294",
+      "source_sha256": {
+        "throughput-probe/Dockerfile": "058e06ba22c1c09f8a104bfb34915280a04526731e8391ca8c136b98ebafc7d6",
+        "throughput-probe/Makefile": "1e3f73f1bbc9e140db454c2b425ed3a9cbd4e5dadb67b4d10488daab2dbca3dc",
+        "throughput-probe/gtp_packet.h": "146f87546ad5dec6d6990105537ddc5bbc4632e0867bada4ed83ba00eba2d1fd",
+        "throughput-probe/gtp_throughput.bpf.c": "7d6e05d2566d7d06eefe7c2f6d9ca79f74dfec690c7f4b7f4fc53bc7279a8210",
+        "throughput-probe/gtp_throughput_user.c": "41915f31aac1aa2613d41612fd31da6728c0fe78ba846424ee06ed0b6e9e1d68",
+        "throughput-probe/exporter.py": "2293de0864c35ccb54c880ba1cbe21890fa7c476daee58530e1af0633c0d9e40",
+        "throughput-probe/entrypoint-throughput.sh": "e7e773ad391037cd7925d610e5f6b3550773189c8cb9032a8ce4fdee4f8e85a3",
+        "common/tunnel_identity.py": "bcc961a9fd6e89e8705c67bad5905ec62404e26ec85d053045150a520857d1ef"
+      },
+      "changes": "Adds procps/pkill for probe replacement when UE mappings change. Keeps endpoint-scoped counters and first-fragment accounting from 2026w43-fragments."
+    },
+    "latency_fragment_fix": {
+      "image": "r2labuser/ebpf-latency-probe:2026w43-fragments",
+      "digest": "sha256:7f569f8f603bee89326c14daf51b25221b9c5356c109ce24072caaeec4e4f991",
+      "source_sha256": {
+        "Dockerfile": "f41a1b437dfc79be44662a511432ba51074e85c93aa5955feb5932c448b8c58b",
+        "gtp_latency.bpf.c": "9efac5b5a258d7503a01ec3b2219e2439422445ca20a0a3adb092d99dcaedc6c",
+        "gtp_latency.h": "7296f20241f43f583cbd495456e6479f49d67d8346e2e8fe3d0fce9ced41aa3d",
+        "gtp_latency_user.c": "cb8aedb62d4f37be301933abf417dbf80766f50efb15b799adf4ef0cf00aad2a",
+        "exporter.py": "726acdc2ca5e7b3e111c87524616b0524fd02aa5fa2892f39210dcd68104acee",
+        "latency_socket_server.py": "5b316069bd4852e7f8ff8c5275c79277a7c0af3c366d6b55369b760eb759ce0c",
+        "entrypoint-latency.sh": "5b874919dd267fdd40ca43026eff3e0bd07893659ff18c6eb7205761f18056d9",
+        "Makefile": "e2890196012d44f2749c9bb11bb02197d0654e0670277f3f1392819ce0681682"
+      },
+      "changes": "Ignore outer continuation fragments; calculate TCP segment length from inner IPv4 length; reject incomplete TCP headers and inner IP fragments."
+    }
+  },
+  "upstream": {
+    "orchestrator_version": "0.0.5",
+    "upstream_commit": "08817f2a121ad798693b2b64f283d1a0f3674125",
+    "metamodel_version": "0.0.5"
+  },
+  "hackathon_profile": {
+    "path": "examples/monitoring/hackathon-2du/monitoring.yaml",
+    "controller": {
+      "repository": "r2labuser/kopf-controller",
+      "image_tag": "2026w44",
+      "image_pull_policy": "Always"
+    },
+    "latency": "r2labuser/ebpf-latency-probe:2026w43",
+    "throughput": "r2labuser/ebpf-throughput-probe:2026w44-mapping"
+  }
+}

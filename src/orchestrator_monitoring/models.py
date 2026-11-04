@@ -51,7 +51,7 @@ class MonitoringTarget(StrictBaseModel):
 class MonitoringImages(StrictBaseModel):
     """Container versions for probes and sniffers injected into network-function pods."""
 
-    probe: str = "r2labuser/ebpf-latency-probe:2026e2eLa<YOUR_PASSWORD>Debug"
+    probe: str = "r2labuser/ebpf-latency-probe:2026e2eLatestDebug"
     throughput: str = "r2labuser/ebpf-throughput-probe:2026w44-mapping"
     amf_sniffer: str = "r2labuser/amf-sniffer:2026w40-tmsi-correlation"
     smf_sniffer: str = "r2labuser/smf-sniffer:2026w10"

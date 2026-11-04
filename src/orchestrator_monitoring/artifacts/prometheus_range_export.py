@@ -57,7 +57,7 @@ sum by (imsi, ue_ip, slice, probe_role, mode) (
 """,
     },
     {
-        "name": "direct_la<YOUR_PASSWORD>_ms",
+        "name": "direct_latest_ms",
         "query": "gtp_teid_latency_ns / 1000000",
     },
     {

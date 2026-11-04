@@ -3,7 +3,7 @@ defaults:
   - key: node-role.kubernetes.io/control-plane
     operator: Exists
     effect: NoSchedule
-  - key: <YOUR_PASSWORD>-eviction
+  - key: test-eviction
     operator: Equal
     value: 'true'
     effect: NoSchedule

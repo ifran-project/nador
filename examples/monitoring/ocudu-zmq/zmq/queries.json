@@ -1,6 +1,6 @@
 [
   {
-    "name": "direct_la<YOUR_PASSWORD>_ms",
+    "name": "direct_latest_ms",
     "query": "gtp_teid_latency_ns / 1000000"
   },
   {
@@ -72,15 +72,15 @@
     "query": "sum by (mode, probe_role) (rate(gtp_tcp_ack_no_match_total[30s]))"
   },
   {
-    "name": "same_packet_upf_rtt_la<YOUR_PASSWORD>_ms",
+    "name": "same_packet_upf_rtt_latest_ms",
     "query": "gtp_same_packet_upf_rtt_ns / 1000000"
   },
   {
-    "name": "same_packet_gnb_rtt_la<YOUR_PASSWORD>_ms",
+    "name": "same_packet_gnb_rtt_latest_ms",
     "query": "gtp_same_packet_gnb_rtt_ns / 1000000"
   },
   {
-    "name": "same_packet_gap_la<YOUR_PASSWORD>_ms",
+    "name": "same_packet_gap_latest_ms",
     "query": "gtp_same_packet_rtt_gap_ns / 1000000"
   },
   {

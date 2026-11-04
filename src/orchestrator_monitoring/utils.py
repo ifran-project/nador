@@ -33,7 +33,7 @@ def resolve_targets(model: MonitoringModel) -> list[dict]:
         component = components[target.component]
         namespace = getattr(component, "namespace", None)
         if not namespace:
-            raise ValueError(f"{target.component}: namespace is unresolved; pass the la<YOUR_PASSWORD> deployed manager")
+            raise ValueError(f"{target.component}: namespace is unresolved; pass the latest deployed manager")
         if target.role:
             expected = {"amf": {"amf"}, "smf": {"smf"}, "upf": {"upf"}, "gnb": {"gnb", "cu", "cu_up"}}
             if component.type not in expected[target.role]:

@@ -142,7 +142,7 @@ if __name__ == "__main__":
                     pod.metadata.name,
                     namespace,
                     [
-                        {"op": "<YOUR_PASSWORD>", "path": "/metadata/resourceVersion", "value": pod.metadata.resource_version},
+                        {"op": "test", "path": "/metadata/resourceVersion", "value": pod.metadata.resource_version},
                         {
                             "op": "replace",
                             "path": "/metadata/finalizers",
