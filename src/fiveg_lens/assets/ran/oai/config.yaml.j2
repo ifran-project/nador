@@ -1,1 +1,12 @@
+{# CSI logger: SRS channel estimates need periodic SRS (and CSI-RS), which the upstream template does not expose. #}
+{% set csi_env = component.extra_env_vars or {} %}
+{% if csi_env.get('CSI_LOGGING_ENABLED') | string == '1' %}
+{% set upstream_config %}{% include 'ran/oai/oai-' ~ component.type ~ '/config.yaml.j2' %}{% endset %}
+{# Text insertion after the single gNBs[0] min_rxtxtime line: a YAML round trip would rewrite values such as mcc 001 or gNB_ID 0x1. #}
+{% if upstream_config is search('(?m)^ +do_(SRS|CSIRS):') or upstream_config is not search('(?m)^    min_rxtxtime: ') %}
+{# Undefined variable on purpose: fail the prepare step instead of rendering a config without SRS. #}
+{{ csi_config_injection_failed_do_SRS_already_set_or_min_rxtxtime_not_found }}
+{% endif %}
+{{ upstream_config | regex_replace('^(    min_rxtxtime: [^\n]*)$', '\\1\n    do_SRS: periodic\n    do_CSIRS: 1', multiline=True) }}{% else %}
 {% include 'ran/oai/oai-' ~ component.type ~ '/config.yaml.j2' %}
+{% endif %}
