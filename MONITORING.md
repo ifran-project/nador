@@ -6,7 +6,7 @@ core/RAN and before UE attachment, so the sniffers observe session establishment
 Profiles select the interfaces and components appropriate to each deployment.
 
 ```python
-from orchestrator_monitoring import MonitoringManagement, MonitoringDeployment
+from fiveg_lens import MonitoringManagement, MonitoringDeployment
 
 monitoring = MonitoringManagement(
     preceding=ran,
@@ -34,7 +34,7 @@ legacy Open5GS KPI-calculator profiles use their explicit custom SMF/UPF images.
 It opens Prometheus access for final collection; Prometheus scrapes continuously.
 
 ```python
-from orchestrator_monitoring.artifacts import ExperimentRun
+from fiveg_lens.artifacts import ExperimentRun
 
 async with ExperimentRun(
     "results/my-run",

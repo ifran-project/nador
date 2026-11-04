@@ -12,7 +12,7 @@ from typing import Any, Self
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-from orchestrator_monitoring.deployment import MonitoringManagement
+from fiveg_lens.deployment import MonitoringManagement
 
 from . import prometheus_range_export as prometheus
 from . import split_prometheus_by_timeline as splitter

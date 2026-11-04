@@ -7,8 +7,8 @@ from orchestrator.deployment.base import BaseManagement
 from orchestrator.deployment.helm import HelmManagement
 from orchestrator.utils.ansible import get_ansible_inventory_line, run_ansible_role
 
-from orchestrator_monitoring.models import MonitoringDeployment, MonitoringModel
-from orchestrator_monitoring.utils import (
+from fiveg_lens.models import MonitoringDeployment, MonitoringModel
+from fiveg_lens.utils import (
     ASSETS,
     resolve_components,
     resolve_targets,

@@ -1,0 +1,6 @@
+collections:
+  - name: ansible.posix
+  - name: community.general
+  - name: kubernetes.core
+  - name: ansible.mysql
+  - name: community.mongodb

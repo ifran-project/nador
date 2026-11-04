@@ -1,7 +1,7 @@
 [project]
-name = "orchestrator-monitoring"
+name = "fiveg-lens"
 version = "0.1.0"
-description = "5G Lens: monitoring and experiment artifacts for the SLICES 5G orchestrator"
+description = "FiveG Lens: monitoring and experiment artifacts for the SLICES 5G orchestrator"
 authors = [{name = "Yassir Amami"}]
 license = {text = "BSD-3-Clause-Clear"}
 readme = "README.md"
@@ -13,9 +13,9 @@ dependencies = [
 ]
 
 [tool.poetry]
-packages = [{include = "orchestrator_monitoring", from = "src"}]
+packages = [{include = "fiveg_lens", from = "src"}]
 include = [
-    {path = "src/orchestrator_monitoring/assets", format = ["sdist", "wheel"]},
+    {path = "src/fiveg_lens/assets", format = ["sdist", "wheel"]},
     {path = "LICENSES", format = ["sdist", "wheel"]},
 ]
 

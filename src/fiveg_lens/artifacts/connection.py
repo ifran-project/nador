@@ -7,7 +7,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from orchestrator_monitoring.deployment import MonitoringManagement
+from fiveg_lens.deployment import MonitoringManagement
 
 
 @asynccontextmanager

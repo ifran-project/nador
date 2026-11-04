@@ -1,14 +1,24 @@
-# 5G Lens
+# FiveG Lens
 
 Monitoring and experiment artifacts for networks deployed with the
 [SLICES 5G orchestrator](https://gitlab.inria.fr/slices-ri/blueprints/post-5g/orchestrator).
-5G Lens is an independent Python extension: it depends on upstream without
+FiveG Lens is an independent Python extension: it depends on upstream without
 shipping or modifying upstream's Python package or Ansible roles.
 
 It integrates Prometheus, Grafana and Loki, correlates UE/slice/tunnel/session
 information, deploys latency and N3 throughput probes, and exports experiment
 timelines and metrics. Network deployment remains handled by upstream managers.
-The Python import remains `orchestrator_monitoring`.
+The Python package is `fiveg_lens`.
+
+Install from GitHub:
+
+```bash
+python -m pip install "git+https://github.com/yassir63/fiveg-lens.git"
+```
+
+```python
+from fiveg_lens import MonitoringManagement, MonitoringDeployment
+```
 
 Examples are under [examples/monitoring](examples/monitoring):
 
