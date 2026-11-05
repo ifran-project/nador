@@ -12,6 +12,7 @@ from typing import Any, Self
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
+from fiveg_lens.csi.collection import CsiCollector
 from fiveg_lens.deployment import MonitoringManagement
 
 from . import prometheus_range_export as prometheus
@@ -38,6 +39,8 @@ class ExperimentRun:
         step: str = "1s",
         timezone: str = "Europe/Paris",
         monitoring: MonitoringManagement | None = None,
+        csi: CsiCollector | None = None,
+        csi_clock_threshold_s: float = 0.5,
     ) -> None:
         if monitoring is not None and prometheus_url is not None:
             raise ValueError("Supply monitoring or prometheus_url, not both")
@@ -53,6 +56,12 @@ class ExperimentRun:
         self.names = set()
         self.entered = False
         self.active_sections = 0
+        self.csi = csi
+        # Offset (gNB node - local clock) is applied to events only beyond this bound: below it,
+        # the ssh measurement error (RTT/2) is of the same order as the offset itself.
+        self.csi_clock_threshold_s = csi_clock_threshold_s
+        self.ran_clock = None
+        self.ran_offset_s = 0.0
 
     def _event(self, level: str, phase: str, name: str, **extra: Any) -> None:
         now = datetime.now(UTC)
@@ -67,12 +76,19 @@ class ExperimentRun:
             "timezone": self.timezone,
             **extra,
         }
+        if self.ran_clock is not None:
+            # gNB node clock, used to cut the CSI log per window (see fiveg_lens.csi.CsiCollector)
+            event["ran_epoch"] = now.timestamp() + self.ran_offset_s
         with (self.directory / "timeline_events.jsonl").open("a") as f:
             f.write(json.dumps(event) + "\n")
 
     async def __aenter__(self) -> Self:
         if self.entered:
             raise RuntimeError("ExperimentRun cannot be entered twice")
+        if self.csi is not None:
+            self.ran_clock = await self.csi.measure_clock()
+            if abs(self.ran_clock["offset_s"]) > self.csi_clock_threshold_s:
+                self.ran_offset_s = self.ran_clock["offset_s"]
         self.directory.mkdir(parents=True, exist_ok=False)
         self.entered = True
         self.started = time.time()
@@ -84,6 +100,14 @@ class ExperimentRun:
             "status": "running",
             "collection_errors": [],
         }
+        if self.ran_clock is not None:
+            self.metadata["csi"] = {
+                "clock_start": self.ran_clock,
+                "clock_threshold_s": self.csi_clock_threshold_s,
+                "clock_offset_applied_s": self.ran_offset_s,
+                "clock_offset_applied": self.ran_offset_s != 0.0,
+                "warnings": [],
+            }
         self._save_metadata()
         return self
 
@@ -188,6 +212,31 @@ class ExperimentRun:
                 await asyncio.to_thread(self._collect, ended)
         except Exception as exc:
             self.metadata["collection_errors"].append(f"collection: {exc}")
+        if self.csi is not None:
+            await self._collect_csi()
+
+    async def _collect_csi(self) -> None:
+        errors = self.metadata["collection_errors"]
+        try:
+            clock_end = await self.csi.measure_clock()
+            self.metadata["csi"]["clock_end"] = clock_end
+            # Offset change over the run (clock drift or step); compare with the ~5 s CSI batch granularity
+            drift = clock_end["offset_s"] - self.ran_clock["offset_s"]
+            self.metadata["csi"]["clock_drift_s"] = drift
+            if abs(drift) > self.csi_clock_threshold_s:
+                self.metadata["csi"]["warnings"].append(
+                    f"gNB node clock offset changed by {drift:+.3f} s during the run "
+                    f"(threshold {self.csi_clock_threshold_s} s): CSI windows may be shifted"
+                )
+        except Exception as exc:
+            errors.append(f"csi clock: {exc}")
+        windows = self.directory / "timeline_summary.json"
+        try:
+            self.metadata["csi"]["summary"] = await self.csi.collect(
+                self.directory / "csi", windows if windows.is_file() else None
+            )
+        except Exception as exc:
+            errors.append(f"csi: {exc}")
 
     async def __aexit__(
         self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None

@@ -3,6 +3,8 @@
 from orchestrator.deployment import RANManagement
 from orchestrator.models.k8s import ContainerImage
 
+from fiveg_lens.csi.collection import CsiCollector
+
 # Upstream default OAI gNB repository -> CSI logger image built from the same OAI tag.
 CSI_IMAGE_REPOSITORIES = {
     "docker.io/oaisoftwarealliance/oai-gnb": "docker.io/r2labuser/oai-gnb-csi",
@@ -10,7 +12,7 @@ CSI_IMAGE_REPOSITORIES = {
 
 DEFAULT_OUTPUT_DIR = "/data/csi"
 
-__all__ = ["DEFAULT_OUTPUT_DIR", "enable_csi"]
+__all__ = ["DEFAULT_OUTPUT_DIR", "CsiCollector", "enable_csi"]
 
 
 def enable_csi(
