@@ -1,0 +1,80 @@
+# Make the CSI output directory of a radio node live on a disk, never in RAM.
+# Same approach as 5g_ansible roles/setup/pre_k8s (branch csi-ue-mapper): on a live system "/" is an
+# overlay on tmpfs, so a hostPath file there is in RAM (5g_ansible saw the gNB pod OOM-killed after ~2 min
+# at ~7 MB/s, 2026-10-09). The csi-data directory sits at the root of the data disk, where 5g_ansible puts it
+# (its /var/lib/containerd is that disk): mounted elsewhere, its csi-data is bind-mounted; not mounted, the
+# disk is mounted on csi_storage_mount first. The disk is never formatted. Mounts do not survive a reboot.
+#
+# Inputs:
+#   csi_output_dir     directory written by the logger (hostPath of the gNB/DU pod)
+#   csi_storage_device data disk partition under /dev (e.g. sda1), "" when the node has none
+#   csi_storage_mount  mount point of that partition when it is not mounted yet
+# Output (set_stats): csi_storage (filesystem of csi_output_dir, before and after)
+---
+- name: CSI storage - filesystem holding the CSI directory
+  ansible.builtin.shell: |
+    set -eu
+    d={{ csi_output_dir | quote }}
+    while [ ! -e "$d" ]; do d=$(dirname "$d"); done
+    findmnt -n -o FSTYPE,SOURCE,TARGET -T "$d"
+  register: csi_fs_before
+  changed_when: false
+
+- name: CSI storage - is it in RAM
+  ansible.builtin.set_fact:
+    csi_in_ram: "{{ (csi_fs_before.stdout.split() | first) in csi_ram_fstypes }}"
+  vars:
+    csi_ram_fstypes: [tmpfs, ramfs, overlay, squashfs, rootfs]
+
+- name: CSI storage - a data disk is required on a node whose CSI directory is in RAM
+  ansible.builtin.fail:
+    msg: >-
+      {{ csi_output_dir }} on {{ inventory_hostname }} is on '{{ csi_fs_before.stdout }}' (RAM): the CSI file
+      would fill the memory. Give the data disk partition of this node (storage={'{{ inventory_hostname }}': 'sda1'}).
+  when: csi_in_ram and csi_storage_device | length == 0
+
+- name: CSI storage - put the CSI directory on the data disk
+  when: csi_in_ram
+  block:
+    - name: CSI storage - current mount point of the data disk
+      ansible.builtin.command: findmnt -n -o TARGET --first-only /dev/{{ csi_storage_device }}
+      register: csi_disk_target
+      failed_when: false
+      changed_when: false
+
+    - name: CSI storage - mount the data disk (not formatted, no fstab entry)
+      ansible.builtin.shell: |
+        set -eu
+        test -b /dev/{{ csi_storage_device | quote }}
+        mkdir -p {{ csi_storage_mount | quote }}
+        mount -o noatime /dev/{{ csi_storage_device | quote }} {{ csi_storage_mount | quote }}
+      when: csi_disk_target.stdout | trim | length == 0
+
+    - name: CSI storage - bind-mount csi-data of the data disk onto the CSI directory
+      ansible.builtin.shell: |
+        set -eu
+        mkdir -p {{ (csi_disk_root + '/csi-data') | quote }} {{ csi_output_dir | quote }}
+        mountpoint -q {{ csi_output_dir | quote }} || mount --bind {{ (csi_disk_root + '/csi-data') | quote }} {{ csi_output_dir | quote }}
+      vars:
+        csi_disk_root: "{{ (csi_disk_target.stdout | trim) or csi_storage_mount }}"
+
+- name: CSI storage - create the CSI directory (on disk)
+  ansible.builtin.file:
+    path: "{{ csi_output_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: CSI storage - filesystem of the CSI directory now
+  ansible.builtin.command: findmnt -n -o FSTYPE,SOURCE,TARGET,AVAIL -T {{ csi_output_dir }}
+  register: csi_fs_after
+  changed_when: false
+
+- name: CSI storage - the CSI directory must no longer be in RAM
+  ansible.builtin.assert:
+    that: (csi_fs_after.stdout.split() | first) not in ['tmpfs', 'ramfs', 'overlay', 'squashfs', 'rootfs']
+    fail_msg: "{{ csi_output_dir }} on {{ inventory_hostname }} is still on '{{ csi_fs_after.stdout }}'"
+
+- name: CSI storage - return the result
+  ansible.builtin.set_stats:
+    data:
+      csi_storage: {"before": "{{ csi_fs_before.stdout }}", "after": "{{ csi_fs_after.stdout }}"}

@@ -5,6 +5,7 @@ from orchestrator.models.k8s import ContainerImage
 
 from fiveg_lens.csi.collection import CsiCollector
 from fiveg_lens.csi.live import CsiLiveView
+from fiveg_lens.csi.storage import prepare_csi_storage
 
 # Upstream default OAI gNB repository -> CSI logger image built from the same OAI tag.
 CSI_IMAGE_REPOSITORIES = {
@@ -14,7 +15,7 @@ CSI_IMAGE_REPOSITORIES = {
 DEFAULT_OUTPUT_DIR = "/data/csi"
 CSI_COMPONENT_TYPES = ("gnb", "du")
 
-__all__ = ["DEFAULT_OUTPUT_DIR", "CsiCollector", "CsiLiveView", "enable_csi"]
+__all__ = ["DEFAULT_OUTPUT_DIR", "CsiCollector", "CsiLiveView", "enable_csi", "prepare_csi_storage"]
 
 
 def enable_csi(
