@@ -18,7 +18,7 @@ core/RAN and before UE attachment, so the sniffers observe session establishment
 Profiles select the interfaces and components appropriate to each deployment.
 
 ```python
-from fiveg_lens import MonitoringManagement, MonitoringDeployment
+from nextg_lens import MonitoringManagement, MonitoringDeployment
 
 monitoring = MonitoringManagement(
     preceding=ran,
@@ -40,7 +40,7 @@ print(await monitoring.get_logs(components=["ue-mapper-api"], quiet=True))
 It opens Prometheus access for final collection; Prometheus scrapes continuously.
 
 ```python
-from fiveg_lens.artifacts import ExperimentRun
+from nextg_lens.artifacts import ExperimentRun
 
 async with ExperimentRun(
     "results/my-run",
@@ -57,6 +57,6 @@ Each experiment needs a new result directory. The collector finalizes artifacts
 on workload failure; it does not automatically save packet captures or every
 pod's logs. Building this package does not rebuild its container images.
 
-Default image versions are selected in `src/fiveg_lens/assets/images.json`.
+Default image versions are selected in `src/nextg_lens/assets/images.json`.
 Standard profiles inherit them; `images` and `components.<name>.image` remain available
 for deliberate overrides. Image-update pull requests change only that manifest.

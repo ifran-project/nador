@@ -15,16 +15,14 @@ Install from GitHub:
 python -m pip install --upgrade "git+https://github.com/yassir63/nextg-lens.git@main"
 ```
 
-The code on this branch still uses the original Python import name:
-
 ```python
-from fiveg_lens import MonitoringManagement, MonitoringDeployment
+from nextg_lens import MonitoringManagement, MonitoringDeployment
 ```
 
 Start with the [minimal tutorial](examples/quickstart/tutorial.ipynb): installation,
 imports, monitoring deployment and one experiment with artifact collection.
 
-Default monitoring image versions live in [`assets/images.json`](src/fiveg_lens/assets/images.json).
+Default monitoring image versions live in [`assets/images.json`](src/nextg_lens/assets/images.json).
 Image builds can propose updates through a pull request; deployments change after you merge it.
 Explicit scenario overrides still take precedence.
 

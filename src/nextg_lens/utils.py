@@ -9,7 +9,7 @@ from orchestrator.utils.ansible import get_ansible_inventory_line, run_ansible_r
 from orchestrator.utils.k8s import build_k8s_safe
 from orchestrator.utils.utils import deep_merge
 
-from fiveg_lens.models import DEFAULT_IMAGES, DeployedMonitoringComponent, MonitoringModel
+from nextg_lens.models import DEFAULT_IMAGES, DeployedMonitoringComponent, MonitoringModel
 
 ASSETS = Path(__file__).resolve().parent / "assets"
 CHARTS = ASSETS / "charts"
