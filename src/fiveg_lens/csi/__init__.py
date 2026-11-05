@@ -15,7 +15,14 @@ CSI_IMAGE_REPOSITORIES = {
 DEFAULT_OUTPUT_DIR = "/data/csi"
 CSI_COMPONENT_TYPES = ("gnb", "du")
 
-__all__ = ["DEFAULT_OUTPUT_DIR", "CsiCollector", "CsiLiveView", "enable_csi", "prepare_csi_storage"]
+__all__ = [
+    "DEFAULT_OUTPUT_DIR",
+    "CsiCollector",
+    "CsiLiveView",
+    "enable_csi",
+    "prepare_csi_storage",
+    "select_csi_images",
+]
 
 
 def enable_csi(
@@ -34,6 +41,8 @@ def enable_csi(
     CSI_ANTENNA_SELECTION, CSI_PORT_SELECTION, CSI_SUBCARRIER_SAMPLING, CSI_FLUSH_CORE).
     Each logging component writes <output_dir>/csi_per_rb.csv on its node: two of them on the same
     node need different output_dir values (call enable_csi once per component).
+    The other OAI components get their image without CSI logger (see select_csi_images): call
+    enable_csi(ran, components=[]) for a deployment without CSI.
     """
     all_components = ran.deployment_model.ran.components
     names = list(all_components) if components is None else components
@@ -73,6 +82,7 @@ def enable_csi(
             }
             | (env or {})
         )
+    select_csi_images(ran)
 
 
 def _check_distinct_files(all_components: dict, selected: list[str], output_dir: str) -> None:
@@ -102,3 +112,25 @@ def _check_distinct_files(all_components: dict, selected: list[str], output_dir:
                 f"{[n for n, node in users if node in shared]} write {directory}/csi_per_rb.csv on the same node: "
                 "use distinct output_dir"
             )
+
+
+def select_csi_images(ran: RANManagement) -> None:
+    """
+    Use a CSI logger image only on the components where CSI logging is enabled.
+
+    The logger of these images always starts (oai-csi-logging v3.1), and the orchestrator defaults to
+    r2labuser/oai-gnb-aw2s-csi for the AW2S gNB, DU, CU and CU-CP: without enable_csi it would write
+    /data/csi inside the container. Every other OAI component with a "-csi" image gets the same image
+    without logger: the reverse of CSI_IMAGE_REPOSITORIES, else the repository without its "-csi" suffix
+    (r2labuser/oai-gnb-aw2s-csi -> r2labuser/oai-gnb-aw2s), with the same tag.
+    """
+    without_csi = {csi: plain for plain, csi in CSI_IMAGE_REPOSITORIES.items()}
+    for component in ran.deployment_model.ran.components.values():
+        if component.implementation != "oai" or component.image is None:
+            continue
+        if str((component.extra_env_vars or {}).get("CSI_LOGGING_ENABLED")) == "1":
+            continue
+        repository = component.image.repository
+        if repository.endswith("-csi"):
+            plain = without_csi.get(repository, repository.removesuffix("-csi"))
+            component.image = component.image.model_copy(update={"repository": plain})
