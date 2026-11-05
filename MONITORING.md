@@ -6,7 +6,7 @@ configuration, deployment and artifact collection in one notebook.
 Install the latest merged library from GitHub `main` in your notebook:
 
 ```python
-%pip install --upgrade "git+https://github.com/yassir63/fiveg-lens.git@main"
+%pip install --upgrade "git+https://github.com/yassir63/nextg-lens.git@main"
 ```
 
 Restart the kernel after installation, then run your core/RAN setup before
