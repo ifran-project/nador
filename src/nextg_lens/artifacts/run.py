@@ -12,8 +12,8 @@ from typing import Any, Self
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-from fiveg_lens.csi.collection import CsiCollector
-from fiveg_lens.deployment import MonitoringManagement
+from nextg_lens.csi.collection import CsiCollector
+from nextg_lens.deployment import MonitoringManagement
 
 from . import prometheus_range_export as prometheus
 from . import split_prometheus_by_timeline as splitter

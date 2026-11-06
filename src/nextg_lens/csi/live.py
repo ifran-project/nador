@@ -10,7 +10,7 @@ from pathlib import Path
 from orchestrator.deployment.base import BaseManagement
 from orchestrator.utils.ansible import get_ansible_inventory_line, run_ansible_role
 
-from fiveg_lens.csi.collection import ROLES, CsiCollector
+from nextg_lens.csi.collection import ROLES, CsiCollector
 
 LIVE_ROOT = "/root/csi_live"  # on the live node
 

@@ -6,7 +6,7 @@ from pathlib import Path
 from orchestrator.deployment.base import BaseManagement
 from orchestrator.utils.ansible import get_ansible_inventory_line, run_ansible_role
 
-from fiveg_lens.csi.collection import ROLES
+from nextg_lens.csi.collection import ROLES
 
 DEFAULT_STORAGE_MOUNT = "/mnt/csi-disk"
 
@@ -36,7 +36,7 @@ async def prepare_csi_storage(
             raise ValueError(f"{name}: node_name must name a deployment node to prepare its CSI directory")
         directories.setdefault(component.node_name, set()).add(env.get("CSI_OUTPUT_DIR", "/data/csi"))
     if not directories:
-        raise ValueError("No CSI-enabled component (see fiveg_lens.csi.enable_csi)")
+        raise ValueError("No CSI-enabled component (see nextg_lens.csi.enable_csi)")
     storage = storage or {}
     unknown = set(storage) - directories.keys()
     if unknown:

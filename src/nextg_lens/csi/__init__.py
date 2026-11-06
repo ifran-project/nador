@@ -1,11 +1,11 @@
-"""CSI logging (oai-csi-logging images) for OAI gNBs deployed with the fiveg-lens OAI charts."""
+"""CSI logging (oai-csi-logging images) for OAI gNBs deployed with the nextg-lens OAI charts."""
 
 from orchestrator.deployment import RANManagement
 from orchestrator.models.k8s import ContainerImage
 
-from fiveg_lens.csi.collection import CsiCollector
-from fiveg_lens.csi.live import CsiLiveView
-from fiveg_lens.csi.storage import prepare_csi_storage
+from nextg_lens.csi.collection import CsiCollector
+from nextg_lens.csi.live import CsiLiveView
+from nextg_lens.csi.storage import prepare_csi_storage
 
 # Upstream default OAI gNB repository -> CSI logger image built from the same OAI tag.
 CSI_IMAGE_REPOSITORIES = {
@@ -35,7 +35,7 @@ def enable_csi(
     """
     Select the CSI logger image and its environment on OAI gnb / du components, before ran.prepare().
 
-    The fiveg-lens OAI charts (custom_chart_path / custom_rendered_files) must already be selected:
+    The nextg-lens OAI charts (custom_chart_path / custom_rendered_files) must already be selected:
     they mount output_dir as a hostPath and force do_SRS: periodic / do_CSIRS: 1 when
     CSI_LOGGING_ENABLED is "1". env adds or overrides CSI_* variables (CSI_GRANULARITY,
     CSI_ANTENNA_SELECTION, CSI_PORT_SELECTION, CSI_SUBCARRIER_SAMPLING, CSI_FLUSH_CORE).
@@ -59,7 +59,7 @@ def enable_csi(
                 continue
             raise ValueError(f"{name}: CSI logging is only supported on OAI gnb and du components")
         if not component.custom_chart_path:
-            raise ValueError(f"{name}: select the fiveg-lens OAI charts before enabling CSI")
+            raise ValueError(f"{name}: select the nextg-lens OAI charts before enabling CSI")
         selected.append(name)
     _check_distinct_files(all_components, selected, output_dir)
 

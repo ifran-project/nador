@@ -1,8 +1,8 @@
-# FiveG Lens
+# NextG Lens
 
 Monitoring and experiment artifacts for networks deployed with the
 [SLICES 5G orchestrator](https://gitlab.inria.fr/slices-ri/blueprints/post-5g/orchestrator).
-FiveG Lens is an independent Python extension: it depends on upstream without
+NextG Lens is an independent Python extension: it depends on upstream without
 shipping or modifying upstream's Python package or Ansible roles.
 
 It integrates Prometheus, Grafana and Loki, correlates UE/slice/tunnel/session
@@ -12,17 +12,17 @@ timelines and metrics. Network deployment remains handled by upstream managers.
 Install from GitHub:
 
 ```bash
-python -m pip install --upgrade "git+https://github.com/yassir63/fiveg-lens.git@main"
+python -m pip install --upgrade "git+https://github.com/yassir63/nextg-lens.git@main"
 ```
 
 ```python
-from fiveg_lens import MonitoringManagement, MonitoringDeployment
+from nextg_lens import MonitoringManagement, MonitoringDeployment
 ```
 
 Start with the [minimal tutorial](examples/quickstart/tutorial.ipynb): installation,
 imports, monitoring deployment and one experiment with artifact collection.
 
-Default monitoring image versions live in [`assets/images.json`](src/fiveg_lens/assets/images.json).
+Default monitoring image versions live in [`assets/images.json`](src/nextg_lens/assets/images.json).
 Image builds can propose updates through a pull request; deployments change after you merge it.
 Explicit scenario overrides still take precedence.
 

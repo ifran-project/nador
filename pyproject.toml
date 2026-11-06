@@ -1,7 +1,7 @@
 [project]
-name = "fiveg-lens"
-version = "0.1.0"
-description = "FiveG Lens: monitoring and experiment artifacts for the SLICES 5G orchestrator"
+name = "nextg-lens"
+version = "0.2.0"
+description = "NextG Lens: monitoring and experiment artifacts for the SLICES 5G orchestrator"
 authors = [{name = "Yassir Amami"}]
 license = {text = "BSD-3-Clause-Clear"}
 readme = "README.md"
@@ -13,9 +13,9 @@ dependencies = [
 ]
 
 [tool.poetry]
-packages = [{include = "fiveg_lens", from = "src"}]
+packages = [{include = "nextg_lens", from = "src"}]
 include = [
-    {path = "src/fiveg_lens/assets", format = ["sdist", "wheel"]},
+    {path = "src/nextg_lens/assets", format = ["sdist", "wheel"]},
     {path = "LICENSES", format = ["sdist", "wheel"]},
 ]
 

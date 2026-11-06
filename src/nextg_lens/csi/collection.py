@@ -43,7 +43,7 @@ class CsiCollector:
         deployed = model.ran.components[component]
         env = deployed.extra_env_vars or {}
         if str(env.get("CSI_LOGGING_ENABLED")) != "1":
-            raise ValueError(f"{component}: CSI logging is not enabled (see fiveg_lens.csi.enable_csi)")
+            raise ValueError(f"{component}: CSI logging is not enabled (see nextg_lens.csi.enable_csi)")
         if not deployed.node_name or deployed.node_name not in model.nodes:
             # The hostPath file lives on the pod's node: it must be known from the deployment model.
             raise ValueError(f"{component}: node_name must name a deployment node to locate the CSI file")

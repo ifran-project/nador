@@ -3,7 +3,7 @@
 # 1b5a0b30). The play runs on the live host (the monitoring node, never the gNB node): a streamer
 # follows the CSI log of the gNB node over ssh, and Streamlit (visualizer v8.8, live mode) shows a
 # sliding window of it on 127.0.0.1:csi_live_port of the live host, reached with an ssh tunnel
-# (fiveg_lens.csi.CsiLiveView.tunnel_command). gNB node load: one sshd session plus "tail -F" at the
+# (nextg_lens.csi.CsiLiveView.tunnel_command). gNB node load: one sshd session plus "tail -F" at the
 # lowest CPU/IO priority. Both nodes are in the inventory; gNB node tasks are delegated to csi_ran_host.
 # csi_live_action = start | stop | status. Output (set_stats): csi_live_status (status only).
 

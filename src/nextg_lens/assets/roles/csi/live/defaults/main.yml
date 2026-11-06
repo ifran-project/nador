@@ -1,5 +1,5 @@
 # Defaults of the live view, taken from 5g_ansible roles/5g/csi_logging/defaults/main.yml (1b5a0b30).
-# fiveg_lens.csi.CsiLiveView passes the deployment-specific values (gNB node, address, file).
+# nextg_lens.csi.CsiLiveView passes the deployment-specific values (gNB node, address, file).
 csi_live_action: start
 # The play runs on the live host
 csi_live_host: "{{ inventory_hostname }}"

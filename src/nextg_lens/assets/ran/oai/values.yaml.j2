@@ -5,7 +5,7 @@ metricsParser:
   enabled: true
   # Published 2026.w38 image; parser source verified against the supplied branch.
   image: ghcr.io/ziyad-mabrouk/oai-gnb-metrics-parser@sha256:d8f793b51727f984f6a680016ff17d72612ce3018295dab1e2b82635af1f92f7
-{# CSI logger (oai-csi-logging images): enabled by fiveg_lens.csi.enable_csi through extra_env_vars. #}
+{# CSI logger (oai-csi-logging images): enabled by nextg_lens.csi.enable_csi through extra_env_vars. #}
 {% set csi_env = component.extra_env_vars or {} %}
 {% if csi_env.get('CSI_LOGGING_ENABLED') | string == '1' %}
 
