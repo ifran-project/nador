@@ -1,80 +1,80 @@
 {
   "probes": {
-    "probe": "ghcr.io/yassir63/ebpf-latency-probe:sha-af0ba1a8430e70dd84141ee71397dbecf6237e89",
-    "throughput": "ghcr.io/yassir63/ebpf-throughput-probe:sha-af0ba1a8430e70dd84141ee71397dbecf6237e89",
-    "amf_sniffer": "ghcr.io/yassir63/amf-sniffer:sha-af0ba1a8430e70dd84141ee71397dbecf6237e89",
-    "smf_sniffer": "ghcr.io/yassir63/smf-sniffer:sha-af0ba1a8430e70dd84141ee71397dbecf6237e89"
+    "probe": "ghcr.io/yassir63/ebpf-latency-probe:sha-45f5e935cedcb30ca0b0313bb3fe54eb0d188dcd",
+    "throughput": "ghcr.io/yassir63/ebpf-throughput-probe:sha-45f5e935cedcb30ca0b0313bb3fe54eb0d188dcd",
+    "amf_sniffer": "ghcr.io/yassir63/amf-sniffer:sha-45f5e935cedcb30ca0b0313bb3fe54eb0d188dcd",
+    "smf_sniffer": "ghcr.io/yassir63/smf-sniffer:sha-45f5e935cedcb30ca0b0313bb3fe54eb0d188dcd"
   },
   "components": {
     "ue-mapper-api": {
       "repository": "ghcr.io/yassir63/ue_mapper_api",
-      "image_tag": "sha-af0ba1a8430e70dd84141ee71397dbecf6237e89",
+      "image_tag": "sha-45f5e935cedcb30ca0b0313bb3fe54eb0d188dcd",
       "image_pull_policy": "IfNotPresent"
     },
     "packet-pairer": {
       "repository": "ghcr.io/yassir63/packet-pairer",
-      "image_tag": "sha-af0ba1a8430e70dd84141ee71397dbecf6237e89",
+      "image_tag": "sha-45f5e935cedcb30ca0b0313bb3fe54eb0d188dcd",
       "image_pull_policy": "Always"
     },
     "kpi-calculator-oai": {
       "repository": "ghcr.io/yassir63/kpi-calculator-oai",
-      "image_tag": "sha-af0ba1a8430e70dd84141ee71397dbecf6237e89",
+      "image_tag": "sha-45f5e935cedcb30ca0b0313bb3fe54eb0d188dcd",
       "image_pull_policy": "IfNotPresent"
     },
     "monitoring-controller": {
       "repository": "ghcr.io/yassir63/kopf-controller",
-      "image_tag": "sha-af0ba1a8430e70dd84141ee71397dbecf6237e89",
+      "image_tag": "sha-45f5e935cedcb30ca0b0313bb3fe54eb0d188dcd",
       "image_pull_policy": "Always"
     }
   },
   "builds": {
     "amf-sniffer": {
-      "digest": "sha256:49c6ea42513f85b95e87295f6540b8b89487bf7029e176d8c45b26827ff0c529",
-      "source_repository": "yassir63/fiveg-lens-images",
-      "source_commit": "af0ba1a8430e70dd84141ee71397dbecf6237e89",
-      "source_change": "Prepare versioned monitoring images with automatic GHCR builds and update proposals"
+      "digest": "sha256:ed37fbebaccc009c7ee609c02254a94a5fde1722336cb45e25f604041b79850d",
+      "source_repository": "yassir63/nextg-lens-images",
+      "source_commit": "45f5e935cedcb30ca0b0313bb3fe54eb0d188dcd",
+      "source_change": "Merge pull request #1 from yassir63/fix-nextg-lens-workflow-naming"
     },
     "controller": {
-      "digest": "sha256:5263afd80e7300736eb0fd474a27fb8d35cf395e0caa422224b2e9033b216748",
-      "source_repository": "yassir63/fiveg-lens-images",
-      "source_commit": "af0ba1a8430e70dd84141ee71397dbecf6237e89",
-      "source_change": "Prepare versioned monitoring images with automatic GHCR builds and update proposals"
+      "digest": "sha256:01ada969805f7fb4ab6cdbb5e17b81c7a58b0d31ee211f3fd5ef6a9f6dc409bb",
+      "source_repository": "yassir63/nextg-lens-images",
+      "source_commit": "45f5e935cedcb30ca0b0313bb3fe54eb0d188dcd",
+      "source_change": "Merge pull request #1 from yassir63/fix-nextg-lens-workflow-naming"
     },
     "kpi-calculator-oai": {
-      "digest": "sha256:804c732b5abd1d83e4dba6c3fb9aa8cd25c73394c2496894a173f67d81522d7f",
-      "source_repository": "yassir63/fiveg-lens-images",
-      "source_commit": "af0ba1a8430e70dd84141ee71397dbecf6237e89",
-      "source_change": "Prepare versioned monitoring images with automatic GHCR builds and update proposals"
+      "digest": "sha256:a8e1b2724d41e0db7f78971b5b1252aea92b25f311019c62548b1ca21adc2f21",
+      "source_repository": "yassir63/nextg-lens-images",
+      "source_commit": "45f5e935cedcb30ca0b0313bb3fe54eb0d188dcd",
+      "source_change": "Merge pull request #1 from yassir63/fix-nextg-lens-workflow-naming"
     },
     "latency-probe": {
-      "digest": "sha256:308c288051469956b3a3362481f4e33331efee8968e5848b72aefb3b58ff8ba9",
-      "source_repository": "yassir63/fiveg-lens-images",
-      "source_commit": "af0ba1a8430e70dd84141ee71397dbecf6237e89",
-      "source_change": "Prepare versioned monitoring images with automatic GHCR builds and update proposals"
+      "digest": "sha256:3243c964b89dc9c0ad6ac2c2e569f20bda21705cdcb57b43b5036b8049d238d9",
+      "source_repository": "yassir63/nextg-lens-images",
+      "source_commit": "45f5e935cedcb30ca0b0313bb3fe54eb0d188dcd",
+      "source_change": "Merge pull request #1 from yassir63/fix-nextg-lens-workflow-naming"
     },
     "packet-pairer": {
-      "digest": "sha256:206cca25e069e3107557576955afa83c77ef3fac29a0d5f5372240f9527cf860",
-      "source_repository": "yassir63/fiveg-lens-images",
-      "source_commit": "af0ba1a8430e70dd84141ee71397dbecf6237e89",
-      "source_change": "Prepare versioned monitoring images with automatic GHCR builds and update proposals"
+      "digest": "sha256:21e7245e4c163e065e882a67315de778fa1460585760d6a46a36735f80ebd474",
+      "source_repository": "yassir63/nextg-lens-images",
+      "source_commit": "45f5e935cedcb30ca0b0313bb3fe54eb0d188dcd",
+      "source_change": "Merge pull request #1 from yassir63/fix-nextg-lens-workflow-naming"
     },
     "smf-sniffer": {
-      "digest": "sha256:be5faaf3c78242fb65438c13c427d3bf34cef3eda4d2fdeefa9c557166453285",
-      "source_repository": "yassir63/fiveg-lens-images",
-      "source_commit": "af0ba1a8430e70dd84141ee71397dbecf6237e89",
-      "source_change": "Prepare versioned monitoring images with automatic GHCR builds and update proposals"
+      "digest": "sha256:ef422d0dd9c48a344e6f4b5771f792dbeaaf1ebc54f376844d05e6e8959d4b08",
+      "source_repository": "yassir63/nextg-lens-images",
+      "source_commit": "45f5e935cedcb30ca0b0313bb3fe54eb0d188dcd",
+      "source_change": "Merge pull request #1 from yassir63/fix-nextg-lens-workflow-naming"
     },
     "throughput-probe": {
-      "digest": "sha256:135e6344aa636dbb9f99705753ee5a72b6941485ab1c910a8dabb2cf84458304",
-      "source_repository": "yassir63/fiveg-lens-images",
-      "source_commit": "af0ba1a8430e70dd84141ee71397dbecf6237e89",
-      "source_change": "Prepare versioned monitoring images with automatic GHCR builds and update proposals"
+      "digest": "sha256:23a43ff8d1e163048a6a1810f5ab2a53b992f2b1e96de84ff481a14b527abbac",
+      "source_repository": "yassir63/nextg-lens-images",
+      "source_commit": "45f5e935cedcb30ca0b0313bb3fe54eb0d188dcd",
+      "source_change": "Merge pull request #1 from yassir63/fix-nextg-lens-workflow-naming"
     },
     "ue-mapper": {
-      "digest": "sha256:526ea91690c6e8ad39167216cef7083685cf71d7454d688125bba5bdc56741ab",
-      "source_repository": "yassir63/fiveg-lens-images",
-      "source_commit": "af0ba1a8430e70dd84141ee71397dbecf6237e89",
-      "source_change": "Prepare versioned monitoring images with automatic GHCR builds and update proposals"
+      "digest": "sha256:19351e05443e9b6a936b027e845d4c0e87f46fcbdedd7f18176c3b4a262d7adb",
+      "source_repository": "yassir63/nextg-lens-images",
+      "source_commit": "45f5e935cedcb30ca0b0313bb3fe54eb0d188dcd",
+      "source_change": "Merge pull request #1 from yassir63/fix-nextg-lens-workflow-naming"
     }
   }
 }
