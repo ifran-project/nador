@@ -4,17 +4,22 @@ from typing import Any
 
 from orchestrator.deployment import RANManagement
 from orchestrator.models.ran import OAIAdvancedDUConfig, OAIAdvancedGNBConfig
-from orchestrator.models.ue import OAIAdvancedUEConfig
 
 ADVANCED_CONFIGS = {"gnb": OAIAdvancedGNBConfig, "du": OAIAdvancedDUConfig}
 # "2x2+awgn" reproduces oai5g-rru rru/gnb-config-rfsim.yaml (nb_tx/nb_rx 2, pusch_AntennaPorts 2, maxMIMO_layers 2,
-# pdsch_AntennaPorts N1 2 / N2 1 / XP 1, AWGN channelmod) and its UE option --ue-nb-ant-tx 2.
-RFSIM_CHANNELS = ("2x2+awgn", "awgn", "ideal")
+# pdsch_AntennaPorts N1 2 / N2 1 / XP 1, AWGN channelmod) and its UEs (--ue-nb-ant-tx 2: 2 transmit, 1 receive antenna).
+# "2x2+epa": the same antennas with the 3GPP EPA fading model (7 paths up to 410 ns, 2x2 correlation matrix), which
+# couples the antennas and makes the SRS estimates frequency selective; rfsim draws the channel once per UE
+# connection (OAI develop simulator.cpp), and the multipath convolution is much more CPU-intensive than AWGN.
+RFSIM_CHANNELS = ("2x2+awgn", "2x2+epa", "awgn", "ideal")
 # Read by the nextg-lens OAI config.yaml.j2, which renders the 2x2 antenna settings of the gNB/DU (also set in the
 # container environment, where OAI ignores it).
 ANTENNAS_MARKER = "RFSIM_ANTENNAS"
-UE_TX_ANTENNAS_OPTION = "--ue-nb-ant-tx 2"
-UE_DEFAULT_OPTIONS = "-E --rfsim"  # orchestrator default for an OAI UE on an OAI simulated RU
+# UE antennas (transmit, receive) per channel. The OAI UE takes them from the RUs section of its configuration, which
+# the orchestrator renders from the simulated RU shared with the gNB/DU (--ue-nb-ant-tx is overridden by it); the
+# gNB/DU antennas come from the marker above. With one UE transmit antenna, a 2x2 gNB never gets the RAR through.
+UE_ANTENNAS = {"2x2+awgn": (2, 1), "2x2+epa": (2, 1), "awgn": (1, 1), "ideal": (1, 1)}
+CHANNEL_MODELS = {"2x2+awgn": "AWGN", "2x2+epa": "EPA", "awgn": "AWGN"}
 
 __all__ = ["RFSIM_CHANNELS", "enable_rfsim_channel_model", "set_rfsim_channel"]
 
@@ -30,10 +35,14 @@ def set_rfsim_channel(
     """
     Select the RFsim channel of the OAI gnb/du components with a simulated RU and of their OAI UEs (before prepare).
 
-    "2x2+awgn" (default): 2x2 MIMO (2 gNB/DU antennas, 2 PUSCH ports, 2 MIMO layers, UEs transmitting on 2 antennas)
-    and the AWGN channel model, as the 5g_ansible rfsim scenario. "awgn": the same AWGN channel model with one
-    antenna. "ideal": no channel model, one antenna. Call it before the radios are prepared and before the UE
-    manager is created (UEManagement copies the UE settings of the RAN deployment model).
+    "2x2+awgn" (default): 2x2 MIMO (2 gNB/DU antennas, 2 PUSCH ports, 2 MIMO layers; UEs with 2 transmit antennas
+    and 1 receive antenna) and the AWGN channel model, as the 5g_ansible rfsim scenario. "awgn": the same AWGN
+    channel model with one antenna. "ideal": no channel model, one antenna. "2x2+epa": the 2x2 antennas with the
+    3GPP EPA fading model: frequency-selective SRS estimates on both gNB/DU antennas, fixed for a UE connection, at a
+    much higher CPU cost. The UE antennas are set on the simulated
+    RU of each radio in the metamodel. Call it before the radios are prepared and before the UE manager is created
+    (UEManagement copies the RAN metamodel and deployment model). OAI's AWGN channel is the identity matrix plus
+    noise: with the single-port SRS of the UEs, the second gNB/DU antenna receives no SRS.
     """
     if channel not in RFSIM_CHANNELS:
         raise ValueError(f"channel must be one of {RFSIM_CHANNELS}")
@@ -42,7 +51,7 @@ def set_rfsim_channel(
     for name in radios:
         component = model[name]
         env = {k: v for k, v in (component.extra_env_vars or {}).items() if k != ANTENNAS_MARKER}
-        if channel == "2x2+awgn":
+        if channel.startswith("2x2"):
             env[ANTENNAS_MARKER] = "2"
         component.extra_env_vars = env
         if channel == "ideal" and component.advanced_config is not None:
@@ -50,8 +59,10 @@ def set_rfsim_channel(
                 update={"rfsimulator": None, "channelmod": None}
             )
     if channel != "ideal":
-        enable_rfsim_channel_model(ran, radios, noise_power_dB=noise_power_dB, ploss_dB=ploss_dB)
-    _set_ue_tx_antennas(ran, radios, two=channel == "2x2+awgn")
+        enable_rfsim_channel_model(
+            ran, radios, model_type=CHANNEL_MODELS[channel], noise_power_dB=noise_power_dB, ploss_dB=ploss_dB
+        )
+    _set_ru_ports(ran, radios, *UE_ANTENNAS[channel])
 
 
 def _rfsim_radios(ran: RANManagement, components: list[str] | None) -> list[str]:
@@ -74,20 +85,15 @@ def _rfsim_radios(ran: RANManagement, components: list[str] | None) -> list[str]
     return radios
 
 
-def _set_ue_tx_antennas(ran: RANManagement, radios: list[str], *, two: bool) -> None:
-    """Add or remove --ue-nb-ant-tx 2 on the OAI UEs attached to the given radios."""
-    for name, ue in (ran.deployment_model.ues or {}).items():
-        meta = ran.mutable_metamodel.ues[name]
-        if str(ue.implementation) != "oai" or not set(meta.config.gnbs) & set(radios):
-            continue
-        advanced = ue.advanced_config or OAIAdvancedUEConfig()
-        options = (advanced.useAdditionalOptions or UE_DEFAULT_OPTIONS).replace(UE_TX_ANTENNAS_OPTION, "").split()
-        if two:
-            options += UE_TX_ANTENNAS_OPTION.split()
-        joined = " ".join(options)
-        ue.advanced_config = advanced.model_copy(
-            update={"useAdditionalOptions": None if joined == UE_DEFAULT_OPTIONS else joined}
-        )
+def _set_ru_ports(ran: RANManagement, radios: list[str], tx: int, rx: int) -> None:
+    """Set the ports of the simulated RUs of the radios (hence of their UEs) in the RAN metamodel."""
+    rus = {ran.metamodel.ran.components[name].config.ru for name in radios}
+    for ru in rus:
+        ran.metamodel.rus[ru].numberOfTxPorts = tx
+        ran.metamodel.rus[ru].numberOfRxPorts = rx
+    if rus:
+        ran.mutable_metamodel = ran.metamodel.model_copy(deep=True)
+        ran.reconcile()
 
 
 def enable_rfsim_channel_model(
