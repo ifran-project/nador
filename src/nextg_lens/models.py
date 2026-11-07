@@ -8,6 +8,7 @@ from metamodel.models.base import StrictBaseModel
 from orchestrator.models.deployment import DeploymentModel
 from orchestrator.models.k8s import ContainerImage
 from pydantic import Field, model_validator
+from nextg_lens.observability import ObservabilitySettings
 
 
 DEFAULT_IMAGES = json.loads((Path(__file__).parent / "assets" / "images.json").read_text())
@@ -42,6 +43,9 @@ class MonitoringTarget(StrictBaseModel):
     metrics_port: int | None = Field(default=None, ge=1, le=65535)
     metrics_path: str = "/metrics"
     latency_mode: Literal["CORE", "RAN", "BOTH", "E2E"] = "BOTH"
+    n3_interface: str | None = None
+    n6_interface: str | None = None
+    n3_network_names: list[str] = Field(default_factory=list)
 
     # Require an interface and container for packet capture.
     @model_validator(mode="after")
@@ -50,6 +54,9 @@ class MonitoringTarget(StrictBaseModel):
             raise ValueError("component must not be empty")
         if self.role and (not self.interface or not self.container):
             raise ValueError("Monitoring targets require explicit interface and container")
+        for interface in (self.interface, self.n3_interface, self.n6_interface):
+            if interface is not None and (not interface.strip() or any(c.isspace() for c in interface)):
+                raise ValueError("Interfaces must be non-empty names without whitespace")
         return self
 
 
@@ -74,6 +81,7 @@ class MonitoringDeployment(StrictBaseModel):
     packet_pairing: bool = False
     core_kpis: bool = False
     ran_kpis: bool = False
+    observability: ObservabilitySettings = Field(default_factory=ObservabilitySettings)
     targets: list[MonitoringTarget] = Field(default_factory=list)
     images: MonitoringImages = Field(default_factory=MonitoringImages)
     components: dict[str, DeployedMonitoringComponent] = Field(default_factory=dict)
@@ -100,6 +108,19 @@ class MonitoringDeployment(StrictBaseModel):
                 raise ValueError("Packet pairing requires both gnb and upf targets")
         if self.throughput and self.targets and "upf" not in {t.role for t in self.targets}:
             raise ValueError("Throughput requires a UPF packet target")
+        roles = {t.role for t in self.targets}
+        observation = self.observability
+        if (observation.ngap or observation.mapper_coverage) and "amf" not in roles:
+            raise ValueError("NGAP/mapper coverage requires an AMF target")
+        if (observation.pfcp or observation.mapper_coverage) and "smf" not in roles:
+            raise ValueError("PFCP/mapper coverage requires an SMF target")
+        if observation.user_plane_paths and not roles.intersection({"gnb", "upf"}):
+            raise ValueError("Path monitoring requires a gnb/upf target")
+        for target in self.targets:
+            port = {"amf": observation.ngap_port, "smf": observation.pfcp_port,
+                    "gnb": observation.path_port, "upf": observation.path_port}.get(target.role)
+            if observation.active and target.metrics_port == port:
+                raise ValueError(f"{target.component}: observability and NF metric ports conflict")
         if len({self.prometheus_node_port, self.grafana_node_port, self.loki_node_port}) != 3:
             raise ValueError("Monitoring NodePorts must be distinct")
         return self

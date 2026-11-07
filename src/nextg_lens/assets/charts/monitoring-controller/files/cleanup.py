@@ -25,7 +25,7 @@ for path in pathlib.Path('/proc').glob('[0-9]*/environ'):
     statuses = {s.name: s for s in (pod.status.ephemeral_container_statuses or [])}
     names = []
     for c in pod.spec.ephemeral_containers or []:
-        if not c.name.startswith(("amf-sniffer-", "smf-sniffer-")):
+        if not c.name.startswith(("amf-sniffer-", "smf-sniffer-", "user-plane-path-")):
             continue
         env = {e.name: e.value for e in c.env or []}
         if env.get("MONITORING_SNIFFER_OWNER") != owner:

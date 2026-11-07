@@ -9,6 +9,10 @@ It integrates Prometheus, Grafana and Loki, correlates UE/slice/tunnel/session
 information, deploys latency and N3 throughput probes, and exports experiment
 timelines and metrics. Network deployment remains handled by upstream managers.
 
+Optional protocol/path collectors and richer experiment collection are described
+in [ML observability](OBSERVABILITY.md). These additions require explicitly
+selected collector images and live validation before use in experiments.
+
 Install from GitHub:
 
 ```bash
@@ -29,6 +33,9 @@ Explicit scenario overrides still take precedence.
 Examples are under [examples/monitoring](examples/monitoring):
 
 - [RFsim](examples/monitoring/rfsim): monolithic and split OAI radios.
+  The monolithic OAI RFsim example uses stock Open5GS SMF and UPF images
+  selected by the orchestrator. Its ML profile uses separate collector
+  images and leaves custom core KPIs off.
 - [Multi-gNB](examples/monitoring/multi-gnb-2du/test.ipynb): 20 UEs, a monolithic
   gNB plus a CU/two DUs, three slices and two UPFs; includes on-demand traffic.
 - [Open5GS throughput](examples/monitoring/throughput/test.ipynb) and

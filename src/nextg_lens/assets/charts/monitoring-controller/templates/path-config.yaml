@@ -1,0 +1,10 @@
+{{- if .Values.observability.user_plane_paths }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: monitoring-path-controller
+  namespace: {{ .Release.Namespace }}
+data:
+  path_controller.py: |
+{{ .Files.Get "files/path_controller.py" | indent 4 }}
+{{- end }}

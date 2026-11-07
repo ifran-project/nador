@@ -5,3 +5,7 @@ dashboards:
   variant: oai
 lokiEnabled: true
 throughputEnabled: false
+observability:
+  ngap: false
+  pfcp: false
+  user_plane_paths: false

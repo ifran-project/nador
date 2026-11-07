@@ -18,3 +18,4 @@ latency:
   packetPairing: {{ monitoring.packet_pairing | tojson }}
 targets: {{ targets | tojson }}
 operationTimeoutSeconds: {{ monitoring.operation_timeout_seconds }}
+observability: {{ monitoring.observability.model_dump() | tojson }}

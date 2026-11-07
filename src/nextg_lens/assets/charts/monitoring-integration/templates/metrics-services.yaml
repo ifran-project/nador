@@ -21,3 +21,37 @@ spec:
       targetPort: {{ .metrics_port }}
 {{- end }}
 {{- end }}
+{{- $settings := .Values.observability }}
+{{- range .Values.targets }}
+{{- $port := 0 }}
+{{- $kind := "" }}
+{{- if and $settings.ngap (eq .role "amf") }}
+{{- $port = int $settings.ngap_port }}{{- $kind = "ngap" }}
+{{- else if and $settings.pfcp (eq .role "smf") }}
+{{- $port = int $settings.pfcp_port }}{{- $kind = "pfcp" }}
+{{- else if and $settings.user_plane_paths (or (eq .role "gnb") (eq .role "upf")) }}
+{{- $port = int $settings.path_port }}{{- $kind = "path" }}
+{{- end }}
+{{- if $port }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ printf "obs-%s-%s-%s" $kind .category .component | replace "_" "-" | lower | trunc 63 | trimSuffix "-" }}
+  namespace: {{ .namespace }}
+  labels:
+    {{- include "monitoring.labels" $ | nindent 4 }}
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: /metrics
+    prometheus.io/port: {{ $port | quote }}
+    monitoring.blueprint/scrape-mode: endpoints
+spec:
+  selector:
+    {{- toYaml .selector | nindent 4 }}
+  ports:
+    - name: observability
+      port: {{ $port }}
+      targetPort: {{ $port }}
+{{- end }}
+{{- end }}

@@ -119,7 +119,8 @@ class MonitoringManagement(HelmManagement):
         plan = self.plan()
         await self._run_tasks("prepare", quiet=quiet)
         await self.install(quiet=quiet)
-        if self.deployment_model.monitoring.latency or self.deployment_model.monitoring.throughput:
+        if (self.deployment_model.monitoring.latency or self.deployment_model.monitoring.throughput
+                or self.deployment_model.monitoring.observability.active):
             await self._run_tasks("inject_sniffers", targets=plan["targets"], quiet=quiet)
 
     # Uninstall monitoring releases in reverse installation order.

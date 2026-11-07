@@ -1,10 +1,11 @@
 # Open5GS + OAI CU-CP/CU-UP/DU split with RF-simulated UEs on VMs.
 namespace: monitoring
+node_name: node4
 kubeconfig: /etc/kubernetes/admin.conf
 latency: true
 packet_pairing: true
 loki: true
-core_kpis: true
+core_kpis: false
 # CU has no MAC/L1 statistics; its parser is experimental.
 ran_kpis: false
 targets:

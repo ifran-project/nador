@@ -11,10 +11,9 @@ from nextg_lens.deployment import MonitoringManagement
 
 
 @asynccontextmanager
-async def prometheus_connection(monitoring: MonitoringManagement) -> AsyncIterator[str]:
-    """Open a temporary SSH forward to Prometheus and close it when finished."""
+async def _connection(monitoring: MonitoringManagement, node_port: int, service: str) -> AsyncIterator[str]:
+    """Open a temporary SSH forward using the monitoring manager's SSH settings."""
     model = monitoring.deployment_model
-    config = model.monitoring
     name = model.params.k8s.master_node
     node = model.nodes[name]
     ssh = node.ssh_info
@@ -40,7 +39,7 @@ async def prometheus_connection(monitoring: MonitoringManagement) -> AsyncIterat
         "-p",
         str(ssh.port),
         "-L",
-        f"127.0.0.1:{port}:{host}:{config.prometheus_node_port}",
+        f"127.0.0.1:{port}:{host}:{node_port}",
         f"{ssh.user}@{host}",
     ]
     process = await asyncio.create_subprocess_exec(
@@ -55,7 +54,7 @@ async def prometheus_connection(monitoring: MonitoringManagement) -> AsyncIterat
             while True:
                 if process.returncode is not None:
                     _, error = await process.communicate()
-                    raise RuntimeError("Prometheus SSH tunnel failed: " + error.decode(errors="replace").strip())
+                    raise RuntimeError(service + " SSH tunnel failed: " + error.decode(errors="replace").strip())
                 try:
                     _, writer = await asyncio.open_connection("127.0.0.1", port)
                     writer.close()
@@ -75,3 +74,17 @@ async def prometheus_connection(monitoring: MonitoringManagement) -> AsyncIterat
             except TimeoutError:
                 process.kill()
                 await process.wait()
+
+
+@asynccontextmanager
+async def prometheus_connection(monitoring: MonitoringManagement) -> AsyncIterator[str]:
+    """Open Prometheus access only for the duration of collection."""
+    async with _connection(monitoring, monitoring.deployment_model.monitoring.prometheus_node_port, 'Prometheus') as url:
+        yield url
+
+
+@asynccontextmanager
+async def loki_connection(monitoring: MonitoringManagement) -> AsyncIterator[str]:
+    """Open Loki access through the same route as the monitoring manager."""
+    async with _connection(monitoring, monitoring.deployment_model.monitoring.loki_node_port, 'Loki') as url:
+        yield url

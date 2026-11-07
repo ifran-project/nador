@@ -11,7 +11,7 @@ kubeconfig: /etc/kubernetes/admin.conf
 latency: true
 packet_pairing: true
 loki: true
-core_kpis: true
+core_kpis: false
 ran_kpis: true
 targets:
 - category: core

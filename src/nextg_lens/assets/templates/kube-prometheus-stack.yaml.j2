@@ -27,6 +27,9 @@ prometheus:
             names: {{ target_namespaces | tojson }}
           role: service
         relabel_configs:
+        - action: drop
+          regex: endpoints
+          source_labels: [__meta_kubernetes_service_annotation_monitoring_blueprint_scrape_mode]
         - action: keep
           regex: 'true'
           source_labels:
@@ -52,6 +55,27 @@ prometheus:
         - action: replace
           source_labels:
           - __meta_kubernetes_service_name
+          target_label: service
+        scrape_interval: '{{ monitoring.prometheus_scrape_interval }}'
+      - job_name: observability-endpoints
+        kubernetes_sd_configs:
+        - namespaces:
+            names: {{ target_namespaces | tojson }}
+          role: endpoints
+        relabel_configs:
+        - action: keep
+          regex: endpoints
+          source_labels: [__meta_kubernetes_service_annotation_monitoring_blueprint_scrape_mode]
+        - action: keep
+          regex: observability
+          source_labels: [__meta_kubernetes_endpoint_port_name]
+        - source_labels: [__meta_kubernetes_namespace]
+          target_label: namespace
+        - source_labels: [__meta_kubernetes_pod_name]
+          target_label: pod
+        - source_labels: [__meta_kubernetes_pod_node_name]
+          target_label: node
+        - source_labels: [__meta_kubernetes_service_name]
           target_label: service
         scrape_interval: '{{ monitoring.prometheus_scrape_interval }}'
       - job_name: latency-probes
@@ -137,3 +161,12 @@ prometheus:
           - __meta_kubernetes_pod_name
           target_label: pod
         scrape_interval: '{{ monitoring.prometheus_scrape_interval }}'
+{% if monitoring.observability.node_metrics %}
+nodeExporter:
+  enabled: true
+prometheus-node-exporter:
+  extraArgs: [--no-collector.cpufreq]
+  tolerations:
+    - operator: Exists
+      effect: NoSchedule
+{% endif %}

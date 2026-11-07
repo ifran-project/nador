@@ -14,3 +14,5 @@ latency:
   packetPairing: false
 targets: []
 operationTimeoutSeconds: 300
+observability:
+  user_plane_paths: false

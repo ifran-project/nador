@@ -6,7 +6,7 @@ node_name: sopnode-f3
 latency: true
 packet_pairing: true
 loki: true
-core_kpis: true
+core_kpis: false
 ran_kpis: false
 targets:
 - category: core

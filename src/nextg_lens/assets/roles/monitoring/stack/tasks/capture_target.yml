@@ -33,6 +33,12 @@
           value: "{{ redis_host }}"
         - name: MONITORING_SNIFFER_OWNER
           value: "{{ monitoring_owner }}"
+        - name: "{{ 'AMF_NGAP' if capture_target.role == 'amf' else 'SMF_PFCP' }}_METRICS_ENABLED"
+          value: "{{ (monitoring_config.observability.ngap if capture_target.role == 'amf' else monitoring_config.observability.pfcp) | string | lower }}"
+        - name: "{{ 'AMF_NGAP' if capture_target.role == 'amf' else 'SMF_PFCP' }}_METRICS_PORT"
+          value: "{{ (monitoring_config.observability.ngap_port if capture_target.role == 'amf' else monitoring_config.observability.pfcp_port) | string }}"
+        - name: "{{ 'AMF_NGAP' if capture_target.role == 'amf' else 'SMF_PFCP' }}_PENDING_TIMEOUT_SECONDS"
+          value: "{{ monitoring_config.observability.pending_timeout_seconds | string }}"
       securityContext:
         privileged: true
         runAsUser: 0
@@ -49,18 +55,9 @@
     label: "{{ item.metadata.name }}"
   when: existing | map(attribute='name') | select('match', '^' ~ prefix) | difference(terminated) | length == 0
 
-- name: Wait for attachment sniffer on {{ capture_target.component }}
-  kubernetes.core.k8s_info:
-    api_version: v1
-    kind: Pod
-    namespace: "{{ capture_target.namespace }}"
-    label_selectors: "{{ capture_target.label_selectors }}"
-  register: capture_pods
-  until:
-    - capture_pods.resources | length == 1
-    - >-
-      (capture_pods.resources | first | default({})).get('status', {}).get('ephemeralContainerStatuses', [])
-      | selectattr('name', 'match', '^' ~ capture_target.role ~ '-sniffer-')
-      | selectattr('state.running', 'defined') | list | length > 0
-  retries: "{{ [1, monitoring_timeout_seconds | int // 2] | max }}"
-  delay: 2
+- name: Verify attachment sniffers on each replica
+  ansible.builtin.include_tasks: verify_capture_pod.yml
+  loop: "{{ capture_pods.resources }}"
+  loop_control:
+    loop_var: capture_pod
+    label: "{{ capture_pod.metadata.name }}"

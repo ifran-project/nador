@@ -17,6 +17,11 @@ complete deployment and interactive traffic flow. Deploy monitoring after the
 core/RAN and before UE attachment, so the sniffers observe session establishment.
 Profiles select the interfaces and components appropriate to each deployment.
 
+For monolithic OAI RFsim, keep the orchestrator-selected stock Open5GS SMF and
+UPF images. The supplied normal and ML profiles set `core_kpis: false` because
+the custom core KPIs depend on a separate Open5GS build. This does not turn
+off the external NGAP, PFCP, mapper or path collectors in the ML profile.
+
 ```python
 from nextg_lens import MonitoringManagement, MonitoringDeployment
 

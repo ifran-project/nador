@@ -93,7 +93,7 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
     enabled = {"integration", "prometheus", "grafana"}
     if monitoring.loki:
         enabled.update(("loki", "promtail"))
-    if monitoring.latency or monitoring.throughput:
+    if monitoring.latency or monitoring.throughput or monitoring.observability.active:
         enabled.update(("redis", "ue-mapper-api", "monitoring-controller"))
         if monitoring.packet_pairing:
             enabled.add("packet-pairer")
@@ -104,7 +104,7 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
     components = {}
     for name, definition in defaults["components"].items():
         # The controller also needs the pairer image when pairing is disabled.
-        if name not in enabled and not ((monitoring.latency or monitoring.throughput) and name == "packet-pairer"):
+        if name not in enabled and not ((monitoring.latency or monitoring.throughput or monitoring.observability.active) and name == "packet-pairer"):
             continue
         data = (
             {"release_name": name, "chart_ref": name, "pod_selector": ["app=" + name]}
@@ -118,6 +118,13 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
                 data, monitoring.components[name].model_dump(mode="json", exclude_unset=True, exclude_none=True)
             )
         component = DeployedMonitoringComponent.model_validate(data)
+        if name == "ue-mapper-api" and monitoring.observability.mapper_coverage:
+            image = monitoring.observability.mapper_image
+            repository, separator, tag = image.rpartition(":")
+            if not separator or not repository or not tag or "/" in tag or "@" in image:
+                raise ValueError("mapper_image must use an explicit repository:tag")
+            component.image.repository = repository
+            component.image.image_tag = tag
         component.namespace = monitoring.namespace
         components[name] = component
     for name in enabled:
