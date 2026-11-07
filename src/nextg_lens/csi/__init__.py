@@ -11,7 +11,7 @@ from orchestrator.utils.defaults import DEFAULT_RAN_IMAGES
 
 from nextg_lens.csi.collection import CsiCollector
 from nextg_lens.csi.live import CsiLiveView
-from nextg_lens.csi.rfsim import enable_rfsim_channel_model
+from nextg_lens.csi.rfsim import RFSIM_CHANNELS, enable_rfsim_channel_model, set_rfsim_channel
 from nextg_lens.csi.storage import prepare_csi_storage
 
 # Upstream default OAI gNB repository -> CSI logger image built from the same OAI tag.
@@ -39,6 +39,8 @@ __all__ = [
     "CsiLiveView",
     "enable_csi",
     "enable_rfsim_channel_model",
+    "set_rfsim_channel",
+    "RFSIM_CHANNELS",
     "prepare_csi_storage",
     "select_csi_images",
 ]
