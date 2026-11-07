@@ -25,8 +25,8 @@ def enable_rfsim_channel_model(
     Defaults reproduce 5g_ansible: an AWGN channel, noise power -30 dB, no path loss, applied by the gNB/DU to what it
     receives (uplink, hence the SRS used for CSI). The gNB/DU reads rfsimu_channel_ue<i> for its i-th connected UE
     and falls back to rfsimu_channel_ue0 beyond ue_channels; rfsimu_channel_enB0 is the UE-side model (unused unless
-    the UEs enable chanmod too). The upstream template renders advanced_config.rfsimulator as a mapping: OAI reads it
-    and logs "rfsimulator parameters should be provided as array elements".
+    the UEs enable chanmod too). The upstream template renders advanced_config.rfsimulator as a mapping, which makes
+    OAI 2026.w42 crash when it opens the RF device: the nextg-lens OAI config.yaml.j2 rewrites it as a list.
     """
     all_components = ran.deployment_model.ran.components
     names = list(all_components) if components is None else components

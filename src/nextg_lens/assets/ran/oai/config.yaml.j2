@@ -1,12 +1,36 @@
-{# CSI logger: SRS channel estimates need periodic SRS (and CSI-RS), which the upstream template does not expose. #}
+{# nextg-lens edits of the upstream OAI configuration, applied as text (a YAML round trip would rewrite values such #}
+{# as mcc 001 or gNB_ID 0x1); the upstream rendering is included unchanged when none applies. #}
+{# - CSI logger: SRS channel estimates need periodic SRS (and CSI-RS), which the upstream template does not expose. #}
+{# - rfsimulator given as a mapping (advanced_config.rfsimulator is a dict in the orchestrator model): OAI 2026.w42 #}
+{#   crashes (segmentation fault) when it opens the RF device with that form; it is rewritten as a one-element list. #}
 {% set csi_env = component.extra_env_vars or {} %}
-{% if csi_env.get('CSI_LOGGING_ENABLED') | string == '1' %}
+{% set csi = csi_env.get('CSI_LOGGING_ENABLED') | string == '1' %}
+{% set rfsim_mapping = component.advanced_config is mapping and component.advanced_config.get('rfsimulator') is mapping %}
+{% if csi or rfsim_mapping %}
 {% set upstream_config %}{% include 'ran/oai/oai-' ~ component.type ~ '/config.yaml.j2' %}{% endset %}
-{# Text insertion after the single gNBs[0] min_rxtxtime line: a YAML round trip would rewrite values such as mcc 001 or gNB_ID 0x1. #}
-{% if upstream_config is search('(?m)^ +do_(SRS|CSIRS):') or upstream_config is not search('(?m)^    min_rxtxtime: ') %}
+{% set ns = namespace(lines=[], block=false, first=false) %}
+{% for line in upstream_config.split('\n') %}
+{% if rfsim_mapping and line == 'rfsimulator:' %}
+{% set ns.block = true %}
+{% set ns.first = true %}
+{% set ns.lines = ns.lines + [line] %}
+{% elif ns.block and line.startswith('  ') %}
+{% set ns.lines = ns.lines + [('  - ' ~ line[2:]) if ns.first else ('  ' ~ line)] %}
+{% set ns.first = false %}
+{% else %}
+{% set ns.block = false %}
+{% set ns.lines = ns.lines + [line] %}
+{% endif %}
+{% endfor %}
+{% set config = ns.lines | join('\n') %}
+{% if csi %}
+{# Text insertion after the single gNBs[0] min_rxtxtime line. #}
+{% if config is search('(?m)^ +do_(SRS|CSIRS):') or config is not search('(?m)^    min_rxtxtime: ') %}
 {# Undefined variable on purpose: fail the prepare step instead of rendering a config without SRS. #}
 {{ csi_config_injection_failed_do_SRS_already_set_or_min_rxtxtime_not_found }}
 {% endif %}
-{{ upstream_config | regex_replace('^(    min_rxtxtime: [^\n]*)$', '\\1\n    do_SRS: periodic\n    do_CSIRS: 1', multiline=True) }}{% else %}
+{% set config = config | regex_replace('^(    min_rxtxtime: [^\n]*)$', '\\1\n    do_SRS: periodic\n    do_CSIRS: 1', multiline=True) %}
+{% endif %}
+{{ config }}{% else %}
 {% include 'ran/oai/oai-' ~ component.type ~ '/config.yaml.j2' %}
 {% endif %}
