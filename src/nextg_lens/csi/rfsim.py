@@ -11,6 +11,12 @@ ADVANCED_CONFIGS = {"gnb": OAIAdvancedGNBConfig, "du": OAIAdvancedDUConfig}
 # "2x2+epa": the same antennas with the 3GPP EPA fading model (7 paths up to 410 ns, 2x2 correlation matrix), which
 # couples the antennas and makes the SRS estimates frequency selective; rfsim draws the channel once per UE
 # connection (OAI develop simulator.cpp), and the multipath convolution is much more CPU-intensive than AWGN.
+# Known issues with OAI develop-f80a883 (2026-10-16), observed on SLICES BI:
+# - "2x2+epa" is still to be debugged: the gNB/DU softmodem crashes as soon as a UE connects, right after
+#   "Random channel rfsimu_channel_ue0 in rfsimulator activated" (ru_thread: NULL pointer read in librfsimulator.so,
+#   always at offset 0xf11b), so no UE attaches.
+# - "2x2+awgn": UEs attach, but a UE softmodem may crash under sustained traffic (DL__actor thread: invalid write in
+#   libc.so.6, always at offset 0x17173a).
 RFSIM_CHANNELS = ("2x2+awgn", "2x2+epa", "awgn", "ideal")
 # Read by the nextg-lens OAI config.yaml.j2, which renders the 2x2 antenna settings of the gNB/DU (also set in the
 # container environment, where OAI ignores it).
@@ -37,12 +43,12 @@ def set_rfsim_channel(
 
     "2x2+awgn" (default): 2x2 MIMO (2 gNB/DU antennas, 2 PUSCH ports, 2 MIMO layers; UEs with 2 transmit antennas
     and 1 receive antenna) and the AWGN channel model, as the 5g_ansible rfsim scenario. "awgn": the same AWGN
-    channel model with one antenna. "ideal": no channel model, one antenna. "2x2+epa": the 2x2 antennas with the
-    3GPP EPA fading model: frequency-selective SRS estimates on both gNB/DU antennas, fixed for a UE connection, at a
-    much higher CPU cost. The UE antennas are set on the simulated
-    RU of each radio in the metamodel. Call it before the radios are prepared and before the UE manager is created
-    (UEManagement copies the RAN metamodel and deployment model). OAI's AWGN channel is the identity matrix plus
-    noise: with the single-port SRS of the UEs, the second gNB/DU antenna receives no SRS.
+    channel model with one antenna. "ideal": no channel model, one antenna. "2x2+epa" (still to be debugged, see
+    the known issues above RFSIM_CHANNELS): the 2x2 antennas with the 3GPP EPA fading model, for frequency-selective
+    SRS estimates on both gNB/DU antennas, fixed for a UE connection, at a much higher CPU cost. The UE antennas
+    are set on the simulated RU of each radio in the metamodel. Call it before the radios are prepared and before
+    the UE manager is created (UEManagement copies the RAN metamodel and deployment model). OAI's AWGN channel is
+    the identity matrix plus noise: with the single-port SRS of the UEs, the second gNB/DU antenna receives no SRS.
     """
     if channel not in RFSIM_CHANNELS:
         raise ValueError(f"channel must be one of {RFSIM_CHANNELS}")
