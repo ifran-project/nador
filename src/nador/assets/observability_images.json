@@ -1,5 +1,5 @@
 {
-  "source_repository": "yassir63/nextg-lens-images",
+  "source_repository": "yassir63/nador-images",
   "images": {
     "amf_image": "ghcr.io/yassir63/amf-sniffer:sha-25abc6620446cfdc994062ae11949132208b0cec",
     "smf_image": "ghcr.io/yassir63/smf-sniffer:sha-e3e93f1f7094ac86f3d02aa20ac4b8a75d93f2dd",

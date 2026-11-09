@@ -6,7 +6,7 @@ configuration, deployment and artifact collection in one notebook.
 Install the latest merged library from GitHub `main` in your notebook:
 
 ```python
-%pip install --upgrade "git+https://github.com/yassir63/nextg-lens.git@main"
+%pip install --upgrade "git+https://github.com/yassir63/nador.git@main"
 ```
 
 Restart the kernel after installation, then run your core/RAN setup before
@@ -23,7 +23,7 @@ the custom core KPIs depend on a separate Open5GS build. This does not turn
 off the external NGAP, PFCP, mapper or path collectors in the ML profile.
 
 ```python
-from nextg_lens import MonitoringManagement, MonitoringDeployment
+from nador import MonitoringManagement, MonitoringDeployment
 
 monitoring = MonitoringManagement(
     preceding=ran,
@@ -45,7 +45,7 @@ print(await monitoring.get_logs(components=["ue-mapper-api"], quiet=True))
 It opens Prometheus access for final collection; Prometheus scrapes continuously.
 
 ```python
-from nextg_lens.artifacts import ExperimentRun
+from nador.artifacts import ExperimentRun
 
 async with ExperimentRun(
     "results/my-run",
@@ -62,6 +62,6 @@ Each experiment needs a new result directory. The collector finalizes artifacts
 on workload failure; it does not automatically save packet captures or every
 pod's logs. Building this package does not rebuild its container images.
 
-Default image versions are selected in `src/nextg_lens/assets/images.json`.
+Default image versions are selected in `src/nador/assets/images.json`.
 Standard profiles inherit them; `images` and `components.<name>.image` remain available
 for deliberate overrides. Image-update pull requests change only that manifest.

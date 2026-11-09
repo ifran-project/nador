@@ -6,14 +6,14 @@ The collection layer is now adapted in this checkout; see `OBSERVABILITY.md`.
 Selected images are published. OAI single-gNB and multi-gNB RFsim validation
 passed; ZeroMQ complete artifact export and physical-RU validation remain pending.
 
-Runtime image sources now live in the sibling `nextg-lens-images` checkout on
+Runtime image sources now live in the sibling `nador-images` checkout on
 its local `ml-observability` branch: the existing AMF/SMF/mapper component
 directories, `common/observation_runtime.py`, and the new `user-plane-path/`.
-NextG Lens retains deployment settings and artifact collection only. Duplicate
+NADOR retains deployment settings and artifact collection only. Duplicate
 runtime modules and the temporary image-context generator were removed here.
 The image repository includes Docker recipes, collector tests, build-matrix
 registration and versioned source records. Published references and digests
-are selected by NextG Lens manifests; the path probe remains explicitly opt-in.
+are selected by NADOR manifests; the path probe remains explicitly opt-in.
 
 ## Research objective
 
@@ -39,7 +39,7 @@ orchestrator migration lives in the sibling `orchestrator-monitoring-ML`.
 | UE context history | Bounded periodic mapper inventory snapshots, timestamps, sampling errors, truncation hints and final summaries | Sampled history, not a complete event log; transient changes between polls can be missed |
 | Experiment collection | Extended native experiment windows with metric exports, setup/UE context and optional bounded Loki logs; cleanup on failure/cancellation | Workload exceptions preserved; incomplete collection recorded; full Loki pages flagged as possibly truncated |
 | Availability check | Read-only Prometheus/Loki checks, scrape target health and available/partial/non-finite/empty query states | Empty results remain unknown or conditional, not healthy zero |
-| Deployment integration | Typed opt-in collector settings, sniffer environment/ports, component targeting, per-pod scraping, restart/cleanup, image build sources | Old orchestrator model/controller integration cannot be copied unchanged into NextG Lens |
+| Deployment integration | Typed opt-in collector settings, sniffer environment/ports, component targeting, per-pod scraping, restart/cleanup, image build sources | Old orchestrator model/controller integration cannot be copied unchanged into NADOR |
 | Trial sync | Local three-way source synchronization against the trial checkout | Obsolete for the current independent-extension architecture; do not port it |
 
 ## What was tested
@@ -52,11 +52,11 @@ The older orchestrator migration's recorded local result was 79 passing tests
 plus 15 subtests, Ansible syntax/template checks and a package build. Those
 tests used mocked cluster boundaries/local fixtures. That migration did not
 build/publish new images or deploy its own live cluster. These historical
-results are not a current NextG Lens compatibility result.
+results are not a current NADOR compatibility result.
 
-## Current NextG Lens baseline
+## Current NADOR baseline
 
-NextG Lens already provides Prometheus/Grafana/Loki, current UE/session/tunnel
+NADOR already provides Prometheus/Grafana/Loki, current UE/session/tunnel
 mapping, eBPF latency and N3 throughput, Helm lifecycle management, and
 ExperimentRun timelines/reports/metric export with automatic Prometheus access.
 Use these existing pieces as the integration points.
@@ -75,7 +75,7 @@ measurements distinct rather than replacing it with the old path observer.
 2. Adapt mapper-coverage and NGAP/PFCP collectors to the current component image
    sources and schemas. Preserve current mapping logic, expose explicit image
    requirements, and prepare image-source changes before any build or publish.
-3. Add optional path/host telemetry through NextG Lens models and owned Helm/
+3. Add optional path/host telemetry through NADOR models and owned Helm/
    Ansible assets. Integrate per-pod scrape discovery and existing cleanup.
 4. Validate locally, then perform a live baseline smoke test with fresh UE
    attachment before controlled faults or model training.
@@ -87,7 +87,7 @@ publishing, tags or releases without explicit user confirmation.
 
 ## Local port validation
 
-The focused NextG Lens lifecycle/access/cleanup and new observability suite
+The focused NADOR lifecycle/access/cleanup and new observability suite
 passes 33 tests, including Helm rendering with/without path probes. The
 generated current-source image contexts compile and a synthetic Scapy PFCP
 exchange passes through the new observation hook. Package build succeeds.

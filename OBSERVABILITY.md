@@ -1,4 +1,4 @@
-# ML observability in NextG Lens
+# ML observability in NADOR
 
 The upstream orchestrator is unchanged.
 Existing monitoring remains unchanged unless these collectors are enabled.
@@ -7,8 +7,8 @@ Existing monitoring remains unchanged unless these collectors are enabled.
 
 Collector defaults use exact published commit tags rather than moving version
 tags. Per-component source commits and digests are recorded in
-`src/nextg_lens/assets/observability_images.json`. Controller, calculator and
-probe defaults are recorded in `src/nextg_lens/assets/images.json`.
+`src/nador/assets/observability_images.json`. Controller, calculator and
+probe defaults are recorded in `src/nador/assets/images.json`.
 The controller rebuild preserves the recovered hackathon Python dependencies.
 The selected latency probe remains the recorded original
 `r2labuser/ebpf-latency-probe:2026w43`; an equivalent source rebuild is not claimed.
@@ -53,10 +53,10 @@ Missing observations do not prove a network fault.
 ## Image sources and builds
 
 The maintained runtime sources and Dockerfiles belong to the sibling
-`nextg-lens-images` repository, not this Python deployment library:
+`nador-images` repository, not this Python deployment library:
 
 ```bash
-cd ../nextg-lens-images
+cd ../nador-images
 docker build --platform linux/amd64 -f amf-sniffer/Dockerfile -t amf-sniffer:ml-test .
 docker build --platform linux/amd64 -f smf-sniffer/Dockerfile -t smf-sniffer:ml-test .
 docker build --platform linux/amd64 -f ue-mapper/Dockerfile -t ue-mapper:ml-test .
@@ -70,7 +70,7 @@ The old `.local/observability-images` contexts are superseded snapshots, not
 maintained sources. Select your published image references explicitly:
 
 ```python
-from nextg_lens import ObservabilitySettings
+from nador import ObservabilitySettings
 
 observability = ObservabilitySettings(
     ngap=True, amf_image="YOUR_REGISTRY/amf-sniffer:YOUR_TAG",
@@ -106,7 +106,7 @@ first; it will not silently leave an old image/settings running.
 ## Experiment artifacts
 
 ```python
-from nextg_lens.artifacts import ObservabilityRun
+from nador.artifacts import ObservabilityRun
 
 async with ObservabilityRun(
     "results/baseline-001", monitoring=monitoring,
@@ -159,7 +159,7 @@ needs its own check of log volume and appropriate filtering.
 Read-only availability checks:
 
 ```bash
-python -m nextg_lens.artifacts.check_observability \
+python -m nador.artifacts.check_observability \
   --prometheus-url http://HOST:30095 --loki-url http://HOST:31000 \
   --out results/observability_check.json
 ```

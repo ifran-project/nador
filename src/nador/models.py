@@ -8,7 +8,7 @@ from metamodel.models.base import StrictBaseModel
 from orchestrator.models.deployment import DeploymentModel
 from orchestrator.models.k8s import ContainerImage
 from pydantic import Field, model_validator
-from nextg_lens.observability import ObservabilitySettings
+from nador.observability import ObservabilitySettings
 
 
 DEFAULT_IMAGES = json.loads((Path(__file__).parent / "assets" / "images.json").read_text())

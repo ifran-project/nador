@@ -18,7 +18,7 @@ from .connection import loki_connection
 from contextlib import AsyncExitStack
 
 if TYPE_CHECKING:
-    from nextg_lens.deployment import MonitoringManagement
+    from nador.deployment import MonitoringManagement
 
 
 class ObservabilityRun(ExperimentRun):

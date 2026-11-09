@@ -30,49 +30,49 @@
   "builds": {
     "amf-sniffer": {
       "digest": "sha256:c676c52c8e3480906457400fcac19072f952f1179da6ff75be598220ecf82fef",
-      "source_repository": "yassir63/nextg-lens-images",
+      "source_repository": "yassir63/nador-images",
       "source_commit": "25abc6620446cfdc994062ae11949132208b0cec",
       "source_change": "Pinned published build selected by the ML trials"
     },
     "controller": {
       "digest": "sha256:29e1a24830b63cfef548eae07a81a6644de7a5e1fa94c57d3ae6714ddc66af1c",
-      "source_repository": "yassir63/nextg-lens-images",
+      "source_repository": "yassir63/nador-images",
       "source_commit": "5da937d630efaeebfb10d566bb80ce9f7f68950f",
       "source_change": "Pinned published build selected by the ML trials"
     },
     "kpi-calculator-oai": {
       "digest": "sha256:32a385c4801a7924b167f7bfa628ca360a2337d5759510cdf4b7b0c4bc7684dc",
-      "source_repository": "yassir63/nextg-lens-images",
+      "source_repository": "yassir63/nador-images",
       "source_commit": "cc2fb205ca284a55492ae72600c0e23a9e01ce7f",
       "source_change": "Pinned published build selected by the ML trials"
     },
     "latency-probe": {
       "digest": "sha256:b0444e0d606891f45667c6d05d672be277559a87e4858efc2cd1fd9a0a82e80e",
-      "source_repository": "yassir63/nextg-lens-images",
+      "source_repository": "yassir63/nador-images",
       "version_record": "versions/latency-probe/2026w43.json",
       "source_change": "Recorded original selected by the passing trials; no replacement source build claimed"
     },
     "packet-pairer": {
       "digest": "sha256:206cca25e069e3107557576955afa83c77ef3fac29a0d5f5372240f9527cf860",
-      "source_repository": "yassir63/nextg-lens-images",
+      "source_repository": "yassir63/nador-images",
       "source_commit": "af0ba1a8430e70dd84141ee71397dbecf6237e89",
       "source_change": "Prepare versioned monitoring images with automatic GHCR builds and update proposals"
     },
     "smf-sniffer": {
       "digest": "sha256:c12f6f84f9e5efdec8d68acc3d0bfbaf32bbc4e27ec8626f3481c8804a219211",
-      "source_repository": "yassir63/nextg-lens-images",
+      "source_repository": "yassir63/nador-images",
       "source_commit": "e3e93f1f7094ac86f3d02aa20ac4b8a75d93f2dd",
       "source_change": "Pinned published build selected by the ML trials"
     },
     "throughput-probe": {
       "digest": "sha256:135e6344aa636dbb9f99705753ee5a72b6941485ab1c910a8dabb2cf84458304",
-      "source_repository": "yassir63/nextg-lens-images",
+      "source_repository": "yassir63/nador-images",
       "source_commit": "af0ba1a8430e70dd84141ee71397dbecf6237e89",
       "source_change": "Prepare versioned monitoring images with automatic GHCR builds and update proposals"
     },
     "ue-mapper": {
       "digest": "sha256:edd87dd139caa0df2d92a3732f23efe125ef00e6315af4ea9cc7ecfcde0cdacd",
-      "source_repository": "yassir63/nextg-lens-images",
+      "source_repository": "yassir63/nador-images",
       "source_commit": "e5918cd4c40753ff85bbf2bed48d80ea70d0428e",
       "source_change": "Pinned published build selected by the ML trials"
     }

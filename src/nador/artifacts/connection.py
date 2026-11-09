@@ -7,7 +7,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from nextg_lens.deployment import MonitoringManagement
+from nador.deployment import MonitoringManagement
 
 
 @asynccontextmanager

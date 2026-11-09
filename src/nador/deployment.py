@@ -7,8 +7,8 @@ from orchestrator.deployment.base import BaseManagement
 from orchestrator.deployment.helm import HelmManagement
 from orchestrator.utils.ansible import get_ansible_inventory_line, run_ansible_role
 
-from nextg_lens.models import MonitoringDeployment, MonitoringModel
-from nextg_lens.utils import (
+from nador.models import MonitoringDeployment, MonitoringModel
+from nador.utils import (
     ASSETS,
     resolve_components,
     resolve_targets,

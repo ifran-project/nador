@@ -12,7 +12,7 @@ from typing import Any, Self
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-from nextg_lens.deployment import MonitoringManagement
+from nador.deployment import MonitoringManagement
 
 from . import prometheus_range_export as prometheus
 from . import split_prometheus_by_timeline as splitter
