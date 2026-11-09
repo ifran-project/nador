@@ -1,0 +1,57 @@
+{{- $kinds := list }}
+{{- if .Values.latency.enabled }}{{- $kinds = append $kinds "latency" }}{{- end }}
+{{- if .Values.throughput.enabled }}{{- $kinds = append $kinds "throughput" }}{{- end }}
+{{- if or $kinds .Values.observability.user_plane_paths }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: monitoring-controller
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "monitoring.labels" $ | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: monitoring-controller
+      monitoring.blueprint/owner: {{ $.Release.Namespace | quote }}
+  template:
+    metadata:
+      labels:
+        app: monitoring-controller
+        {{- include "monitoring.labels" $ | nindent 8 }}
+    spec:
+      {{- include "monitoring.placement" $ | nindent 6 }}
+      serviceAccountName: monitoring
+      containers:
+        {{- range $kind := $kinds }}
+        {{- $ctx := dict "Values" (deepCopy $.Values) "Release" $.Release }}
+        {{- $_ := set $ctx.Values "probeKind" $kind }}
+        - name: {{ $kind }}-controller
+          image: {{ printf "%s:%s" $.Values.image.repository $.Values.image.tag | quote }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          env:
+            {{- include "monitoring.controllerEnv" $ctx | nindent 12 }}
+        {{- end }}
+        {{- if .Values.observability.user_plane_paths }}
+        - name: path-controller
+          image: {{ printf "%s:%s" .Values.image.repository .Values.image.tag | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: [python3, /opt/observability/path_controller.py]
+          env:
+            - name: OBSERVABILITY_SETTINGS
+              value: {{ .Values.observability | toJson | quote }}
+            - name: MONITORING_TARGETS
+              value: {{ .Values.targets | toJson | quote }}
+            - name: MONITORING_OWNER
+              value: {{ .Release.Namespace | quote }}
+          volumeMounts:
+            - name: path-controller
+              mountPath: /opt/observability
+              readOnly: true
+      volumes:
+        - name: path-controller
+          configMap:
+            name: monitoring-path-controller
+        {{- end }}
+{{- end }}

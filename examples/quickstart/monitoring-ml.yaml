@@ -1,0 +1,40 @@
+# One core and one gNB; adapt target names and interfaces to your network.
+namespace: monitoring
+node_name: node4
+operation_timeout_seconds: 600
+kubeconfig: /etc/kubernetes/admin.conf
+latency: true
+packet_pairing: false
+loki: true
+core_kpis: false
+ran_kpis: false
+targets:
+- category: core
+  component: amf
+  role: amf
+  container: amf
+  interface: eth0
+- category: core
+  component: smf
+  role: smf
+  container: smf
+  interface: eth0
+- category: core
+  component: upf
+  role: upf
+  container: upf
+  interface: eth0
+- category: ran
+  component: gnb
+  role: gnb
+  container: gnb
+  interface: eth0
+throughput: true
+
+# Use the verified commit-tagged images selected by the ML branch.
+observability:
+  ngap: true
+  pfcp: true
+  mapper_coverage: true
+  user_plane_paths: true
+  node_metrics: true

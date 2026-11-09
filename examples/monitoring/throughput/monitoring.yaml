@@ -42,5 +42,5 @@ targets:
   role: gnb
   container: gnb
   interface: eth0
-node_name: node1
+node_name: node4
 throughput: true

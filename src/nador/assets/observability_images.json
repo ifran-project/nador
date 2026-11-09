@@ -1,0 +1,33 @@
+{
+  "source_repository": "yassir63/nador-images",
+  "images": {
+    "amf_image": "ghcr.io/yassir63/amf-sniffer:sha-25abc6620446cfdc994062ae11949132208b0cec",
+    "smf_image": "ghcr.io/yassir63/smf-sniffer:sha-e3e93f1f7094ac86f3d02aa20ac4b8a75d93f2dd",
+    "mapper_image": "ghcr.io/yassir63/ue_mapper_api:sha-e5918cd4c40753ff85bbf2bed48d80ea70d0428e",
+    "path_image": "ghcr.io/yassir63/user-plane-path-probe:sha-e3e93f1f7094ac86f3d02aa20ac4b8a75d93f2dd"
+  },
+  "digests": {
+    "amf_image": "sha256:c676c52c8e3480906457400fcac19072f952f1179da6ff75be598220ecf82fef",
+    "smf_image": "sha256:c12f6f84f9e5efdec8d68acc3d0bfbaf32bbc4e27ec8626f3481c8804a219211",
+    "mapper_image": "sha256:edd87dd139caa0df2d92a3732f23efe125ef00e6315af4ea9cc7ecfcde0cdacd",
+    "path_image": "sha256:968ce0033c188b1dcdd594e10ca68f891e687a2c31babb2a393abb88f2e78713"
+  },
+  "builds": {
+    "ue-mapper": {
+      "source_commit": "e5918cd4c40753ff85bbf2bed48d80ea70d0428e",
+      "digest": "sha256:edd87dd139caa0df2d92a3732f23efe125ef00e6315af4ea9cc7ecfcde0cdacd"
+    },
+    "amf-sniffer": {
+      "source_commit": "25abc6620446cfdc994062ae11949132208b0cec",
+      "digest": "sha256:c676c52c8e3480906457400fcac19072f952f1179da6ff75be598220ecf82fef"
+    },
+    "smf-sniffer": {
+      "source_commit": "e3e93f1f7094ac86f3d02aa20ac4b8a75d93f2dd",
+      "digest": "sha256:c12f6f84f9e5efdec8d68acc3d0bfbaf32bbc4e27ec8626f3481c8804a219211"
+    },
+    "user-plane-path": {
+      "source_commit": "e3e93f1f7094ac86f3d02aa20ac4b8a75d93f2dd",
+      "digest": "sha256:968ce0033c188b1dcdd594e10ca68f891e687a2c31babb2a393abb88f2e78713"
+    }
+  }
+}

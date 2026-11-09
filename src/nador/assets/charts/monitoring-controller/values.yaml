@@ -1,0 +1,18 @@
+controller:
+  watchNamespaces: []
+  probeMode: both
+  gnbInterface: eth0
+  upfInterface: eth0
+  gnbLatencyMode: BOTH
+  upfLatencyMode: BOTH
+images: {}
+throughput:
+  enabled: false
+  probeImage: ""
+latency:
+  enabled: true
+  packetPairing: false
+targets: []
+operationTimeoutSeconds: 300
+observability:
+  user_plane_paths: false

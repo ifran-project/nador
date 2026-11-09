@@ -1,34 +1,49 @@
-# NextG Lens
+# NADOR
 
-Monitoring and experiment artifacts for networks deployed with the
-[SLICES 5G orchestrator](https://gitlab.inria.fr/slices-ri/blueprints/post-5g/orchestrator).
-NextG Lens is an independent Python extension: it depends on upstream without
-shipping or modifying upstream's Python package or Ansible roles.
+**Network Analytics, Diagnostics, Observability, and Reporting for Mobile Networks.**
+
+Named after Nador, a city in northeastern Morocco associated with the idea of a
+lookout, NADOR helps teams monitor mobile network performance, investigate issues,
+and report their findings.
+
+NADOR extends the [SLICES 5G orchestrator](https://gitlab.inria.fr/slices-ri/blueprints/post-5g/orchestrator),
+which is planned to become **IFRAN** (Infrastructure Framework for Reproducible
+Automation of Networks). IFRAN, inspired by Ifrane and an anagram of INFRA, handles
+reproducible network provisioning and slice management.
 
 It integrates Prometheus, Grafana and Loki, correlates UE/slice/tunnel/session
 information, deploys latency and N3 throughput probes, and exports experiment
 timelines and metrics. Network deployment remains handled by upstream managers.
 
+Optional protocol/path collectors and richer experiment collection are described
+in [ML observability](OBSERVABILITY.md). These additions require explicitly
+selected collector images and live validation before use in experiments.
+
 Install from GitHub:
 
 ```bash
-python -m pip install --upgrade "git+https://github.com/yassir63/nextg-lens.git@main"
+python -m pip install --upgrade "git+https://github.com/yassir63/nador.git@main"
 ```
 
 ```python
-from nextg_lens import MonitoringManagement, MonitoringDeployment
+from nador import MonitoringManagement, MonitoringDeployment
 ```
+
+For existing notebooks, replace imports from `nextg_lens` with imports from `nador`.
 
 Start with the [minimal tutorial](examples/quickstart/tutorial.ipynb): installation,
 imports, monitoring deployment and one experiment with artifact collection.
 
-Default monitoring image versions live in [`assets/images.json`](src/nextg_lens/assets/images.json).
+Default monitoring image versions live in [`assets/images.json`](src/nador/assets/images.json).
 Image builds can propose updates through a pull request; deployments change after you merge it.
 Explicit scenario overrides still take precedence.
 
 Examples are under [examples/monitoring](examples/monitoring):
 
 - [RFsim](examples/monitoring/rfsim): monolithic and split OAI radios.
+  The monolithic OAI RFsim example uses stock Open5GS SMF and UPF images
+  selected by the orchestrator. Its ML profile uses separate collector
+  images and leaves custom core KPIs off.
 - [Multi-gNB](examples/monitoring/multi-gnb-2du/test.ipynb): 20 UEs, a monolithic
   gNB plus a CU/two DUs, three slices and two UPFs; includes on-demand traffic.
 - [Open5GS throughput](examples/monitoring/throughput/test.ipynb) and

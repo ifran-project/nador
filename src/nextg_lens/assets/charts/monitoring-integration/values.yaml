@@ -1,7 +1,0 @@
-targets: []
-dashboards:
-  enabled: true
-  logs: true
-  variant: oai
-lokiEnabled: true
-throughputEnabled: false

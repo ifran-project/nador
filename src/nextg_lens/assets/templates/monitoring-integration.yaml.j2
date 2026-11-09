@@ -1,5 +1,0 @@
-targets: {{ targets | tojson }}
-dashboards:
-  variant: {{ ('srsran' if model.ran.implementation | string == 'srsRAN' else 'oai') | tojson }}
-lokiEnabled: {{ monitoring.loki | tojson }}
-throughputEnabled: {{ monitoring.throughput | tojson }}

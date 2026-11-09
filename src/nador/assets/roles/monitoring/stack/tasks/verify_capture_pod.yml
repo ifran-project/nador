@@ -1,0 +1,45 @@
+- name: Wait for attachment sniffer
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: "{{ capture_target.namespace }}"
+    name: "{{ capture_pod.metadata.name }}"
+  register: current_capture
+  until:
+    - current_capture.resources | length == 1
+    - >-
+      (current_capture.resources | first | default({})).get('status', {}).get('ephemeralContainerStatuses', [])
+      | selectattr('name', 'match', '^' ~ capture_target.role ~ '-sniffer-')
+      | selectattr('state.running', 'defined') | list | length > 0
+  retries: "{{ [1, monitoring_timeout_seconds | int // 2] | max }}"
+  delay: 2
+
+- name: Verify running sniffer configuration
+  ansible.builtin.assert:
+    that:
+      - item.image == sniffer_image
+      - >-
+        item.env | default([]) | selectattr('name', 'equalto', 'MONITORING_SNIFFER_OWNER')
+        | map(attribute='value') | first | default('') == monitoring_owner
+      - >-
+        item.env | default([]) | selectattr('name', 'equalto', metrics_flag)
+        | map(attribute='value') | first | default('false') == metrics_enabled
+      - >-
+        metrics_enabled != 'true' or
+        (item.env | default([]) | selectattr('name', 'equalto', metrics_prefix ~ '_METRICS_PORT')
+        | map(attribute='value') | first | default('')) == metrics_port
+      - >-
+        metrics_enabled != 'true' or
+        (item.env | default([]) | selectattr('name', 'equalto', metrics_prefix ~ '_PENDING_TIMEOUT_SECONDS')
+        | map(attribute='value') | first | default('')) == (monitoring_config.observability.pending_timeout_seconds | string)
+    fail_msg: "Active sniffer has different settings. Remove monitoring before switching sniffer images or collectors."
+  vars:
+    terminated: "{{ current_capture.resources[0].status.ephemeralContainerStatuses | default([]) | selectattr('state.terminated', 'defined') | map(attribute='name') | list }}"
+    metrics_flag: "{{ 'AMF_NGAP' if capture_target.role == 'amf' else 'SMF_PFCP' }}_METRICS_ENABLED"
+    metrics_prefix: "{{ 'AMF_NGAP' if capture_target.role == 'amf' else 'SMF_PFCP' }}"
+    metrics_port: "{{ (monitoring_config.observability.ngap_port if capture_target.role == 'amf' else monitoring_config.observability.pfcp_port) | string }}"
+    metrics_enabled: "{{ (monitoring_config.observability.ngap if capture_target.role == 'amf' else monitoring_config.observability.pfcp) | string | lower }}"
+  loop: "{{ current_capture.resources[0].spec.ephemeralContainers | default([]) }}"
+  when:
+    - item.name is match('^' ~ capture_target.role ~ '-sniffer-')
+    - item.name not in terminated

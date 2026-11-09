@@ -1,0 +1,63 @@
+- name: Find attachment capture pods
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: "{{ capture_target.namespace }}"
+    label_selectors: "{{ capture_target.label_selectors }}"
+  register: capture_pods
+  failed_when: capture_pods.resources | length == 0
+
+- name: Inject attachment sniffer
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - replace
+      - --raw
+      - "/api/v1/namespaces/{{ capture_target.namespace }}/pods/{{ item.metadata.name }}/ephemeralcontainers"
+      - -f
+      - "-"
+    stdin: "{{ capture_patch | to_json }}"
+  vars:
+    prefix: "{{ capture_target.role }}-sniffer-"
+    existing: "{{ item.spec.ephemeralContainers | default([]) }}"
+    terminated: "{{ item.status.ephemeralContainerStatuses | default([]) | selectattr('state.terminated', 'defined') | map(attribute='name') | list }}"
+    sniffer:
+      name: "{{ prefix }}{{ existing | length + 1 }}"
+      image: "{{ sniffer_image }}"
+      imagePullPolicy: IfNotPresent
+      targetContainerName: "{{ capture_target.container }}"
+      env:
+        - name: "{{ capture_target.role }}_sniffer_iface"
+          value: "{{ capture_target.interface }}"
+        - name: REDIS_HOST
+          value: "{{ redis_host }}"
+        - name: MONITORING_SNIFFER_OWNER
+          value: "{{ monitoring_owner }}"
+        - name: "{{ 'AMF_NGAP' if capture_target.role == 'amf' else 'SMF_PFCP' }}_METRICS_ENABLED"
+          value: "{{ (monitoring_config.observability.ngap if capture_target.role == 'amf' else monitoring_config.observability.pfcp) | string | lower }}"
+        - name: "{{ 'AMF_NGAP' if capture_target.role == 'amf' else 'SMF_PFCP' }}_METRICS_PORT"
+          value: "{{ (monitoring_config.observability.ngap_port if capture_target.role == 'amf' else monitoring_config.observability.pfcp_port) | string }}"
+        - name: "{{ 'AMF_NGAP' if capture_target.role == 'amf' else 'SMF_PFCP' }}_PENDING_TIMEOUT_SECONDS"
+          value: "{{ monitoring_config.observability.pending_timeout_seconds | string }}"
+      securityContext:
+        privileged: true
+        runAsUser: 0
+    capture_patch:
+      apiVersion: v1
+      kind: Pod
+      metadata:
+        name: "{{ item.metadata.name }}"
+        resourceVersion: "{{ item.metadata.resourceVersion }}"
+      spec:
+        ephemeralContainers: "{{ existing + [sniffer] }}"
+  loop: "{{ capture_pods.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  when: existing | map(attribute='name') | select('match', '^' ~ prefix) | difference(terminated) | length == 0
+
+- name: Verify attachment sniffers on each replica
+  ansible.builtin.include_tasks: verify_capture_pod.yml
+  loop: "{{ capture_pods.resources }}"
+  loop_control:
+    loop_var: capture_pod
+    label: "{{ capture_pod.metadata.name }}"

@@ -2,13 +2,14 @@
 # Verify these node, container and interface names against your running cluster.
 # eth0 assumes the default pod network without Multus; adjust if using N2/N3/N4 interfaces.
 namespace: monitoring
+node_name: node4
 kubeconfig: /etc/kubernetes/admin.conf
 
 latency: true
+throughput: true
 packet_pairing: true
 loki: true
-# The default notebook selects the metrics image for both SMF and UPF.
-core_kpis: true
+core_kpis: false
 # The default notebook enables the OAI statistics parser before RAN deployment.
 ran_kpis: true
 

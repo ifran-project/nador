@@ -1,0 +1,578 @@
+[
+  {
+    "name": "n3_throughput_bps",
+    "query": "8 * rate(gtp_throughput_bytes_total{probe_role=\"upf\"}[5s])"
+  },
+  {
+    "name": "oai_mac_dl_goodput_mbps",
+    "query": "oai_gnb_mac_dl_goodput_mbps"
+  },
+  {
+    "name": "oai_mac_ul_goodput_mbps",
+    "query": "oai_gnb_mac_ul_goodput_mbps"
+  },
+  {
+    "name": "fiveg_ue_session_info",
+    "query": "fiveg_ue_session_info"
+  },
+  {
+    "name": "gtp_throughput_bytes_per_second_30s",
+    "query": "rate(gtp_throughput_bytes_total[30s])"
+  },
+  {
+    "name": "ngap_pdu_session_setup_request_rate_hz_30s",
+    "query": "rate(ngap_pdu_session_setup_requests_total[30s])"
+  },
+  {
+    "name": "ngap_pdu_session_setup_response_rate_hz_30s",
+    "query": "sum by (outcome) (rate(ngap_pdu_session_setup_responses_total[30s]))"
+  },
+  {
+    "name": "ngap_pdu_session_setup_completed_rate_hz_30s",
+    "query": "sum by (outcome) (rate(ngap_pdu_session_setup_completed_total[30s]))"
+  },
+  {
+    "name": "ngap_pdu_session_setup_mean_ms_30s",
+    "query": "(sum by (outcome) (rate(ngap_pdu_session_setup_duration_seconds_sum[30s])) / sum by (outcome) (rate(ngap_pdu_session_setup_duration_seconds_count[30s]))) * 1000"
+  },
+  {
+    "name": "ngap_pdu_session_setup_p95_ms_30s",
+    "query": "histogram_quantile(0.95, sum by (le, outcome) (rate(ngap_pdu_session_setup_duration_seconds_bucket[30s]))) * 1000"
+  },
+  {
+    "name": "ngap_pdu_session_setup_pending",
+    "query": "ngap_pdu_session_setup_pending"
+  },
+  {
+    "name": "ngap_pdu_session_setup_expired_rate_hz_30s",
+    "query": "rate(ngap_pdu_session_setup_expired_total[30s])"
+  },
+  {
+    "name": "ngap_pdu_session_setup_unmatched_response_rate_hz_30s",
+    "query": "rate(ngap_pdu_session_setup_unmatched_responses_total[30s])"
+  },
+  {
+    "name": "ngap_pdu_session_setup_untrackable_request_rate_hz_30s",
+    "query": "rate(ngap_pdu_session_setup_untrackable_requests_total[30s])"
+  },
+  {
+    "name": "ngap_pdu_session_setup_untrackable_response_rate_hz_30s",
+    "query": "rate(ngap_pdu_session_setup_untrackable_responses_total[30s])"
+  },
+  {
+    "name": "ngap_pdu_session_setup_overlap_rate_hz_30s",
+    "query": "rate(ngap_pdu_session_setup_overlapping_requests_total[30s])"
+  },
+  {
+    "name": "ngap_pdu_session_setup_decode_error_rate_hz_30s",
+    "query": "rate(ngap_pdu_session_setup_decode_errors_total[30s])"
+  },
+  {
+    "name": "ngap_pdu_session_setup_capture_started",
+    "query": "ngap_pdu_session_setup_capture_started"
+  },
+  {
+    "name": "pfcp_session_establishment_request_rate_hz_30s",
+    "query": "rate(pfcp_session_establishment_requests_total[30s])"
+  },
+  {
+    "name": "pfcp_session_establishment_response_rate_hz_30s",
+    "query": "sum by (outcome) (rate(pfcp_session_establishment_responses_total[30s]))"
+  },
+  {
+    "name": "pfcp_session_establishment_completed_rate_hz_30s",
+    "query": "sum by (outcome) (rate(pfcp_session_establishment_completed_total[30s]))"
+  },
+  {
+    "name": "pfcp_session_establishment_mean_ms_30s",
+    "query": "(sum by (outcome) (rate(pfcp_session_establishment_duration_seconds_sum[30s])) / sum by (outcome) (rate(pfcp_session_establishment_duration_seconds_count[30s]))) * 1000"
+  },
+  {
+    "name": "pfcp_session_establishment_p95_ms_30s",
+    "query": "histogram_quantile(0.95, sum by (le, outcome) (rate(pfcp_session_establishment_duration_seconds_bucket[30s]))) * 1000"
+  },
+  {
+    "name": "pfcp_session_establishment_pending",
+    "query": "pfcp_session_establishment_pending"
+  },
+  {
+    "name": "pfcp_session_establishment_expired_rate_hz_30s",
+    "query": "rate(pfcp_session_establishment_expired_total[30s])"
+  },
+  {
+    "name": "pfcp_session_establishment_unmatched_response_rate_hz_30s",
+    "query": "rate(pfcp_session_establishment_unmatched_responses_total[30s])"
+  },
+  {
+    "name": "pfcp_session_establishment_untrackable_request_rate_hz_30s",
+    "query": "rate(pfcp_session_establishment_untrackable_requests_total[30s])"
+  },
+  {
+    "name": "pfcp_session_establishment_untrackable_response_rate_hz_30s",
+    "query": "rate(pfcp_session_establishment_untrackable_responses_total[30s])"
+  },
+  {
+    "name": "pfcp_session_establishment_overlap_rate_hz_30s",
+    "query": "rate(pfcp_session_establishment_overlapping_requests_total[30s])"
+  },
+  {
+    "name": "pfcp_session_establishment_decode_error_rate_hz_30s",
+    "query": "rate(pfcp_session_establishment_decode_errors_total[30s])"
+  },
+  {
+    "name": "pfcp_session_establishment_capture_started",
+    "query": "pfcp_session_establishment_capture_started"
+  },
+  {
+    "name": "user_plane_probe_path_ready",
+    "query": "user_plane_probe_path_ready"
+  },
+  {
+    "name": "user_plane_probe_path_confirmed",
+    "query": "user_plane_probe_path_confirmed"
+  },
+  {
+    "name": "user_plane_probe_interface_receive_bytes_per_second_30s",
+    "query": "sum by (anchor, path) (rate(user_plane_probe_interface_receive_bytes_total[30s]))"
+  },
+  {
+    "name": "user_plane_probe_interface_transmit_bytes_per_second_30s",
+    "query": "sum by (anchor, path) (rate(user_plane_probe_interface_transmit_bytes_total[30s]))"
+  },
+  {
+    "name": "user_plane_probe_interface_drops_per_second_30s",
+    "query": "sum by (anchor, path) (rate(user_plane_probe_interface_receive_drops_total[30s]) + rate(user_plane_probe_interface_transmit_drops_total[30s]))"
+  },
+  {
+    "name": "user_plane_probe_interface_errors_per_second_30s",
+    "query": "sum by (anchor, path) (rate(user_plane_probe_interface_receive_errors_total[30s]) + rate(user_plane_probe_interface_transmit_errors_total[30s]))"
+  },
+  {
+    "name": "user_plane_probe_gtpu_packets_per_second_30s",
+    "query": "sum by (anchor, direction) (rate(user_plane_probe_gtpu_packets_total[30s]))"
+  },
+  {
+    "name": "user_plane_probe_gtpu_bytes_per_second_30s",
+    "query": "sum by (anchor, direction) (rate(user_plane_probe_gtpu_bytes_total[30s]))"
+  },
+  {
+    "name": "user_plane_probe_gtpu_capture_active",
+    "query": "user_plane_probe_gtpu_capture_active"
+  },
+  {
+    "name": "user_plane_probe_gtpu_seen",
+    "query": "user_plane_probe_gtpu_seen"
+  },
+  {
+    "name": "user_plane_probe_collection_success",
+    "query": "user_plane_probe_collection_success"
+  },
+  {
+    "name": "user_plane_probe_collection_error_rate_hz_30s",
+    "query": "sum by (anchor, operation) (rate(user_plane_probe_collection_errors_total[30s]))"
+  },
+  {
+    "name": "ue_mapper_collection_success",
+    "query": "ue_mapper_collection_success"
+  },
+  {
+    "name": "ue_mapper_collection_busy",
+    "query": "ue_mapper_collection_busy"
+  },
+  {
+    "name": "ue_mapper_redis_up",
+    "query": "ue_mapper_redis_up"
+  },
+  {
+    "name": "ue_mapper_collection_duration_seconds",
+    "query": "ue_mapper_collection_duration_seconds"
+  },
+  {
+    "name": "ue_mapper_context_records",
+    "query": "ue_mapper_context_records"
+  },
+  {
+    "name": "ue_mapper_context_records_by_slice",
+    "query": "ue_mapper_context_records_by_slice"
+  },
+  {
+    "name": "ue_mapper_identified_ues_by_slice",
+    "query": "ue_mapper_identified_ues_by_slice"
+  },
+  {
+    "name": "ue_mapper_paired_contexts_by_slice",
+    "query": "ue_mapper_paired_contexts_by_slice"
+  },
+  {
+    "name": "ue_mapper_context_missing_fields",
+    "query": "ue_mapper_context_missing_fields"
+  },
+  {
+    "name": "srsran_dl_bitrate_raw",
+    "query": "ue_dl_brate"
+  },
+  {
+    "name": "srsran_ul_bitrate_raw",
+    "query": "ue_ul_brate"
+  },
+  {
+    "name": "srsran_dl_transmissions_ok_raw",
+    "query": "ue_dl_nof_ok"
+  },
+  {
+    "name": "srsran_dl_transmissions_nok_raw",
+    "query": "ue_dl_nof_nok"
+  },
+  {
+    "name": "srsran_ul_transmissions_ok_raw",
+    "query": "ue_ul_nof_ok"
+  },
+  {
+    "name": "srsran_ul_transmissions_nok_raw",
+    "query": "ue_ul_nof_nok"
+  },
+  {
+    "name": "srsran_dl_mcs",
+    "query": "ue_dl_mcs"
+  },
+  {
+    "name": "srsran_ul_mcs",
+    "query": "ue_ul_mcs"
+  },
+  {
+    "name": "srsran_dl_rank_indicator",
+    "query": "ue_dl_ri"
+  },
+  {
+    "name": "srsran_ul_rank_indicator",
+    "query": "ue_ul_ri"
+  },
+  {
+    "name": "srsran_cqi",
+    "query": "ue_cqi"
+  },
+  {
+    "name": "srsran_pucch_snr_db",
+    "query": "ue_pucch_snr_db"
+  },
+  {
+    "name": "srsran_pusch_snr_db",
+    "query": "ue_pusch_snr_db"
+  },
+  {
+    "name": "srsran_dl_buffer_raw",
+    "query": "ue_dl_bs"
+  },
+  {
+    "name": "direct_latest_ms",
+    "query": "gtp_teid_latency_ns / 1000000"
+  },
+  {
+    "name": "direct_mean_ms_5s",
+    "query": "(sum by (imsi, ue_ip, slice, probe_role, mode) (rate(gtp_teid_latency_observed_ns_sum[5s])) / sum by (imsi, ue_ip, slice, probe_role, mode) (rate(gtp_teid_latency_observed_ns_count[5s]))) / 1000000"
+  },
+  {
+    "name": "direct_p50_ms_5s",
+    "query": "histogram_quantile(0.50, sum by (le, imsi, ue_ip, slice, probe_role, mode) (rate(gtp_teid_latency_observed_ns_bucket[5s]))) / 1000000"
+  },
+  {
+    "name": "direct_median_1s_ms",
+    "query": "gtp_teid_latency_median_1s_ns / 1000000"
+  },
+  {
+    "name": "direct_mean_ms_5s_by_kind",
+    "query": "(sum by (kind, imsi, ue_ip, slice, probe_role, mode) (rate(gtp_teid_latency_observed_ns_sum[5s])) / sum by (kind, imsi, ue_ip, slice, probe_role, mode) (rate(gtp_teid_latency_observed_ns_count[5s]))) / 1000000"
+  },
+  {
+    "name": "direct_median_1s_ms_by_kind",
+    "query": "gtp_teid_latency_median_1s_ns / 1000000"
+  },
+  {
+    "name": "direct_p50_ms_5s_by_kind",
+    "query": "histogram_quantile(0.50, sum by (le, kind, imsi, ue_ip, slice, probe_role, mode) (rate(gtp_teid_latency_observed_ns_bucket[5s]))) / 1000000"
+  },
+  {
+    "name": "direct_p95_ms_5s_by_kind",
+    "query": "histogram_quantile(0.95, sum by (le, kind, imsi, ue_ip, slice, probe_role, mode) (rate(gtp_teid_latency_observed_ns_bucket[5s]))) / 1000000"
+  },
+  {
+    "name": "direct_event_rate_hz_5s_by_kind",
+    "query": "sum by (kind, imsi, ue_ip, slice, probe_role, mode) (rate(gtp_teid_latency_observed_ns_count[5s]))"
+  },
+  {
+    "name": "direct_p95_ms_5s",
+    "query": "histogram_quantile(0.95, sum by (le, imsi, ue_ip, slice, probe_role, mode) (rate(gtp_teid_latency_observed_ns_bucket[5s]))) / 1000000"
+  },
+  {
+    "name": "direct_p99_ms_5s",
+    "query": "histogram_quantile(0.99, sum by (le, imsi, ue_ip, slice, probe_role, mode) (rate(gtp_teid_latency_observed_ns_bucket[5s]))) / 1000000"
+  },
+  {
+    "name": "direct_event_rate_hz_5s",
+    "query": "sum by (imsi, ue_ip, slice, probe_role, mode) (rate(gtp_teid_latency_observed_ns_count[5s]))"
+  },
+  {
+    "name": "direct_lost_events_hz_5s",
+    "query": "sum by (probe_role, stream) (rate(gtp_teid_latency_lost_events_total[5s]))"
+  },
+  {
+    "name": "tcp_data_observed_hz_30s",
+    "query": "sum by (mode, probe_role) (rate(gtp_tcp_data_observed_total[30s]))"
+  },
+  {
+    "name": "tcp_ack_observed_hz_30s",
+    "query": "sum by (mode, probe_role) (rate(gtp_tcp_ack_observed_total[30s]))"
+  },
+  {
+    "name": "tcp_rtt_emitted_hz_30s",
+    "query": "sum by (mode, probe_role) (rate(gtp_tcp_rtt_emitted_total[30s]))"
+  },
+  {
+    "name": "tcp_pending_evicted_hz_30s",
+    "query": "sum by (mode, probe_role, reason) (rate(gtp_tcp_pending_evicted_total[30s]))"
+  },
+  {
+    "name": "tcp_ack_no_match_hz_30s",
+    "query": "sum by (mode, probe_role) (rate(gtp_tcp_ack_no_match_total[30s]))"
+  },
+  {
+    "name": "same_packet_upf_rtt_latest_ms",
+    "query": "gtp_same_packet_upf_rtt_ns / 1000000"
+  },
+  {
+    "name": "same_packet_gnb_rtt_latest_ms",
+    "query": "gtp_same_packet_gnb_rtt_ns / 1000000"
+  },
+  {
+    "name": "same_packet_gap_latest_ms",
+    "query": "gtp_same_packet_rtt_gap_ns / 1000000"
+  },
+  {
+    "name": "same_packet_upf_rtt_mean_ms_5s",
+    "query": "(sum by (imsi, ue_ip, slice, probe_role, mode, direction) (rate(gtp_same_packet_upf_rtt_observed_ns_sum[5s])) / sum by (imsi, ue_ip, slice, probe_role, mode, direction) (rate(gtp_same_packet_upf_rtt_observed_ns_count[5s]))) / 1000000"
+  },
+  {
+    "name": "same_packet_gnb_rtt_mean_ms_5s",
+    "query": "(sum by (imsi, ue_ip, slice, probe_role, mode, direction) (rate(gtp_same_packet_gnb_rtt_observed_ns_sum[5s])) / sum by (imsi, ue_ip, slice, probe_role, mode, direction) (rate(gtp_same_packet_gnb_rtt_observed_ns_count[5s]))) / 1000000"
+  },
+  {
+    "name": "same_packet_gap_mean_ms_5s",
+    "query": "(sum by (imsi, ue_ip, slice, probe_role, mode, direction) (rate(gtp_same_packet_rtt_gap_observed_ns_sum[5s])) / sum by (imsi, ue_ip, slice, probe_role, mode, direction) (rate(gtp_same_packet_rtt_gap_observed_ns_count[5s]))) / 1000000"
+  },
+  {
+    "name": "same_packet_upf_rtt_p95_ms_5s",
+    "query": "histogram_quantile(0.95, sum by (le, imsi, ue_ip, slice, probe_role, mode, direction) (rate(gtp_same_packet_upf_rtt_observed_ns_bucket[5s]))) / 1000000"
+  },
+  {
+    "name": "same_packet_gnb_rtt_p95_ms_5s",
+    "query": "histogram_quantile(0.95, sum by (le, imsi, ue_ip, slice, probe_role, mode, direction) (rate(gtp_same_packet_gnb_rtt_observed_ns_bucket[5s]))) / 1000000"
+  },
+  {
+    "name": "same_packet_gap_p95_ms_5s",
+    "query": "histogram_quantile(0.95, sum by (le, imsi, ue_ip, slice, probe_role, mode, direction) (rate(gtp_same_packet_rtt_gap_observed_ns_bucket[5s]))) / 1000000"
+  },
+  {
+    "name": "same_packet_pair_rate_hz_5s",
+    "query": "sum by (imsi, ue_ip, slice, probe_role, mode, direction) (rate(gtp_same_packet_pairs_total[5s]))"
+  },
+  {
+    "name": "same_packet_rejections_hz_5s",
+    "query": "sum by (direction, probe_role, reason) (rate(gtp_same_packet_pair_rejections_total[5s]))"
+  },
+  {
+    "name": "mac_throughput_per_rnti_bps",
+    "query": "mac_throughput{direction=~\"downlink|uplink\"}"
+  },
+  {
+    "name": "mac_throughput_total_bps",
+    "query": "sum by (direction) (mac_throughput{direction=~\"downlink|uplink\"} > 0)"
+  },
+  {
+    "name": "prach_i0_db",
+    "query": "oai_gnb_l1_prach_i0_db"
+  },
+  {
+    "name": "container_cpu_cores_5s",
+    "query": "sum by (namespace, pod, container) (rate(container_cpu_usage_seconds_total{container!=\"POD\", image!=\"\"}[5s]))"
+  },
+  {
+    "name": "container_cpu_cores_30s_any",
+    "query": "sum by (namespace, pod, container) (rate(container_cpu_usage_seconds_total{container!=\"POD\", container!=\"\"}[30s]))"
+  },
+  {
+    "name": "container_memory_mib",
+    "query": "sum by (namespace, pod, container) (container_memory_working_set_bytes{container!=\"POD\", image!=\"\"}) / 1024 / 1024"
+  },
+  {
+    "name": "container_memory_mib_any",
+    "query": "sum by (namespace, pod, container) (container_memory_working_set_bytes{container!=\"POD\", container!=\"\"}) / 1024 / 1024"
+  },
+  {
+    "name": "node_cpu_non_idle_cores_30s",
+    "query": "sum by (instance) (rate(node_cpu_seconds_total{mode!=\"idle\"}[30s]))"
+  },
+  {
+    "name": "node_cpu_softirq_cores_30s",
+    "query": "sum by (instance) (rate(node_cpu_seconds_total{mode=\"softirq\"}[30s]))"
+  },
+  {
+    "name": "container_cpu_throttled_seconds_per_second_1m",
+    "query": "rate(container_cpu_cfs_throttled_seconds_total{container!=\"\",container!=\"POD\",pod!=\"\"}[1m])"
+  },
+  {
+    "name": "container_cpu_throttled_period_fraction_1m",
+    "query": "rate(container_cpu_cfs_throttled_periods_total{container!=\"\",container!=\"POD\",pod!=\"\"}[1m]) / (rate(container_cpu_cfs_periods_total{container!=\"\",container!=\"POD\",pod!=\"\"}[1m]) > 0)"
+  },
+  {
+    "name": "container_oom_events_total",
+    "query": "container_oom_events_total{container!=\"\",container!=\"POD\",pod!=\"\"}"
+  },
+  {
+    "name": "pod_container_restarts_total",
+    "query": "kube_pod_container_status_restarts_total"
+  },
+  {
+    "name": "pod_container_last_termination_reason",
+    "query": "kube_pod_container_status_last_terminated_reason"
+  },
+  {
+    "name": "pod_container_waiting_reason",
+    "query": "kube_pod_container_status_waiting_reason"
+  },
+  {
+    "name": "pod_ready",
+    "query": "kube_pod_status_ready{condition=\"true\"}"
+  },
+  {
+    "name": "pod_phase",
+    "query": "kube_pod_status_phase"
+  },
+  {
+    "name": "pod_container_resource_requests",
+    "query": "kube_pod_container_resource_requests{resource=~\"cpu|memory\"}"
+  },
+  {
+    "name": "pod_container_resource_limits",
+    "query": "kube_pod_container_resource_limits{resource=~\"cpu|memory\"}"
+  },
+  {
+    "name": "pod_node_identity",
+    "query": "kube_pod_info"
+  },
+  {
+    "name": "pod_container_identity",
+    "query": "kube_pod_container_info"
+  },
+  {
+    "name": "node_resource_allocatable",
+    "query": "kube_node_status_allocatable{resource=~\"cpu|memory\"}"
+  },
+  {
+    "name": "node_conditions",
+    "query": "kube_node_status_condition{condition=~\"Ready|MemoryPressure|DiskPressure|PIDPressure\"}"
+  },
+  {
+    "name": "node_cpu_mode_seconds_per_second_1m",
+    "query": "sum by (instance, node, mode) (rate(node_cpu_seconds_total[1m]))"
+  },
+  {
+    "name": "node_cpu_pressure_waiting_fraction_1m",
+    "query": "rate(node_pressure_cpu_waiting_seconds_total[1m])"
+  },
+  {
+    "name": "node_memory_pressure_waiting_fraction_1m",
+    "query": "rate(node_pressure_memory_waiting_seconds_total[1m])"
+  },
+  {
+    "name": "node_io_pressure_waiting_fraction_1m",
+    "query": "rate(node_pressure_io_waiting_seconds_total[1m])"
+  },
+  {
+    "name": "node_scheduler_wait_seconds_per_second_1m",
+    "query": "sum by (instance, node) (rate(node_schedstat_waiting_seconds_total[1m]))"
+  },
+  {
+    "name": "node_processes_runnable",
+    "query": "node_procs_running"
+  },
+  {
+    "name": "node_memory_available_bytes",
+    "query": "node_memory_MemAvailable_bytes"
+  },
+  {
+    "name": "node_memory_total_bytes",
+    "query": "node_memory_MemTotal_bytes"
+  },
+  {
+    "name": "node_network_receive_bytes_per_second_1m",
+    "query": "rate(node_network_receive_bytes_total{device!=\"lo\"}[1m])"
+  },
+  {
+    "name": "node_network_transmit_bytes_per_second_1m",
+    "query": "rate(node_network_transmit_bytes_total{device!=\"lo\"}[1m])"
+  },
+  {
+    "name": "node_network_receive_drops_per_second_1m",
+    "query": "rate(node_network_receive_drop_total{device!=\"lo\"}[1m])"
+  },
+  {
+    "name": "node_network_transmit_drops_per_second_1m",
+    "query": "rate(node_network_transmit_drop_total{device!=\"lo\"}[1m])"
+  },
+  {
+    "name": "node_network_receive_errors_per_second_1m",
+    "query": "rate(node_network_receive_errs_total{device!=\"lo\"}[1m])"
+  },
+  {
+    "name": "node_network_transmit_errors_per_second_1m",
+    "query": "rate(node_network_transmit_errs_total{device!=\"lo\"}[1m])"
+  },
+  {
+    "name": "pod_network_receive_bytes_per_second_1m",
+    "query": "rate(container_network_receive_bytes_total{pod!=\"\",interface!=\"lo\"}[1m])"
+  },
+  {
+    "name": "pod_network_transmit_bytes_per_second_1m",
+    "query": "rate(container_network_transmit_bytes_total{pod!=\"\",interface!=\"lo\"}[1m])"
+  },
+  {
+    "name": "pod_network_receive_drops_per_second_1m",
+    "query": "rate(container_network_receive_packets_dropped_total{pod!=\"\",interface!=\"lo\"}[1m])"
+  },
+  {
+    "name": "pod_network_transmit_drops_per_second_1m",
+    "query": "rate(container_network_transmit_packets_dropped_total{pod!=\"\",interface!=\"lo\"}[1m])"
+  },
+  {
+    "name": "node_disk_io_busy_fraction_1m",
+    "query": "rate(node_disk_io_time_seconds_total[1m])"
+  },
+  {
+    "name": "node_filesystem_available_bytes",
+    "query": "node_filesystem_avail_bytes"
+  },
+  {
+    "name": "node_clock_synchronized",
+    "query": "node_timex_sync_status"
+  },
+  {
+    "name": "node_clock_offset_seconds",
+    "query": "node_timex_offset_seconds"
+  },
+  {
+    "name": "node_identity",
+    "query": "node_uname_info"
+  },
+  {
+    "name": "node_collector_success",
+    "query": "node_scrape_collector_success"
+  },
+  {
+    "name": "monitoring_target_up",
+    "query": "up"
+  },
+  {
+    "name": "monitoring_scrape_duration_seconds",
+    "query": "scrape_duration_seconds"
+  }
+]
