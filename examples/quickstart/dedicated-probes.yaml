@@ -1,0 +1,15 @@
+# Overlay for an existing monitoring profile. Only CPU is enabled in this example.
+# Omit bundled extended.node_image and extended.service_image when using this overlay.
+extended:
+  off_cpu: true
+  probe_images:
+    cpu: ghcr.io/yassir63/nador-probe-cpu@sha256:f90b18564f4e952854adbb2e0ad69522d9d1af76335b62ca2289b4cb484b753b
+    drops: ghcr.io/yassir63/nador-probe-drops@sha256:f0c8f2fcee7337b7b44bbf07a27cab869022afc7d92307261fb3bb04300ab19a
+    queueing: ghcr.io/yassir63/nador-probe-queueing@sha256:5ace269a7daa75f94e6702cb6182f4cf70923f4ff83e2e2f6812ef44f455e735
+    tcp: ghcr.io/yassir63/nador-probe-tcp@sha256:5f3fea030d6f09848e449ebb8138b6ace92d526ec7c7bcbf39d23afb2c42829d
+    qfi: ghcr.io/yassir63/nador-probe-qfi@sha256:535b446db390422357b8373b88de787fcf6aceb14cb72e2326b0c446f782c373
+    concordance: ghcr.io/yassir63/nador-probe-concordance@sha256:6d89934ac12249076d5fd3906b89cffafb2703a340e8a2345d0e3fc9e6e92d79
+    split-signaling: ghcr.io/yassir63/nador-probe-split-signaling@sha256:dec09fe6701c5dc8e2b7fb91ba0530fd2a5b73c9dd66d6932e16eff56d3dede6
+    source-liveness: ghcr.io/yassir63/nador-probe-source-liveness@sha256:92631147752746d9799a21bb2e1dad2171682ad91d1a6ce862595b65d58c131d
+    nf-liveness: ghcr.io/yassir63/nador-probe-nf-liveness@sha256:4dfd9cbdc5e7fe798f441aae9fea840d03226bab73604b223c3a84adecab0b19
+    measurement-quality: ghcr.io/yassir63/nador-probe-measurement-quality@sha256:f3216b49d5c00a3736d0f9d91da0481601786a5f900822b82ae98011970c031a

@@ -56,6 +56,8 @@ Set `extended.probe_images` instead of the legacy `node_image` and
 `service_image` fields. Each enabled purpose needs its own published image.
 The matching `probe-<purpose>` release starts and stops independently.
 No existing latency probe, AMF sniffer, or SMF sniffer is changed.
+The [digest-pinned example](examples/quickstart/dedicated-probes.yaml) enables
+only CPU by default; selecting an image does not enable its probe.
 
 | Image suffix after `nador-probe-` | What the release runs |
 | --- | --- |
@@ -101,7 +103,7 @@ The command prints a manifest unless you add `--create`:
 python -m nador.artifacts.amf_visibility \
   --context YOUR_CONTEXT --amf-namespace YOUR_AMF_NAMESPACE \
   --amf-pod YOUR_RUNNING_AMF_POD --interface YOUR_N2_INTERFACE \
-  --image ghcr.io/yassir63/nador-amf-visibility:extended-PUBLISHED_COMMIT
+  --image ghcr.io/yassir63/nador-amf-visibility@sha256:a35627045060e4da8390e6b221ed0a8c63b3928e4b73215d264fd2fadfc16d84
 ```
 
 The temporary Job requires privileged node access and is pinned to the AMF's
