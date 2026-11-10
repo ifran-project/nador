@@ -1,0 +1,4 @@
+settings: {{ monitoring.extended.model_dump() | tojson }}
+targets: {{ extended_targets | tojson }}
+prometheusUrl: "http://monitoring-prometheus-prometheus.{{ monitoring.namespace }}.svc:9090"
+tolerations: {{ component.tolerations | tojson }}

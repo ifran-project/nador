@@ -8,6 +8,8 @@ defaults:
     value: 'true'
     effect: NoSchedule
 components:
+  extended-probes:
+    pod_selector: []
   integration:
     release_name: monitoring-integration
     chart_ref: monitoring-integration

@@ -9,6 +9,7 @@ from orchestrator.models.deployment import DeploymentModel
 from orchestrator.models.k8s import ContainerImage
 from pydantic import Field, model_validator
 from nador.observability import ObservabilitySettings
+from nador.extended import ExtendedSettings
 
 
 DEFAULT_IMAGES = json.loads((Path(__file__).parent / "assets" / "images.json").read_text())
@@ -83,6 +84,7 @@ class MonitoringDeployment(StrictBaseModel):
     ran_kpis: bool = False
     ocudu_metrics_port: int = Field(default=8001, ge=1, le=65535)
     observability: ObservabilitySettings = Field(default_factory=ObservabilitySettings)
+    extended: ExtendedSettings = Field(default_factory=ExtendedSettings)
     targets: list[MonitoringTarget] = Field(default_factory=list)
     images: MonitoringImages = Field(default_factory=MonitoringImages)
     components: dict[str, DeployedMonitoringComponent] = Field(default_factory=dict)

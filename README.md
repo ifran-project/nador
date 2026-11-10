@@ -1,5 +1,7 @@
 # NADOR
 
+Opt-in collectors on `ml-extended` are described in [Extended ML Observability](EXTENDED.md).
+
 **Network Analytics, Diagnostics, Observability, and Reporting for Mobile Networks.**
 
 Named after Nador, a city in northeastern Morocco associated with the idea of a
