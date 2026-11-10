@@ -1,7 +1,7 @@
 # Portable Extended Observability
 
-Implementation branch: `ml-extended-portable` in NADOR and NADOR Images,
-based on `ml-extended`. Existing ML and base monitoring remain unchanged.
+Implementation branch: `ml-extended` in NADOR and NADOR Images.
+The original `ml-observability` branch and base monitoring remain unchanged.
 This is experimental instrumentation, not a claim of universally supported
 Linux or 5G measurements.
 
