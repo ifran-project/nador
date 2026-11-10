@@ -1,0 +1,106 @@
+{{- range .Values.sources }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .source_service }}
+  namespace: {{ .namespace }}
+spec:
+  clusterIP: None
+  selector:
+    {{- toYaml .selector | nindent 4 }}
+  ports:
+    - name: websocket
+      port: {{ .port }}
+      targetPort: {{ .port }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .exporter }}
+  namespace: {{ $.Release.Namespace }}
+data:
+  telegraf.conf: |
+    {{- $.Files.Get "files/telegraf.conf" | nindent 4 }}
+  ws_adapter.py: |
+    {{- $.Files.Get "files/ws_adapter.py" | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .exporter }}
+  namespace: {{ $.Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .exporter }}
+  template:
+    metadata:
+      labels:
+        app: {{ .exporter }}
+        app.kubernetes.io/part-of: ocudu-metrics
+      annotations:
+        checksum/config: {{ printf "%s%s" ($.Files.Get "files/telegraf.conf") ($.Files.Get "files/ws_adapter.py") | sha256sum }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: /metrics
+    spec:
+      automountServiceAccountToken: false
+      {{- with $.Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: telegraf
+          image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          command: [telegraf, --config, /etc/ocudu-metrics/telegraf.conf]
+          env:
+            - name: WS_URL
+              value: "ws://{{ .source_service }}.{{ .namespace }}.svc:{{ .port }}"
+            - name: RAN_COMPONENT
+              value: {{ .component | quote }}
+            - name: RAN_ROLE
+              value: {{ .kind | quote }}
+            - name: SOURCE_NAMESPACE
+              value: {{ .namespace | quote }}
+          ports:
+            - name: metrics
+              containerPort: 9090
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+          livenessProbe:
+            tcpSocket:
+              port: metrics
+            initialDelaySeconds: 15
+          resources:
+            {{- toYaml $.Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: configuration
+              mountPath: /etc/ocudu-metrics
+              readOnly: true
+      volumes:
+        - name: configuration
+          configMap:
+            name: {{ .exporter }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .exporter }}
+  namespace: {{ $.Release.Namespace }}
+spec:
+  selector:
+    app: {{ .exporter }}
+  ports:
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+{{- end }}

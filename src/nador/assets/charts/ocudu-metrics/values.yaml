@@ -1,0 +1,14 @@
+image:
+  repository: ghcr.io/ziyad-mabrouk/telegraf
+  # Original collector used by the srsran-helm freetest deployment.
+  tag: v1.0@sha256:ae262668bab56106cef1aae3e10ed345878749b1977d7fc48f34a5e58ce646f5
+  pullPolicy: IfNotPresent
+sources: []
+nodeSelector: {}
+tolerations: []
+resources:
+  requests:
+    cpu: 25m
+    memory: 64Mi
+  limits:
+    memory: 256Mi

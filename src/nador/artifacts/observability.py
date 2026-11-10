@@ -34,7 +34,8 @@ class ObservabilityRun(ExperimentRun):
                  mapper_url=None, collect_setup=True, collect_ue_context=True, setup_hosts=None,
                  interval_seconds=2, timeout_seconds=5, max_seconds=7200,
                  limit=5000, namespace=None, service='ue-mapper-api', service_port=8080,
-                 loki_url=None, collect_loki=False, loki_selector='{namespace=~".+"}', loki_limit=5000, **kwargs):
+                 loki_url=None, collect_loki=False, loki_selector='{namespace=~".+"}', loki_limit=5000,
+                 loki_max_queries=1024, **kwargs):
         kwargs.setdefault('queries_file', Path(__file__).resolve().parents[1]
                           / 'assets' / 'observability_queries.json')
         super().__init__(directory, monitoring=monitoring, **kwargs)
@@ -50,6 +51,8 @@ class ObservabilityRun(ExperimentRun):
             raise ValueError('service_port must be an integer between 1 and 65535')
         if type(loki_limit) is not int or not 1 <= loki_limit <= 100000:
             raise ValueError('loki_limit must be between 1 and 100000')
+        if type(loki_max_queries) is not int or not 1 <= loki_max_queries <= 100000:
+            raise ValueError('loki_max_queries must be between 1 and 100000')
         if mapper_url:
             parsed = urlsplit(mapper_url)
             if parsed.scheme not in ('http', 'https') or not parsed.hostname or parsed.query or parsed.fragment:
@@ -60,6 +63,7 @@ class ObservabilityRun(ExperimentRun):
         self.collect_loki = collect_loki or bool(loki_url)
         self.loki_selector = loki_selector
         self.loki_limit = loki_limit
+        self.loki_max_queries = loki_max_queries
         self.collect_setup = collect_setup
         self.collect_ue_context = collect_ue_context
         if setup_hosts is not None and (not isinstance(setup_hosts, list)
@@ -95,11 +99,14 @@ class ObservabilityRun(ExperimentRun):
                 from .loki_export import collect_logs
 
                 summary = collect_logs(self.directory / 'logs', url=self.loki_url,
-                    selector=self.loki_selector, start=self.started, end=ended, limit=self.loki_limit)
+                    selector=self.loki_selector, start=self.started, end=ended, limit=self.loki_limit,
+                    max_queries=self.loki_max_queries)
                 if summary.get('error'):
                     self._error('loki', summary['error'])
                 if summary.get('possible_truncation'):
-                    self._error('loki', 'possible truncation; log export may be incomplete')
+                    detail = (f'query budget exhausted ({summary["queries"]}/{summary["max_queries"]}); '
+                              if summary.get('query_budget_exhausted') else '')
+                    self._error('loki', detail + 'possible truncation; log export may be incomplete')
             except Exception as exc:
                 self._error('loki', exc)
 

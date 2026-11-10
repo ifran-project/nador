@@ -22,7 +22,7 @@ selected collector images and live validation before use in experiments.
 Install from GitHub:
 
 ```bash
-python -m pip install --upgrade "git+https://github.com/yassir63/nador.git@main"
+python -m pip install --upgrade "git+https://github.com/yassir63/nador.git@ml-observability" --extra-index-url https://gitlab.inria.fr/api/v4/projects/70914/packages/pypi/simple
 ```
 
 ```python
@@ -35,6 +35,11 @@ imports, monitoring deployment and one experiment with artifact collection.
 Default monitoring image versions live in [`assets/images.json`](src/nador/assets/images.json).
 Image builds can propose updates through a pull request; deployments change after you merge it.
 Explicit scenario overrides still take precedence.
+
+`ran_kpis: true` selects OAI's existing KPI pipeline or OCUDU's native JSON
+WebSocket/Telegraf pipeline, according to the RAN implementation. For OCUDU,
+configure telemetry before deploying the RAN, as shown in
+[Monitoring](MONITORING.md#ocudu-native-ran-metrics). This does not enable ML collectors.
 
 Examples are under [examples/monitoring](examples/monitoring):
 

@@ -72,6 +72,13 @@ components:
       image_pull_policy: IfNotPresent
   kpi-calculator-oai:
     chart_ref: kpi-calculator
+  ocudu-metrics:
+    pod_selector:
+    - app.kubernetes.io/part-of=ocudu-metrics
+    image:
+      repository: ghcr.io/ziyad-mabrouk/telegraf
+      image_tag: v1.0@sha256:ae262668bab56106cef1aae3e10ed345878749b1977d7fc48f34a5e58ce646f5
+      image_pull_policy: IfNotPresent
   monitoring-controller:
     pod_selector:
     - app.kubernetes.io/instance=monitoring-controller

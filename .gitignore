@@ -20,3 +20,4 @@ build/
 # Private validation belongs in the development repository.
 /tests/
 /examples/monitoring-trials/
+/.local/

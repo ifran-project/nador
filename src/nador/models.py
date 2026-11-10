@@ -81,6 +81,7 @@ class MonitoringDeployment(StrictBaseModel):
     packet_pairing: bool = False
     core_kpis: bool = False
     ran_kpis: bool = False
+    ocudu_metrics_port: int = Field(default=8001, ge=1, le=65535)
     observability: ObservabilitySettings = Field(default_factory=ObservabilitySettings)
     targets: list[MonitoringTarget] = Field(default_factory=list)
     images: MonitoringImages = Field(default_factory=MonitoringImages)

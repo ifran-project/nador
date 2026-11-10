@@ -10,6 +10,7 @@ from orchestrator.utils.k8s import build_k8s_safe
 from orchestrator.utils.utils import deep_merge
 
 from nador.models import DEFAULT_IMAGES, DeployedMonitoringComponent, MonitoringModel
+from nador.ran_metrics import ocudu_sources
 
 ASSETS = Path(__file__).resolve().parent / "assets"
 CHARTS = ASSETS / "charts"
@@ -74,6 +75,7 @@ def _render_chart_values(
         targets=targets,
         node_selector=node_selector,
         target_namespaces=sorted({model.monitoring.namespace} | {target["namespace"] for target in targets}),
+        ocudu_sources=ocudu_sources(model),
         packet_targets=packet_targets,
         packet_namespaces=sorted({target["namespace"] for target in targets if target["role"] in ("gnb", "upf")}),
     )
@@ -88,8 +90,8 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
     defaults = yaml.safe_load((ASSETS / "components.yaml").read_text())
     if monitoring.core_kpis and str(model.core.implementation) != "open5gs":
         raise ValueError("Core KPI calculator requires Open5GS")
-    if monitoring.ran_kpis and str(model.ran.implementation) != "oai":
-        raise ValueError("RAN KPI calculator requires OAI")
+    if monitoring.ran_kpis and str(model.ran.implementation) not in {"oai", "ocudu"}:
+        raise ValueError("RAN KPIs support OAI and OCUDU")
     enabled = {"integration", "prometheus", "grafana"}
     if monitoring.loki:
         enabled.update(("loki", "promtail"))
@@ -100,7 +102,7 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
     if monitoring.core_kpis:
         enabled.add("kpi-calculator-open5gs")
     if monitoring.ran_kpis:
-        enabled.add("kpi-calculator-oai")
+        enabled.add("ocudu-metrics" if str(model.ran.implementation) == "ocudu" else "kpi-calculator-oai")
     components = {}
     for name, definition in defaults["components"].items():
         # The controller also needs the pairer image when pairing is disabled.

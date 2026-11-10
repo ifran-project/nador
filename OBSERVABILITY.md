@@ -143,14 +143,19 @@ The OAI validator checks native per-radio/per-RNTI DL and UL goodput rather
 than requiring the removed calculator `mac_throughput` metric. Goodput is a
 gNB-reported rate; it is not relabeled as a cumulative byte counter.
 
-Loki exports split full query pages into disjoint time windows, with at most
-128 queries. Reaching the budget is flagged as possible truncation, not success.
+Loki exports split full query pages into disjoint time windows and stream the
+accepted pages to disk. The default budget is 1,024 queries; set
+`loki_max_queries` on `ObservabilityRun` to adjust it for larger experiments.
+The summary records the budget and whether it was exhausted. Incomplete exports
+are still flagged as possible truncation and fail artifact validation.
 For noisy ZeroMQ PHY logs, an explicit selector can omit routine info messages:
 
 ```python
-loki_selector = '{namespace=~".+"} != "[PHY_LIB] [I]" != "[PHY0-NR] [I]"'
+loki_selector = r'{namespace=~".+"} !~ `\[(PHY_LIB|PHY[0-9]*(-NR)?|MAC(-NR)?|RLC(-NR)?|PDCP(-NR)?|GTPU|GW|SCHED)[ ]*\] \[I\]|^[ ]+[0-9a-fA-F]{4}:`'
 ```
 
+For these ZMQ trials, the selector omits routine packet-layer INFO messages
+and packet hex-dump lines. It retains signaling INFO and warning/error messages.
 This filters only the exported evidence, not ingestion or retention in Loki.
 The selector is recorded in the export summary. Warnings and errors are retained.
 The complete filtered ZeroMQ export still requires validation; physical-RU OCUDU

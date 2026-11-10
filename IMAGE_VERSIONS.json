@@ -46,8 +46,9 @@
   },
   "upstream": {
     "orchestrator_version": "0.0.5",
-    "upstream_commit": "c3f8953363367a6d58c115c22af46d7badbcff1d",
-    "metamodel_version": "0.0.5"
+    "upstream_commit": "b77e7aae4ec073f7ca5aafc6d809088198e07583",
+    "metamodel_version": "0.0.5",
+    "repository": "https://github.com/ifran-project/ifran"
   },
   "multi_gnb_profile": {
     "path": "examples/monitoring/multi-gnb-2du/monitoring.yaml",
