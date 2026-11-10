@@ -9,7 +9,8 @@ defaults:
     effect: NoSchedule
 components:
   extended-probes:
-    pod_selector: []
+    pod_selector:
+    - app.kubernetes.io/part-of=nador-extended
   integration:
     release_name: monitoring-integration
     chart_ref: monitoring-integration

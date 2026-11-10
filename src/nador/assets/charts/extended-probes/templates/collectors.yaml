@@ -51,11 +51,12 @@ spec:
     metadata:
       labels:
         app: {{ $base }}-node
+        app.kubernetes.io/part-of: nador-extended
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9500"
         prometheus.io/path: /metrics
-        checksum/config: {{ $s | toJson | sha256sum }}
+        checksum/config: {{ merge (dict "targets" .Values.targets "prometheus_url" .Values.prometheusUrl) $s | toJson | sha256sum }}
     spec:
       hostPID: true
       serviceAccountName: {{ $base }}
@@ -137,11 +138,12 @@ spec:
     metadata:
       labels:
         app: {{ $base }}-service
+        app.kubernetes.io/part-of: nador-extended
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9501"
         prometheus.io/path: /metrics
-        checksum/config: {{ $s | toJson | sha256sum }}
+        checksum/config: {{ merge (dict "targets" .Values.targets "prometheus_url" .Values.prometheusUrl) $s | toJson | sha256sum }}
     spec:
       automountServiceAccountToken: false
       {{- with .Values.tolerations }}

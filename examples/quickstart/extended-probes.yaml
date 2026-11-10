@@ -1,0 +1,16 @@
+# Overlay only: merge this into your existing monitoring profile.
+# Experimental, source-built images; Linux live validation is still pending.
+extended:
+  scheduler_wait: true
+  kernel_drops: true
+  network_queues: true
+  socket_counters: true
+  split_signaling: true
+  quality: true
+  node_image: ghcr.io/yassir63/nador-extended-node@sha256:339a333761488dd9747506b5ac48cee8279134f439ddda31127b1b22aee49194
+  service_image: ghcr.io/yassir63/nador-extended-service@sha256:b2af6853aa7c019f8f6cd66e9091838a0cb2a84cdbc8f0932b0eec81d4fcea55
+  quality_queries:
+    - name: user_plane_events
+      query: user_plane_probe_gtpu_last_packet_timestamp_seconds
+      kind: event_timestamp
+      max_age_seconds: 30

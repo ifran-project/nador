@@ -118,6 +118,27 @@ class ExperimentRun:
             self._event("section", "end", name, status=status)
             self.active_sections -= 1
 
+    def _export_queries(self):
+        """Preserve the original profile and add opt-in extended evidence."""
+        config = self.monitoring.deployment_model.monitoring if self.monitoring is not None else None
+        settings = getattr(config, "extended", None)
+        if settings is None or not settings.active:
+            return self.queries_file
+        queries = prometheus.load_queries(str(self.queries_file) if self.queries_file else None)
+        name = "nador_extended_raw"
+        query = '{__name__=~"nador_.*"}'
+        existing = next((item for item in queries if item["name"] == name), None)
+        if existing is not None and existing["query"] != query:
+            raise ValueError("nador_extended_raw query name is reserved for extended evidence")
+        if existing is None:
+            queries.append({"name": name, "query": query})
+        output = self.directory / "extended_export_queries.json"
+        output.write_text(json.dumps(queries, indent=2))
+        (self.directory / "extended_collector_config.json").write_text(
+            json.dumps(settings.model_dump(mode="json"), indent=2)
+        )
+        return output
+
     def _collect(self, ended: float) -> None:
         errors = self.metadata["collection_errors"]
         try:
@@ -153,8 +174,9 @@ class ExperimentRun:
                     str(summary),
                     "--no-discover-metrics",
                 ]
-                if self.queries_file:
-                    args += ["--queries-json", str(self.queries_file)]
+                queries_file = self._export_queries()
+                if queries_file:
+                    args += ["--queries-json", str(queries_file)]
                 prometheus.main(args)
                 queries = json.loads(summary.read_text())["queries"]
                 errors.extend(f"{q['name']}: {q['error']}" for q in queries if q.get("error"))

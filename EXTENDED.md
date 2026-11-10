@@ -29,7 +29,10 @@ production deployment. Scheduling overhead and decoder CPU must be measured.
 The images workflow builds from Debian/Python bases, not inherited probe
 images. Only the `ml-extended` workflow publishes `extended-<commit>` tags;
 it never updates main's image pins. After a successful build, use the two exact
-image tags or digests in the monitoring profile:
+image tags or digests in the monitoring profile. The first successful build is
+recorded in `src/nador/assets/extended_images.json`; a digest-pinned overlay is
+provided in `examples/quickstart/extended-probes.yaml`. Merge that overlay into
+your existing profile rather than treating it as a complete deployment profile:
 
 ```yaml
 extended:
@@ -57,6 +60,11 @@ previously installed releases automatically.
 The main measurement-quality gap still requiring implementation is historical
 session validity over the traffic window. These quality metrics alone do not
 fix the post-export session identity comparison in the private trial runner.
+
+When an experiment receives a monitoring manager with the extension active,
+`ExperimentRun` preserves its query profile and additionally exports all
+`nador_*` series. The resolved queries and extension configuration are saved
+alongside the timeline. This also applies to `ObservabilityRun`.
 
 ## Not yet implemented
 

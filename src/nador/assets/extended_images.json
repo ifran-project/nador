@@ -1,0 +1,10 @@
+{
+  "source_repository": "yassir63/nador-images",
+  "source_commit": "97413713bbf195faafa6dfebc83fcb15e4116f85",
+  "workflow_run": "https://github.com/yassir63/nador-images/actions/runs/42821926651",
+  "validation": "source-build-and-packaged-dependencies-passed; live-validation-pending",
+  "images": {
+    "node_image": "ghcr.io/yassir63/nador-extended-node@sha256:339a333761488dd9747506b5ac48cee8279134f439ddda31127b1b22aee49194",
+    "service_image": "ghcr.io/yassir63/nador-extended-service@sha256:b2af6853aa7c019f8f6cd66e9091838a0cb2a84cdbc8f0932b0eec81d4fcea55"
+  }
+}
