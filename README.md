@@ -1,6 +1,7 @@
 # NADOR
 
 Opt-in collectors on `ml-extended` are described in [Extended ML Observability](EXTENDED.md).
+The follow-on `ml-extended-portable` branch is documented in [Portable Extended Observability](PORTABLE.md).
 
 **Network Analytics, Diagnostics, Observability, and Reporting for Mobile Networks.**
 

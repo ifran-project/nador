@@ -67,14 +67,17 @@ def _render_chart_values(
         node_selector = {"kubernetes.io/hostname": component.node_name}
     packet_targets = {target["role"]: target for target in targets if target["role"] in ("gnb", "upf")}
     template = VALUES_TEMPLATES.get_template(f"{chart}.yaml.j2")
-    extended_targets = [target for target in targets if target["category"] in ("ran", "core")]
+    extended_targets = [
+        target | {"kind": str(getattr(model, target["category"]).components[target["component"]].type)}
+        for target in targets if target["category"] in ("ran", "core")
+    ]
     if model.monitoring.extended.active:
         existing = {(target["category"], target["component"]) for target in extended_targets}
         for category in ("ran", "core"):
             for name, nf in getattr(model, category).components.items():
                 if (category, name) not in existing and nf.namespace:
                     extended_targets.append({
-                        "category": category, "component": name, "namespace": nf.namespace,
+                        "category": category, "component": name, "namespace": nf.namespace, "kind": str(nf.type),
                         "selector": {"app": build_k8s_safe(f"{nf.implementation}-{name}")},
                     })
     rendered = template.render(
@@ -87,6 +90,10 @@ def _render_chart_values(
         target_namespaces=sorted({model.monitoring.namespace} | {target["namespace"] for target in targets}),
         ocudu_sources=ocudu_sources(model),
         extended_targets=extended_targets,
+        extended_config=model.monitoring.extended.model_dump(mode="json") | {
+            "node_enabled": model.monitoring.extended.node_enabled,
+            "service_enabled": model.monitoring.extended.service_enabled,
+        },
         packet_targets=packet_targets,
         packet_namespaces=sorted({target["namespace"] for target in targets if target["role"] in ("gnb", "upf")}),
     )
@@ -104,8 +111,11 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
     if monitoring.ran_kpis and str(model.ran.implementation) not in {"oai", "ocudu"}:
         raise ValueError("RAN KPIs support OAI and OCUDU")
     enabled = {"integration", "prometheus", "grafana"}
-    if monitoring.extended.active:
+    if monitoring.extended.node_enabled or monitoring.extended.service_enabled:
         enabled.add("extended-probes")
+    for check in monitoring.extended.reachability:
+        if check.source_component and check.source_component not in getattr(model, check.source_category).components:
+            raise ValueError(f"Unknown source NF for extended check {check.name}: {check.source_component}")
     if monitoring.loki:
         enabled.update(("loki", "promtail"))
     if monitoring.latency or monitoring.throughput or monitoring.observability.active:

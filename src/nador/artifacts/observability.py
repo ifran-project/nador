@@ -94,6 +94,12 @@ class ObservabilityRun(ExperimentRun):
 
     def _collect(self, ended):
         super()._collect(ended)
+        model = getattr(self.monitoring, "deployment_model", None)
+        extended = getattr(getattr(model, "monitoring", None), "extended", None)
+        if extended and extended.session_window_validation:
+            from .session_validity import build_report
+
+            build_report(self.directory, extended.session_max_gap_seconds)
         if self.loki_url:
             try:
                 from .loki_export import collect_logs

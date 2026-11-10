@@ -135,7 +135,7 @@ class ExperimentRun:
         output = self.directory / "extended_export_queries.json"
         output.write_text(json.dumps(queries, indent=2))
         (self.directory / "extended_collector_config.json").write_text(
-            json.dumps(settings.model_dump(mode="json"), indent=2)
+            json.dumps(settings.model_dump(mode="json", exclude={"packet_identity_secret"}), indent=2)
         )
         return output
 

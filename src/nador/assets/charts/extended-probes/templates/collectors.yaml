@@ -1,6 +1,6 @@
 {{- $s := .Values.settings -}}
-{{- $node := or $s.scheduler_wait $s.kernel_drops $s.network_queues $s.socket_counters $s.split_signaling -}}
-{{- $service := or $s.quality (not (empty $s.reachability)) -}}
+{{- $node := $s.node_enabled -}}
+{{- $service := $s.service_enabled -}}
 {{- $base := printf "%s-extended" .Release.Name | trunc 53 | trimSuffix "-" -}}
 {{- if or $node $service }}
 apiVersion: v1
@@ -69,6 +69,13 @@ spec:
           securityContext:
             privileged: true
           env:
+            {{- if or $s.packet_concordance $s.qfi $s.tcp_flows }}
+            - name: NADOR_PACKET_IDENTITY_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "packet_identity_secret must be supplied" $s.packet_identity_secret | quote }}
+                  key: key
+            {{- end }}
             - name: NODE_NAME
               valueFrom:
                 fieldRef:
