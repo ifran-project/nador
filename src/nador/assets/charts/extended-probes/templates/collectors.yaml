@@ -1,6 +1,7 @@
 {{- $s := .Values.settings -}}
 {{- $node := $s.node_enabled -}}
 {{- $service := $s.service_enabled -}}
+{{- $kernel := or (not $s.probe_kind) (eq $s.probe_kind "cpu") (eq $s.probe_kind "drops") -}}
 {{- $base := printf "%s-extended" .Release.Name | trunc 53 | trimSuffix "-" -}}
 {{- if or $node $service }}
 apiVersion: v1
@@ -100,6 +101,7 @@ spec:
             - name: proc
               mountPath: /host/proc
               readOnly: true
+            {{- if $kernel }}
             - name: sys
               mountPath: /sys
               readOnly: true
@@ -109,6 +111,7 @@ spec:
             - name: headers
               mountPath: /usr/src
               readOnly: true
+            {{- end }}
       volumes:
         - name: config
           configMap:
@@ -117,6 +120,7 @@ spec:
           hostPath:
             path: /proc
             type: Directory
+        {{- if $kernel }}
         - name: sys
           hostPath:
             path: /sys
@@ -129,6 +133,7 @@ spec:
           hostPath:
             path: /usr/src
             type: Directory
+        {{- end }}
 {{- end }}
 {{- if $service }}
 ---

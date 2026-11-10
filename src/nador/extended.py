@@ -6,6 +6,7 @@ from typing import Literal
 
 from metamodel.models.base import StrictBaseModel
 from pydantic import Field, model_validator
+from .probe_catalog import PROBES, enabled_probes
 
 
 class ReachabilityTarget(StrictBaseModel):
@@ -66,6 +67,8 @@ class ExtendedSettings(StrictBaseModel):
     quality_queries: list[QualityQuery] = Field(default_factory=list, max_length=64)
     node_image: str | None = None
     service_image: str | None = None
+    probe_images: dict[str, str] = Field(default_factory=dict)
+    probe_targets: dict[str, list[str]] = Field(default_factory=dict)
     interval_seconds: float = Field(default=5, ge=1, le=300)
     timeout_seconds: float = Field(default=2, ge=.1, le=10)
     capture_limit: int = Field(default=8, ge=1, le=32)
@@ -87,8 +90,20 @@ class ExtendedSettings(StrictBaseModel):
 
     @model_validator(mode="after")
     def validate_settings(self):
-        for enabled, image in ((self.node_enabled, self.node_image),
-                               (self.service_enabled, self.service_image)):
+        if self.probe_images:
+            unknown = self.probe_images.keys() - PROBES.keys()
+            if unknown:
+                raise ValueError(f"Unknown probe images: {sorted(unknown)}")
+            if self.node_image or self.service_image:
+                raise ValueError("Choose probe_images or the bundled node/service images, not both")
+            images = [(True, self.probe_images.get(name)) for name in enabled_probes(self)]
+        else:
+            if self.probe_targets:
+                raise ValueError("probe_targets requires independent probe images")
+            images = [(self.node_enabled, self.node_image), (self.service_enabled, self.service_image)]
+        if set(self.probe_targets) - PROBES.keys() or any(not items for items in self.probe_targets.values()):
+            raise ValueError("probe_targets requires a nonempty list for each selected probe kind")
+        for enabled, image in images:
             if enabled and (not image or not (":" in image.rsplit("/", 1)[-1] or "@sha256:" in image)):
                 raise ValueError("Enabled extended collectors require an explicit published image tag or digest")
         for entries in (self.reachability, self.quality_queries):

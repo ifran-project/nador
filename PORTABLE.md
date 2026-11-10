@@ -50,6 +50,71 @@ then measure probe CPU, memory, cardinality, event loss and activation overhead.
 
 ## Activation and remaining limits
 
+### Independent probe releases
+
+Set `extended.probe_images` instead of the legacy `node_image` and
+`service_image` fields. Each enabled purpose needs its own published image.
+The matching `probe-<purpose>` release starts and stops independently.
+No existing latency probe, AMF sniffer, or SMF sniffer is changed.
+
+| Image suffix after `nador-probe-` | What the release runs |
+| --- | --- |
+| cpu | Scheduler wait, off-CPU, and optional kernel stack IDs |
+| drops | Kernel drop reasons and optional namespace attribution |
+| queueing | Software qdisc backlog |
+| tcp | Namespace TCP counters and per-socket evidence |
+| qfi | Observed GTP-U QFI on configured user-plane interfaces |
+| concordance | Bounded matching of observed packet identities |
+| split-signaling | F1AP/E1AP observations, context and setup timing |
+| source-liveness | Explicit checks from selected NF namespaces |
+| nf-liveness | Explicit checks from a separate collector pod |
+| measurement-quality | Prometheus availability, finite values, and freshness |
+
+For example, enable `off_cpu`, set `probe_images.cpu` to the published CPU
+image, and set `probe_targets.cpu: ["core/upf"]` using your deployment's
+component name. Optional `probe_targets.<purpose>` lists select `category/name`
+targets; omitting one uses the normal discovery set. A DaemonSet can still
+run on multiple nodes. Drop tracing observes the local kernel path and the
+selected targets constrain attribution, not which kernel drop events occur.
+QFI is observed in GTP-U packets, not by either attachment sniffer; it is
+not automatically joined to the mapper's UE/session identity.
+
+On a running deployment, after configuring the optional releases and calling
+`monitoring.plan()`, use the existing selected-component actions:
+
+```python
+await monitoring.install(components=["probe-cpu"])
+await monitoring.uninstall(components=["probe-cpu"])
+```
+
+Do not run both a legacy bundled release and independent releases for the
+same measurements. Uninstall the bundled release before migrating those probes.
+Removing a probe does not uninstall the NF or any other probe release.
+
+### External AMF visibility test
+
+Use the separately built `nador-amf-visibility` image. Supply the explicit
+Kubernetes context and exact AMF pod/interface used by the working sniffer.
+The command prints a manifest unless you add `--create`:
+
+```bash
+python -m nador.artifacts.amf_visibility \
+  --context YOUR_CONTEXT --amf-namespace YOUR_AMF_NAMESPACE \
+  --amf-pod YOUR_RUNNING_AMF_POD --interface YOUR_N2_INTERFACE \
+  --image ghcr.io/yassir63/nador-amf-visibility:extended-PUBLISHED_COMMIT
+```
+
+The temporary Job requires privileged node access and is pinned to the AMF's
+node. It resolves the target network namespace by pod UID, checks the named
+interface and counts decoded NGAP frames without exporting payloads. It does
+not modify the AMF or generate signaling. During the short capture window,
+run a normal test UE registration. Check the Job logs for `ngap_observed`;
+`capture_opened_no_ngap` establishes capture startup only. Other results
+identify the failing step. Delete only that Job after collecting logs; its
+finished resources also expire automatically.
+
+### Probe-specific settings
+
 All new switches are off by default: `session_window_validation`, `off_cpu`,
 `off_cpu_stacks`, `attributed_drops`, `qfi`, `tcp_flows`, and
 `packet_concordance`. Use a newly built image from this branch when enabling

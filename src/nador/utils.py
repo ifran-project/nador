@@ -80,6 +80,23 @@ def _render_chart_values(
                         "category": category, "component": name, "namespace": nf.namespace, "kind": str(nf.type),
                         "selector": {"app": build_k8s_safe(f"{nf.implementation}-{name}")},
                     })
+    from nador.probe_catalog import probe_values
+
+    probe_name = (component.release_name or "").removeprefix("probe-")
+    selected = model.monitoring.extended.probe_targets.get(probe_name)
+    if selected:
+        available = {f'{t["category"]}/{t["component"]}' for t in extended_targets}
+        if set(selected) - available:
+            raise ValueError(f"Unresolved probe targets for {probe_name}: {sorted(set(selected) - available)}")
+        extended_targets = [t for t in extended_targets if f'{t["category"]}/{t["component"]}' in selected]
+    extended_config = (
+        probe_values(model.monitoring.extended, probe_name)
+        if model.monitoring.extended.probe_images and (component.release_name or "").startswith("probe-")
+        else model.monitoring.extended.model_dump(mode="json") | {
+            "node_enabled": model.monitoring.extended.node_enabled,
+            "service_enabled": model.monitoring.extended.service_enabled,
+        }
+    )
     rendered = template.render(
         component=component,
         components=components,
@@ -90,10 +107,7 @@ def _render_chart_values(
         target_namespaces=sorted({model.monitoring.namespace} | {target["namespace"] for target in targets}),
         ocudu_sources=ocudu_sources(model),
         extended_targets=extended_targets,
-        extended_config=model.monitoring.extended.model_dump(mode="json") | {
-            "node_enabled": model.monitoring.extended.node_enabled,
-            "service_enabled": model.monitoring.extended.service_enabled,
-        },
+        extended_config=extended_config,
         packet_targets=packet_targets,
         packet_namespaces=sorted({target["namespace"] for target in targets if target["role"] in ("gnb", "upf")}),
     )
@@ -112,7 +126,19 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
         raise ValueError("RAN KPIs support OAI and OCUDU")
     enabled = {"integration", "prometheus", "grafana"}
     if monitoring.extended.node_enabled or monitoring.extended.service_enabled:
-        enabled.add("extended-probes")
+        if monitoring.extended.probe_images:
+            from nador.probe_catalog import NODE_PROBES, enabled_probes
+
+            for kind in enabled_probes(monitoring.extended):
+                name = f"probe-{kind}"
+                workload = "node" if kind in NODE_PROBES else "service"
+                defaults["components"][name] = {
+                    "chart_ref": "extended-probes",
+                    "pod_selector": [f"app={name}-extended-{workload}"],
+                }
+                enabled.add(name)
+        else:
+            enabled.add("extended-probes")
     for check in monitoring.extended.reachability:
         if check.source_component and check.source_component not in getattr(model, check.source_category).components:
             raise ValueError(f"Unknown source NF for extended check {check.name}: {check.source_component}")
