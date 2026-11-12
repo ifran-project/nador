@@ -34,7 +34,7 @@ class MonitoringManagement(HelmManagement):
             raise ValueError("Throughput requires AMF, SMF and UPF packet targets")
         node_name, _ = self._get_deployment_node(None)
         targets = resolve_targets(self.deployment_model)
-        monitoring.components = resolve_components(self.deployment_model, targets)
+        monitoring.components = resolve_components(self.deployment_model, targets, self.mutable_metamodel)
         return {
             "control_node": node_name,
             "targets": targets,

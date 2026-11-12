@@ -25,6 +25,11 @@
       "repository": "ghcr.io/yassir63/kopf-controller",
       "image_tag": "rebuild-5da937d630efaeebfb10d566bb80ce9f7f68950f",
       "image_pull_policy": "Always"
+    },
+    "rnti-mapper": {
+      "repository": "docker.io/library/busybox",
+      "image_tag": "1.36.1",
+      "image_pull_policy": "IfNotPresent"
     }
   },
   "builds": {

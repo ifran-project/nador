@@ -1,0 +1,5 @@
+apiVersion: v2
+name: rnti-mapper
+description: Prometheus info metric ran_ue_info mapping gNB RNTIs to UE identities (IMSI, UE name)
+type: application
+version: 0.1.0

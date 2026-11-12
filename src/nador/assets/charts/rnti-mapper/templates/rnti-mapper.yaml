@@ -1,0 +1,156 @@
+{{- /* rnti-mapper: exports ran_ue_info{ran_node,ran_component,rnti,ran_ue_id,imsi,ue_name} 1 for the Grafana
+joins on rnti. Separate pod, nothing runs in the RAN containers; kubectl comes from the node (hostPath). */ -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rnti-mapper
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "monitoring.labels" . | nindent 4 }}
+data:
+  # <component> <namespace> <label selector> <oai|ocudu>
+  sources: |
+    {{- range .Values.sources }}
+    {{ .component }} {{ .namespace }} {{ .selector }} {{ .type }}
+    {{- end }}
+  # IMSI name; unknown IMSIs are shown as the IMSI
+  ue_names: |
+    {{- range $imsi, $name := .Values.ueNames }}
+    {{ $imsi }} {{ $name }}
+    {{- end }}
+  join.awk: |
+    {{- .Files.Get "files/join.awk" | nindent 4 }}
+  run.sh: |
+    {{- .Files.Get "files/run.sh" | nindent 4 }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rnti-mapper
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "monitoring.labels" . | nindent 4 }}
+{{- $namespaces := list .Values.core.namespace }}
+{{- range .Values.sources }}
+{{- $namespaces = append $namespaces .namespace }}
+{{- end }}
+{{- $roleName := printf "%s-%s" .Release.Namespace .Release.Name | trunc 63 | trimSuffix "-" }}
+{{- range ($namespaces | compact | uniq | sortAlpha) }}
+---
+# Read the RAN pods (RRC statistics through exec, OCUDU log) and the AMF log
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $roleName }}
+  namespace: {{ . }}
+  labels:
+    {{- include "monitoring.labels" $ | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list]
+  - apiGroups: [""]
+    resources: [pods/log]
+    verbs: [get]
+  - apiGroups: [""]
+    resources: [pods/exec]
+    verbs: [create, get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $roleName }}
+  namespace: {{ . }}
+  labels:
+    {{- include "monitoring.labels" $ | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $roleName }}
+subjects:
+  - kind: ServiceAccount
+    name: rnti-mapper
+    namespace: {{ $.Release.Namespace }}
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rnti-mapper
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "monitoring.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rnti-mapper
+      monitoring.blueprint/owner: {{ .Release.Namespace | quote }}
+  template:
+    metadata:
+      labels:
+        app: rnti-mapper
+        {{- include "monitoring.labels" . | nindent 8 }}
+      annotations:
+        # restart the pod when the sources, UE names or scripts change
+        checksum/config: {{ toJson .Values | sha256sum }}
+    spec:
+      serviceAccountName: rnti-mapper
+      {{- include "monitoring.placement" . | nindent 6 }}
+      containers:
+        - name: rnti-mapper
+          image: {{ printf "%s:%s" .Values.image.repository .Values.image.tag | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/sh", "/rnti-mapper/run.sh"]
+          env:
+            - {name: PORT, value: {{ .Values.port | quote }}}
+            - {name: PERIOD, value: {{ .Values.period | quote }}}
+            - {name: CORE_TYPE, value: {{ .Values.core.type | quote }}}
+            - {name: CORE_NS, value: {{ .Values.core.namespace | quote }}}
+            - {name: AMF_SELECTOR, value: {{ .Values.core.selector | quote }}}
+            - {name: AMF_CONTAINER, value: {{ .Values.core.container | quote }}}
+            - {name: INVENTORY_URL, value: {{ .Values.inventoryUrl | quote }}}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.port }}
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.port }}
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 200m, memory: 128Mi}
+          volumeMounts:
+            - name: config
+              mountPath: /rnti-mapper
+            - name: kubectl
+              mountPath: /usr/local/bin/kubectl
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: rnti-mapper
+        - name: kubectl
+          hostPath:
+            path: {{ .Values.kubectlPath }}
+            type: File
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rnti-mapper
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "monitoring.labels" . | nindent 4 }}
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: {{ .Values.port | quote }}
+    prometheus.io/path: /metrics
+spec:
+  selector:
+    app: rnti-mapper
+  ports:
+    - name: metrics
+      port: {{ .Values.port }}
+      targetPort: {{ .Values.port }}

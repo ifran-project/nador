@@ -1,0 +1,13 @@
+# Rendered by nador (templates/rnti-mapper.yaml.j2): image, placement, RAN sources, core, UE names.
+port: 9101
+period: 10
+# kubectl of the node, mounted read-only in the busybox container (in-cluster credentials from the service account)
+kubectlPath: /usr/bin/kubectl
+# RAN components running the RRC: [{component, namespace, selector, type: oai|ocudu}]
+sources: []
+# AMF: {type: oai|open5gs, namespace, selector, container}
+core: {}
+# ue-mapper-api inventory (exact RAN UE NGAP id <-> IMSI from the N2 captures), empty when not deployed
+inventoryUrl: ""
+# IMSI -> UE name
+ueNames: {}
