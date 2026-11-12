@@ -1,7 +1,7 @@
 [project]
 name = "nador"
 version = "0.3.0"
-description = "NADOR: monitoring and experiment artifacts for the SLICES 5G orchestrator"
+description = "NADOR: monitoring and experiment artifacts for IFRAN"
 authors = [{name = "Yassir Amami"}]
 license = {text = "BSD-3-Clause-Clear"}
 readme = "README.md"

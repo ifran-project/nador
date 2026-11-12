@@ -6,10 +6,10 @@ Named after Nador, a city in northeastern Morocco associated with the idea of a
 lookout, NADOR helps teams monitor mobile network performance, investigate issues,
 and report their findings.
 
-NADOR extends the [SLICES 5G orchestrator](https://gitlab.inria.fr/slices-ri/blueprints/post-5g/orchestrator),
-which is planned to become **IFRAN** (Infrastructure Framework for Reproducible
-Automation of Networks). IFRAN, inspired by Ifrane and an anagram of INFRA, handles
-reproducible network provisioning and slice management.
+NADOR extends [IFRAN](https://github.com/ifran-project/ifran), the Infrastructure
+Framework for Reproducible Automation of Networks. Inspired by Ifrane and an
+anagram of INFRA, IFRAN handles reproducible network provisioning and slice management.
+Its current Python distribution and imports remain named `orchestrator`.
 
 It integrates Prometheus, Grafana and Loki, correlates UE/slice/tunnel/session
 information, deploys latency and N3 throughput probes, and exports experiment
@@ -28,8 +28,6 @@ python -m pip install --upgrade "git+https://github.com/yassir63/nador.git@main"
 ```python
 from nador import MonitoringManagement, MonitoringDeployment
 ```
-
-For existing notebooks, replace imports from `nextg_lens` with imports from `nador`.
 
 Start with the [minimal tutorial](examples/quickstart/tutorial.ipynb): installation,
 imports, monitoring deployment and one experiment with artifact collection.
