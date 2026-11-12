@@ -81,6 +81,7 @@ class MonitoringDeployment(StrictBaseModel):
     packet_pairing: bool = False
     core_kpis: bool = False
     ran_kpis: bool = False
+    rnti_mapper: bool = True  # ran_ue_info: gNB RNTI -> IMSI and UE name, for the Grafana panels per RNTI
     observability: ObservabilitySettings = Field(default_factory=ObservabilitySettings)
     targets: list[MonitoringTarget] = Field(default_factory=list)
     images: MonitoringImages = Field(default_factory=MonitoringImages)

@@ -1,0 +1,96 @@
+# Collect the CSI log (csi_per_rb.csv, CSI CSV format v3.1) on the node running the gNB.
+# Adapted from 5g_ansible roles/5g/csi_logging/tasks/collect.yml (branch csi-ue-mapper, 1b5a0b30):
+# the file is read once, in place, at the lowest CPU/IO priority by csi_tools.py (copied verbatim);
+# only the results are fetched to the controller. Pod provenance is recorded by the Python caller
+# from the deployment model, so no kubectl is needed on the gNB node.
+#
+# Inputs:
+#   csi_src_file       absolute path of csi_per_rb.csv on the gNB node
+#   csi_dest_dir       absolute result directory on the controller
+#   csi_run_id         identifier of the remote work directory
+#   csi_fetch_full     fetch the whole file (gzip -1)
+#   csi_windows_json   controller path of a timeline_summary.json with ran_start/end_epoch, or ""
+#   csi_window_types   comma list of window levels used to cut the file
+#   csi_padding        padding (s) added around each window
+#   csi_low_prio       command prefix, e.g. "nice -n 19 ionice -c 3"
+#   csi_cleanup_remote remove the remote work directory
+# Output (set_stats): csi_summary
+# by_window.tar is unpacked by the Python caller: ansible.builtin.unarchive needs GNU tar on the
+# controller, which macOS does not have.
+---
+- name: CSI - set remote work directory
+  ansible.builtin.set_fact:
+    csi_workdir: "/tmp/csi_collect_{{ csi_run_id }}"
+
+- name: CSI - look for the CSI file
+  ansible.builtin.stat:
+    path: "{{ csi_src_file }}"
+    get_checksum: false
+  register: csi_host_file
+
+- name: CSI - stop when there is nothing to collect
+  ansible.builtin.fail:
+    msg: "No {{ csi_src_file }} on {{ inventory_hostname }} (was the gNB deployed with enable_csi?)"
+  when: not csi_host_file.stat.exists
+
+- name: CSI - create work directory
+  ansible.builtin.file:
+    path: "{{ csi_workdir }}"
+    state: directory
+    mode: "0755"
+
+- name: CSI - copy helper script
+  ansible.builtin.copy:
+    src: csi_tools.py
+    dest: "{{ csi_workdir }}/csi_tools.py"
+    mode: "0755"
+
+- name: CSI - copy timeline windows
+  ansible.builtin.copy:
+    src: "{{ csi_windows_json }}"
+    dest: "{{ csi_workdir }}/windows.json"
+    mode: "0644"
+  when: csi_windows_json | length > 0
+
+# Single read of the source file: full .gz, per-window .gz and summary in one pass
+- name: CSI - read, compress and split the CSI file (one pass, lowest priority)
+  ansible.builtin.shell: |
+    set -euo pipefail
+    cd {{ csi_workdir | quote }}
+    {{ csi_low_prio }} python3 csi_tools.py collect --src {{ csi_src_file | quote }} --out-dir out {{ csi_collect_args }}
+    if [ -d out/by_window ]; then tar -cf by_window.tar -C out by_window; fi
+  args:
+    executable: /bin/bash
+  vars:
+    csi_collect_args: >-
+      {{ '--full' if (csi_fetch_full | bool) else '' }}
+      {{ ('--windows-json windows.json --window-types ' + (csi_window_types | quote)
+          + ' --padding-seconds ' + (csi_padding | string))
+         if (csi_windows_json | length > 0) else '' }}
+  register: csi_collect_out
+  changed_when: true
+
+- name: CSI - fetch the full file
+  ansible.builtin.fetch:
+    src: "{{ csi_workdir }}/out/{{ csi_src_file | basename }}.gz"
+    dest: "{{ csi_dest_dir }}/{{ csi_src_file | basename }}.gz"
+    flat: true
+  when: csi_fetch_full | bool
+
+- name: CSI - fetch the per-window files
+  ansible.builtin.fetch:
+    src: "{{ csi_workdir }}/by_window.tar"
+    dest: "{{ csi_dest_dir }}/by_window.tar"
+    flat: true
+  when: csi_windows_json | length > 0
+
+- name: CSI - remove the remote work directory
+  ansible.builtin.file:
+    path: "{{ csi_workdir }}"
+    state: absent
+  when: csi_cleanup_remote | bool
+
+- name: CSI - return the collection summary
+  ansible.builtin.set_stats:
+    data:
+      csi_summary: "{{ csi_collect_out.stdout | from_json }}"

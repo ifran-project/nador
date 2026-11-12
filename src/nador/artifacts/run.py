@@ -12,6 +12,7 @@ from typing import Any, Self
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
+from nador.csi.collection import CsiCollector
 from nador.deployment import MonitoringManagement
 
 from . import prometheus_range_export as prometheus
@@ -38,6 +39,8 @@ class ExperimentRun:
         step: str = "1s",
         timezone: str = "Europe/Paris",
         monitoring: MonitoringManagement | None = None,
+        csi: CsiCollector | list[CsiCollector] | None = None,
+        csi_clock_threshold_s: float = 0.5,
     ) -> None:
         if monitoring is not None and prometheus_url is not None:
             raise ValueError("Supply monitoring or prometheus_url, not both")
@@ -53,6 +56,14 @@ class ExperimentRun:
         self.names = set()
         self.entered = False
         self.active_sections = 0
+        collectors = [] if csi is None else [csi] if isinstance(csi, CsiCollector) else list(csi)
+        if len({collector.component for collector in collectors}) != len(collectors):
+            raise ValueError("Give one CsiCollector per RAN component")
+        self.csi = collectors
+        # Offset (RAN node - local clock) is applied to the CSI windows only beyond this bound: below
+        # it, the ssh measurement error (RTT/2) is of the same order as the offset itself.
+        self.csi_clock_threshold_s = csi_clock_threshold_s
+        self.csi_offset_s: dict[str, float] = {}
 
     def _event(self, level: str, phase: str, name: str, **extra: Any) -> None:
         now = datetime.now(UTC)
@@ -73,6 +84,11 @@ class ExperimentRun:
     async def __aenter__(self) -> Self:
         if self.entered:
             raise RuntimeError("ExperimentRun cannot be entered twice")
+        # Clock of each CSI node, measured before the first event (one node per component)
+        clocks = await asyncio.gather(*(collector.measure_clock() for collector in self.csi))
+        for collector, clock in zip(self.csi, clocks, strict=True):
+            offset = clock["offset_s"] if abs(clock["offset_s"]) > self.csi_clock_threshold_s else 0.0
+            self.csi_offset_s[collector.component] = offset
         self.directory.mkdir(parents=True, exist_ok=False)
         self.entered = True
         self.started = time.time()
@@ -84,6 +100,18 @@ class ExperimentRun:
             "status": "running",
             "collection_errors": [],
         }
+        if self.csi:
+            self.metadata["csi"] = {
+                collector.component: {
+                    "node": collector.node_name,
+                    "clock_start": clock,
+                    "clock_threshold_s": self.csi_clock_threshold_s,
+                    "clock_offset_applied_s": self.csi_offset_s[collector.component],
+                    "clock_offset_applied": self.csi_offset_s[collector.component] != 0.0,
+                    "warnings": [],
+                }
+                for collector, clock in zip(self.csi, clocks, strict=True)
+            }
         self._save_metadata()
         return self
 
@@ -188,6 +216,46 @@ class ExperimentRun:
                 await asyncio.to_thread(self._collect, ended)
         except Exception as exc:
             self.metadata["collection_errors"].append(f"collection: {exc}")
+        # One CSI file per component, each on its own node: collected in parallel
+        await asyncio.gather(*(self._collect_csi(collector) for collector in self.csi))
+
+    def _csi_windows(self, collector: CsiCollector) -> Path | None:
+        """Timeline windows on the clock of the collector's node: <run>/csi/<component>/csi_windows.json."""
+        timeline = self.directory / "timeline_summary.json"
+        if not timeline.is_file():
+            return None
+        offset = self.csi_offset_s[collector.component]
+        windows = [
+            window | {"ran_start_epoch": window["start_epoch"] + offset, "ran_end_epoch": window["end_epoch"] + offset}
+            for window in json.loads(timeline.read_text())["windows"]
+        ]
+        path = self.directory / "csi" / collector.component / "csi_windows.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"node": collector.node_name, "offset_applied_s": offset, "windows": windows}))
+        return path
+
+    async def _collect_csi(self, collector: CsiCollector) -> None:
+        errors = self.metadata["collection_errors"]
+        record = self.metadata["csi"][collector.component]
+        try:
+            clock_end = await collector.measure_clock()
+            record["clock_end"] = clock_end
+            # Offset change over the run (clock drift or step); compare with the ~5 s CSI batch granularity
+            drift = clock_end["offset_s"] - record["clock_start"]["offset_s"]
+            record["clock_drift_s"] = drift
+            if abs(drift) > self.csi_clock_threshold_s:
+                record["warnings"].append(
+                    f"{collector.node_name} clock offset changed by {drift:+.3f} s during the run "
+                    f"(threshold {self.csi_clock_threshold_s} s): CSI windows may be shifted"
+                )
+        except Exception as exc:
+            errors.append(f"csi {collector.component} clock: {exc}")
+        try:
+            record["summary"] = await collector.collect(
+                self.directory / "csi" / collector.component, self._csi_windows(collector)
+            )
+        except Exception as exc:
+            errors.append(f"csi {collector.component}: {exc}")
 
     async def __aexit__(
         self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None

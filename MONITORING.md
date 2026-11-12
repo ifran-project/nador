@@ -41,6 +41,17 @@ installed again with `await monitoring.deploy()`.
 print(await monitoring.get_logs(components=["ue-mapper-api"], quiet=True))
 ```
 
+The `rnti-mapper` component (enabled by default, `rnti_mapper: false` to remove it)
+exports `ran_ue_info{ran_node,ran_component,rnti,ran_ue_id,imsi,ue_name} 1`, so that the
+OAI dashboard shows UE names next to the RNTIs and lists them in the "UE identities" table.
+Every 10 seconds it reads the UE contexts of the RRC of each gNB / CU / CU-CP (OAI
+`nrRRC_stats.log` from the `metrics-parser` sidecar, OCUDU log lines `c-rnti=`/`ran_ue=`),
+joins them with the AMF log (OAI or Open5GS) and, when deployed, the `ue-mapper-api`
+inventory, and names the IMSIs after the UEs of the metamodel. RAN UE NGAP ids are
+allocated per RAN node: with several RRC nodes (a gNB and a CU, for example), the inventory
+binds each id to its node through the node pod IPs; without it, an id used by several
+nodes at once is shown as `imsi="ambiguous"` rather than guessed.
+
 `ExperimentRun` saves a traffic timeline, JSON reports and Prometheus exports.
 It opens Prometheus access for final collection; Prometheus scrapes continuously.
 

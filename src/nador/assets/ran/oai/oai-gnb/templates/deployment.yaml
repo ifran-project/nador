@@ -1,4 +1,5 @@
 {{- $parser := .Values.metricsParser | default dict -}}
+{{- $csi := .Values.csi | default dict -}}
 {{- $workdir := "/opt/oai-gnb" -}}
 {{- if eq .Values.config.radio "aw2s" -}}
 {{- $workdir = "/opt/oai-gnb-aw2s" -}}
@@ -99,6 +100,10 @@ spec:
               mountPath: {{ $workdir }}
             - name: metrics-logs
               mountPath: /shared-logs
+          {{- end }}
+          {{- if $csi.enabled }}
+            - name: csi-output
+              mountPath: {{ $csi.outputDir }}
           {{- end }}
           {{- if eq .Values.config.radio "aw2s" }}
             - name: configuration
@@ -216,6 +221,13 @@ spec:
           emptyDir: {}
         - name: metrics-logs
           emptyDir: {}
+        {{- end }}
+        {{- if $csi.enabled }}
+        # hostPath: csi_per_rb.csv outlives the pod and is read on the gNB node by the collection role
+        - name: csi-output
+          hostPath:
+            path: {{ $csi.outputDir }}
+            type: DirectoryOrCreate
         {{- end }}
         - name: configuration
           configMap:

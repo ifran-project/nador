@@ -4,6 +4,7 @@ from pathlib import Path
 
 import yaml
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
+from metamodel.models.metamodel import MetaModel
 from orchestrator.models.provisioning import ProvisionableNode
 from orchestrator.utils.ansible import get_ansible_inventory_line, run_ansible_role
 from orchestrator.utils.k8s import build_k8s_safe
@@ -20,6 +21,7 @@ VALUES_TEMPLATES = Environment(
     trim_blocks=True,
     lstrip_blocks=True,
 )
+VALUES_TEMPLATES.globals["build_k8s_safe"] = build_k8s_safe
 
 
 # Resolve components into namespaces, pod selectors and capture settings.
@@ -57,6 +59,7 @@ def _render_chart_values(
     model: MonitoringModel,
     targets: list[dict],
     components: dict[str, DeployedMonitoringComponent],
+    ue_names: dict[str, str],
 ) -> dict:
     """Render Helm values from chart defaults, deployment settings and user overrides."""
     chart = component.chart_ref.rsplit("/", 1)[-1]
@@ -76,14 +79,17 @@ def _render_chart_values(
         target_namespaces=sorted({model.monitoring.namespace} | {target["namespace"] for target in targets}),
         packet_targets=packet_targets,
         packet_namespaces=sorted({target["namespace"] for target in targets if target["role"] in ("gnb", "upf")}),
+        ue_names=ue_names,
     )
     values = deep_merge(yaml.safe_load(defaults.read_text()) or {}, yaml.safe_load(rendered))
     return deep_merge(values, component.advanced_config)
 
 
 # Resolve enabled component models once, then build values directly for each chart.
-def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str, DeployedMonitoringComponent]:
-    """Build enabled monitoring components and their Helm values."""
+def resolve_components(
+    model: MonitoringModel, targets: list[dict], metamodel: MetaModel | None = None
+) -> dict[str, DeployedMonitoringComponent]:
+    """Build enabled monitoring components and their Helm values (metamodel: UE names for rnti-mapper)."""
     monitoring = model.monitoring
     defaults = yaml.safe_load((ASSETS / "components.yaml").read_text())
     if monitoring.core_kpis and str(model.core.implementation) != "open5gs":
@@ -101,6 +107,8 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
         enabled.add("kpi-calculator-open5gs")
     if monitoring.ran_kpis:
         enabled.add("kpi-calculator-oai")
+    if monitoring.rnti_mapper and _has_rrc_node(model):
+        enabled.add("rnti-mapper")
     components = {}
     for name, definition in defaults["components"].items():
         # The controller also needs the pairer image when pairing is disabled.
@@ -129,10 +137,25 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
         components[name] = component
     for name in enabled:
         component = components[name]
-        component.chart_values = _render_chart_values(component, model, targets, components)
+        component.chart_values = _render_chart_values(component, model, targets, components, _ue_names(metamodel))
         if not component.chart_version:
             component.chart_ref = f"{REMOTE_CHARTS}/{Path(component.chart_ref).name}"
     return {name: component for name, component in components.items() if name in enabled}
+
+
+# RAN nodes running the RRC that rnti-mapper reads (OAI nrRRC_stats.log, OCUDU log).
+def _has_rrc_node(model: MonitoringModel) -> bool:
+    return any(
+        str(ran.type) in ("gnb", "cu", "cu_cp") and str(ran.implementation) in ("oai", "ocudu")
+        for ran in model.ran.components.values()
+    )
+
+
+# IMSI -> UE name from the metamodel UEs (SUPI = IMSI); empty without metamodel.
+def _ue_names(metamodel: MetaModel | None) -> dict[str, str]:
+    if metamodel is None:
+        return {}
+    return {ue.config.supi: name for name, ue in metamodel.ues.items() if ue.config.supi}
 
 
 # Execute monitoring's chart role without changing the orchestrator's 5G executor.

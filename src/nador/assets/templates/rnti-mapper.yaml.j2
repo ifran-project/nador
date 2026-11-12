@@ -1,0 +1,24 @@
+{% from '_component.yaml.j2' import settings with context %}
+{{ settings() }}
+{# RAN nodes running the RRC (gNB, CU, CU-CP), with the pod selector used by HelmManagement #}
+sources:
+{% for name, ran in model.ran.components.items() if ran.type | string in ('gnb', 'cu', 'cu_cp') and ran.implementation | string in ('oai', 'ocudu') %}
+  - component: {{ name | tojson }}
+    namespace: {{ ran.namespace | tojson }}
+    selector: {{ ('app=' ~ build_k8s_safe(ran.implementation | string ~ '-' ~ name)) | tojson }}
+    type: {{ ran.implementation | string | tojson }}
+{% else %}
+  []
+{% endfor %}
+{% set amf = (model.core.components.items() | selectattr('1.type', 'equalto', 'amf') | first) if model.core is not none else none %}
+core:
+{% if amf %}
+  type: {{ model.core.implementation | string | tojson }}
+  namespace: {{ amf[1].namespace | tojson }}
+  selector: {{ ('app=' ~ build_k8s_safe(model.core.implementation | string ~ '-' ~ amf[0])) | tojson }}
+  container: amf
+{% else %}
+  {}
+{% endif %}
+inventoryUrl: {{ ('http://ue-mapper-api.' ~ monitoring.namespace ~ '.svc.cluster.local:8080/inventory/ues' if 'ue-mapper-api' in components else '') | tojson }}
+ueNames: {{ ue_names | tojson }}
