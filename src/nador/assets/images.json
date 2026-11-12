@@ -1,80 +1,80 @@
 {
   "probes": {
-    "probe": "r2labuser/ebpf-latency-probe:2026w43",
-    "throughput": "ghcr.io/yassir63/ebpf-throughput-probe:sha-af0ba1a8430e70dd84141ee71397dbecf6237e89",
-    "amf_sniffer": "ghcr.io/yassir63/amf-sniffer:sha-25abc6620446cfdc994062ae11949132208b0cec",
-    "smf_sniffer": "ghcr.io/yassir63/smf-sniffer:sha-e3e93f1f7094ac86f3d02aa20ac4b8a75d93f2dd"
+    "probe": "ghcr.io/yassir63/ebpf-latency-probe:sha-8a7d752027bfce15ea9c21b95d7b4fe486f540b6",
+    "throughput": "ghcr.io/yassir63/ebpf-throughput-probe:sha-8a7d752027bfce15ea9c21b95d7b4fe486f540b6",
+    "amf_sniffer": "ghcr.io/yassir63/amf-sniffer:sha-8a7d752027bfce15ea9c21b95d7b4fe486f540b6",
+    "smf_sniffer": "ghcr.io/yassir63/smf-sniffer:sha-8a7d752027bfce15ea9c21b95d7b4fe486f540b6"
   },
   "components": {
     "ue-mapper-api": {
       "repository": "ghcr.io/yassir63/ue_mapper_api",
-      "image_tag": "sha-e5918cd4c40753ff85bbf2bed48d80ea70d0428e",
+      "image_tag": "sha-8a7d752027bfce15ea9c21b95d7b4fe486f540b6",
       "image_pull_policy": "IfNotPresent"
     },
     "packet-pairer": {
       "repository": "ghcr.io/yassir63/packet-pairer",
-      "image_tag": "sha-af0ba1a8430e70dd84141ee71397dbecf6237e89",
+      "image_tag": "sha-8a7d752027bfce15ea9c21b95d7b4fe486f540b6",
       "image_pull_policy": "Always"
     },
     "kpi-calculator-oai": {
       "repository": "ghcr.io/yassir63/kpi-calculator-oai",
-      "image_tag": "test-cc2fb205ca284a55492ae72600c0e23a9e01ce7f",
+      "image_tag": "sha-8a7d752027bfce15ea9c21b95d7b4fe486f540b6",
       "image_pull_policy": "IfNotPresent"
     },
     "monitoring-controller": {
       "repository": "ghcr.io/yassir63/kopf-controller",
-      "image_tag": "rebuild-5da937d630efaeebfb10d566bb80ce9f7f68950f",
+      "image_tag": "sha-8a7d752027bfce15ea9c21b95d7b4fe486f540b6",
       "image_pull_policy": "Always"
     }
   },
   "builds": {
     "amf-sniffer": {
-      "digest": "sha256:c676c52c8e3480906457400fcac19072f952f1179da6ff75be598220ecf82fef",
-      "source_repository": "yassir63/nador-images",
-      "source_commit": "25abc6620446cfdc994062ae11949132208b0cec",
-      "source_change": "Pinned published build selected by the ML trials"
+      "digest": "sha256:43afc21ef78c1fb637818aebf43c7f7d3803d1eff7c98bd7eba3e3c78beabc0f",
+      "source_repository": "ifran-project/nador-images",
+      "source_commit": "8a7d752027bfce15ea9c21b95d7b4fe486f540b6",
+      "source_change": "Keep Nador image publishing under yassir63"
     },
     "controller": {
-      "digest": "sha256:29e1a24830b63cfef548eae07a81a6644de7a5e1fa94c57d3ae6714ddc66af1c",
-      "source_repository": "yassir63/nador-images",
-      "source_commit": "5da937d630efaeebfb10d566bb80ce9f7f68950f",
-      "source_change": "Pinned published build selected by the ML trials"
+      "digest": "sha256:44728bbbc9373ff25e91fa8f1dceed2c7fd29f38de7f6d531c5ef5bbe9c3eb7e",
+      "source_repository": "ifran-project/nador-images",
+      "source_commit": "8a7d752027bfce15ea9c21b95d7b4fe486f540b6",
+      "source_change": "Keep Nador image publishing under yassir63"
     },
     "kpi-calculator-oai": {
-      "digest": "sha256:32a385c4801a7924b167f7bfa628ca360a2337d5759510cdf4b7b0c4bc7684dc",
-      "source_repository": "yassir63/nador-images",
-      "source_commit": "cc2fb205ca284a55492ae72600c0e23a9e01ce7f",
-      "source_change": "Pinned published build selected by the ML trials"
+      "digest": "sha256:49b946f4afe3468ea4e9aaca2997054f89d38fcc4460bac952bbb8ac533630e1",
+      "source_repository": "ifran-project/nador-images",
+      "source_commit": "8a7d752027bfce15ea9c21b95d7b4fe486f540b6",
+      "source_change": "Keep Nador image publishing under yassir63"
     },
     "latency-probe": {
-      "digest": "sha256:b0444e0d606891f45667c6d05d672be277559a87e4858efc2cd1fd9a0a82e80e",
-      "source_repository": "yassir63/nador-images",
-      "version_record": "versions/latency-probe/2026w43.json",
-      "source_change": "Recorded original selected by the passing trials; no replacement source build claimed"
+      "digest": "sha256:2377cd062c2d80cc139041946d78d0f678f31eb16fe86eb8493963aa95648d1c",
+      "source_repository": "ifran-project/nador-images",
+      "source_commit": "8a7d752027bfce15ea9c21b95d7b4fe486f540b6",
+      "source_change": "Keep Nador image publishing under yassir63"
     },
     "packet-pairer": {
-      "digest": "sha256:206cca25e069e3107557576955afa83c77ef3fac29a0d5f5372240f9527cf860",
-      "source_repository": "yassir63/nador-images",
-      "source_commit": "af0ba1a8430e70dd84141ee71397dbecf6237e89",
-      "source_change": "Prepare versioned monitoring images with automatic GHCR builds and update proposals"
+      "digest": "sha256:8fdb8396768f647e5ec3479e1d22fb3c5a321393d8f82aa762ef67b3ab79ee4e",
+      "source_repository": "ifran-project/nador-images",
+      "source_commit": "8a7d752027bfce15ea9c21b95d7b4fe486f540b6",
+      "source_change": "Keep Nador image publishing under yassir63"
     },
     "smf-sniffer": {
-      "digest": "sha256:c12f6f84f9e5efdec8d68acc3d0bfbaf32bbc4e27ec8626f3481c8804a219211",
-      "source_repository": "yassir63/nador-images",
-      "source_commit": "e3e93f1f7094ac86f3d02aa20ac4b8a75d93f2dd",
-      "source_change": "Pinned published build selected by the ML trials"
+      "digest": "sha256:1f3a86d91a639063aea401d8a7666ebdcb15e96307e51bbdbbf04d55a25ffdd7",
+      "source_repository": "ifran-project/nador-images",
+      "source_commit": "8a7d752027bfce15ea9c21b95d7b4fe486f540b6",
+      "source_change": "Keep Nador image publishing under yassir63"
     },
     "throughput-probe": {
-      "digest": "sha256:135e6344aa636dbb9f99705753ee5a72b6941485ab1c910a8dabb2cf84458304",
-      "source_repository": "yassir63/nador-images",
-      "source_commit": "af0ba1a8430e70dd84141ee71397dbecf6237e89",
-      "source_change": "Prepare versioned monitoring images with automatic GHCR builds and update proposals"
+      "digest": "sha256:8a73e31ad3eb463fb0091a4ef9a533ac250a8822216ee0631fdb65652eb562a5",
+      "source_repository": "ifran-project/nador-images",
+      "source_commit": "8a7d752027bfce15ea9c21b95d7b4fe486f540b6",
+      "source_change": "Keep Nador image publishing under yassir63"
     },
     "ue-mapper": {
-      "digest": "sha256:edd87dd139caa0df2d92a3732f23efe125ef00e6315af4ea9cc7ecfcde0cdacd",
-      "source_repository": "yassir63/nador-images",
-      "source_commit": "e5918cd4c40753ff85bbf2bed48d80ea70d0428e",
-      "source_change": "Pinned published build selected by the ML trials"
+      "digest": "sha256:72be3877496d2a36b9afb2d7a51e12e484622a7dc029db2b9790681d2fb04a63",
+      "source_repository": "ifran-project/nador-images",
+      "source_commit": "8a7d752027bfce15ea9c21b95d7b4fe486f540b6",
+      "source_change": "Keep Nador image publishing under yassir63"
     }
   }
 }
