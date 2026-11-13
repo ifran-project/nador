@@ -21,4 +21,5 @@ core:
   {}
 {% endif %}
 inventoryUrl: {{ ('http://ue-mapper-api.' ~ monitoring.namespace ~ '.svc.cluster.local:8080/inventory/ues' if 'ue-mapper-api' in components else '') | tojson }}
-ueNames: {{ ue_names | tojson }}
+{# "IMSI name" strings: an IMSI as a map key or a bare value can be read as a number by YAML (Helm: 1.01e+12) #}
+ueNames: {{ ue_names.items() | map('join', ' ') | list | tojson }}
