@@ -9,5 +9,5 @@ sources: []
 core: {}
 # ue-mapper-api inventory (exact RAN UE NGAP id <-> IMSI from the N2 captures), empty when not deployed
 inventoryUrl: ""
-# IMSI -> UE name
-ueNames: {}
+# "IMSI name" strings (not a map: YAML readers may turn an IMSI key into a number)
+ueNames: []

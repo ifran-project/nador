@@ -15,8 +15,8 @@ data:
     {{- end }}
   # IMSI name; unknown IMSIs are shown as the IMSI
   ue_names: |
-    {{- range $imsi, $name := .Values.ueNames }}
-    {{ $imsi }} {{ $name }}
+    {{- range .Values.ueNames }}
+    {{ . }}
     {{- end }}
   join.awk: |
     {{- .Files.Get "files/join.awk" | nindent 4 }}
