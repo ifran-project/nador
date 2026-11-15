@@ -15,6 +15,21 @@ from nador.csi.collection import ROLES, CsiCollector
 LIVE_ROOT = "/root/csi_live"  # on the live node
 
 
+def _local_port_free(port: int) -> bool:
+    with socket.socket() as probe:
+        try:
+            probe.bind(("127.0.0.1", port))
+        except OSError:
+            return False
+    return True
+
+
+def _free_local_port() -> int:
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return probe.getsockname()[1]
+
+
 class CsiLiveView:
     """
     Follow the CSI log of a gNB from live_node (e.g. the monitoring node) and show it in Streamlit.
@@ -136,15 +151,16 @@ class CsiLiveView:
         return shlex.join(self._tunnel_argv(local_port or self.port))
 
     async def open_tunnel(self, local_port: int | None = None, timeout_s: float = 20) -> str:
-        """Forward 127.0.0.1:local_port of the notebook host to the viewer; return its URL."""
+        """Forward 127.0.0.1:local_port of the notebook host to the viewer; return its URL.
+        Without local_port, the viewer port is used if it is free on the notebook host, else a free port chosen
+        by the system (e.g. a local Streamlit already listens there)."""
         await self.close_tunnel()
-        local_port = local_port or self.port
         # A busy port would make the readiness check below connect to whatever already listens there.
-        with socket.socket() as probe:
-            try:
-                probe.bind(("127.0.0.1", local_port))
-            except OSError as exc:
-                raise RuntimeError(f"Local port {local_port} is already in use; pass local_port=") from exc
+        if not _local_port_free(local_port or self.port):
+            if local_port:
+                raise RuntimeError(f"Local port {local_port} is already in use; pass another local_port=")
+            local_port = _free_local_port()
+        local_port = local_port or self.port
         log = self.tunnel_log
         log.parent.mkdir(parents=True, exist_ok=True)
         with log.open("w") as stderr:  # noqa: ASYNC230 (opened once, inherited by ssh)
