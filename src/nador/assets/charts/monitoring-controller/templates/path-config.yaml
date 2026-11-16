@@ -1,4 +1,4 @@
-{{- if .Values.observability.user_plane_paths }}
+{{- if and .Values.observability.user_plane_paths (not .Values.probeControllerImage) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:

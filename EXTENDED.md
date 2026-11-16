@@ -14,7 +14,6 @@ The same branch name, `ml-extended`, exists in `nador-images`.
 | socket_counters | Per-pod netns TCP retransmission/reset/failure counters | Namespace counters; not per-flow RTT or GTP-U tunnel measurements. |
 | split_signaling | Bounded tshark F1AP/E1AP PDU counts and last observation per selected RAN pod | Does not yet reconstruct UE context or correlate requests/responses. No IMSI/RNTI/NCGI joins or latency claims. Both anchors may observe the same PDU. |
 | quality | Configured Prometheus query nonemptiness, finite values and optional event timestamp freshness | A scrape timestamp is not an event timestamp. Missing/failed queries are not healthy zeros. |
-| reachability | Allowlisted TCP connection attempts | Runs from the service collector pod, not from every NF. Does not validate SCTP, UDP, PFCP, NGAP or SBI transaction semantics. |
 
 Collectors expose Prometheus metrics on ports 9500 and 9501 through the existing
 annotated-pod discovery. A separate Helm release installs and removes them.
@@ -69,19 +68,18 @@ alongside the timeline. This also applies to `ObservabilityRun`.
 ## Not yet implemented
 
 The research note is a roadmap, not a list of finished probes. Full F1AP/E1AP
-context reconstruction, association-scoped procedure timing, off-CPU stacks,
-QFI enrichment, per-flow TCP RTT, driver-specific NIC telemetry, energy
-attribution, E2SM-KPM adapters, SBI HTTP/2/TLS instrumentation and cross-anchor
-packet concordance remain separate implementation and validation tasks.
+context reconstruction, association-scoped procedure timing,
+driver-specific NIC telemetry, energy attribution, E2SM-KPM adapters and SBI
+HTTP/2/TLS instrumentation remain separate implementation and validation tasks.
 Do not present them as available from this branch.
 
 ## Validation
 
 Start offline: models and chart rendering, thread/cgroup parsing fixtures,
-decoder PDML fixtures, finite/stale/missing quality cases and TCP connectivity.
+decoder PDML fixtures, and finite/stale/missing quality cases.
 GitHub then builds both images and checks packaged dependencies.
 Only then test in a Linux cluster: scheduling contention, controlled qdisc/drop
-faults, F1/E1 session procedures, and bounded reachability failures.
+faults, and F1/E1 session procedures.
 Capture kernel/config versions, image digests, overhead and event-loss bounds.
 No live validation or image publication is claimed by adding this source.
 

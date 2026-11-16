@@ -10,6 +10,7 @@ from orchestrator.utils.k8s import build_k8s_safe
 from orchestrator.utils.utils import deep_merge
 
 from nador.models import DEFAULT_IMAGES, DeployedMonitoringComponent, MonitoringModel
+from nador.probe_catalog import NODE_PROBES, PROBES, controlled_probes, enabled_probes, probe_values
 from nador.ran_metrics import ocudu_sources
 
 ASSETS = Path(__file__).resolve().parent / "assets"
@@ -21,6 +22,19 @@ VALUES_TEMPLATES = Environment(
     trim_blocks=True,
     lstrip_blocks=True,
 )
+
+
+def _probe_states(model):
+    if not model.monitoring.probe_controller_image:
+        return {}
+    states = controlled_probes(model.monitoring.extended)
+    kinds = {str(nf.type) for nf in model.ran.components.values()}
+    if not (("du" in kinds and kinds.intersection({"cu", "cu_cp", "cu_up"}))
+            or {"cu_cp", "cu_up"} <= kinds):
+        if states.get("split-signaling"):
+            raise ValueError("split_signaling requires a modeled F1 or E1 split")
+        states.pop("split-signaling", None)
+    return states
 
 
 # Resolve components into namespaces, pod selectors and capture settings.
@@ -71,7 +85,7 @@ def _render_chart_values(
         target | {"kind": str(getattr(model, target["category"]).components[target["component"]].type)}
         for target in targets if target["category"] in ("ran", "core")
     ]
-    if model.monitoring.extended.active:
+    if model.monitoring.extended.active or (model.monitoring.probe_controller_image and model.monitoring.extended.probe_images):
         existing = {(target["category"], target["component"]) for target in extended_targets}
         for category in ("ran", "core"):
             for name, nf in getattr(model, category).components.items():
@@ -80,8 +94,6 @@ def _render_chart_values(
                         "category": category, "component": name, "namespace": nf.namespace, "kind": str(nf.type),
                         "selector": {"app": build_k8s_safe(f"{nf.implementation}-{name}")},
                     })
-    from nador.probe_catalog import probe_values
-
     probe_name = (component.release_name or "").removeprefix("probe-")
     selected = model.monitoring.extended.probe_targets.get(probe_name)
     if selected:
@@ -97,6 +109,13 @@ def _render_chart_values(
             "service_enabled": model.monitoring.extended.service_enabled,
         }
     )
+    probe_states = _probe_states(model)
+    if probe_name in probe_states:
+        extended_config["paused"] = not probe_states[probe_name]
+        if not probe_states[probe_name]:
+            for flag in PROBES[probe_name]:
+                if flag not in ("tcp_flows", "attributed_drops"):
+                    extended_config[flag] = True
     rendered = template.render(
         component=component,
         components=components,
@@ -109,6 +128,7 @@ def _render_chart_values(
         extended_targets=extended_targets,
         extended_config=extended_config,
         packet_targets=packet_targets,
+        probe_states=probe_states,
         packet_namespaces=sorted({target["namespace"] for target in targets if target["role"] in ("gnb", "upf")}),
     )
     values = deep_merge(yaml.safe_load(defaults.read_text()) or {}, yaml.safe_load(rendered))
@@ -126,12 +146,15 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
         raise ValueError("RAN KPIs support OAI and OCUDU")
     enabled = {"integration", "prometheus", "grafana"}
     if monitoring.one_way.image:
-        enabled.update(("one-way", "redis", "ue-mapper-api"))
-    if monitoring.extended.node_enabled or monitoring.extended.service_enabled:
+        enabled.update(("redis", "ue-mapper-api"))
+        if not monitoring.probe_controller_image:
+            enabled.add("one-way")
+    if monitoring.probe_controller_image:
+        enabled.update(("redis", "ue-mapper-api", "monitoring-controller"))
+    if monitoring.extended.active or (monitoring.probe_controller_image and monitoring.extended.probe_images):
         if monitoring.extended.probe_images:
-            from nador.probe_catalog import NODE_PROBES, enabled_probes
-
-            for kind in enabled_probes(monitoring.extended):
+            kinds = _probe_states(model) if monitoring.probe_controller_image else enabled_probes(monitoring.extended)
+            for kind in kinds:
                 name = f"probe-{kind}"
                 workload = "node" if kind in NODE_PROBES else "service"
                 defaults["components"][name] = {
@@ -141,9 +164,6 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
                 enabled.add(name)
         else:
             enabled.add("extended-probes")
-    for check in monitoring.extended.reachability:
-        if check.source_component and check.source_component not in getattr(model, check.source_category).components:
-            raise ValueError(f"Unknown source NF for extended check {check.name}: {check.source_component}")
     if monitoring.loki:
         enabled.update(("loki", "promtail"))
     if monitoring.latency or monitoring.throughput or monitoring.observability.active:
@@ -157,7 +177,7 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
     components = {}
     for name, definition in defaults["components"].items():
         # The controller also needs the pairer image when pairing is disabled.
-        if name not in enabled and not ((monitoring.latency or monitoring.throughput or monitoring.observability.active) and name == "packet-pairer"):
+        if name not in enabled and not (name == "packet-pairer" and "monitoring-controller" in enabled):
             continue
         data = (
             {"release_name": name, "chart_ref": name, "pod_selector": ["app=" + name]}
@@ -185,6 +205,8 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
     for name in enabled:
         component = components[name]
         component.chart_values = _render_chart_values(component, model, targets, components)
+        if name.startswith("probe-") and component.chart_values.get("settings", {}).get("paused"):
+            component.pod_selector = []
         if not component.chart_version:
             component.chart_ref = f"{REMOTE_CHARTS}/{Path(component.chart_ref).name}"
     return {name: component for name, component in components.items() if name in enabled}

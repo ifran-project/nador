@@ -8,7 +8,7 @@ Use a published tagged image or digest built from the nador-images
 
 ```yaml
 one_way:
-  image: ghcr.io/yassir63/nador-n3-oneway:extended-ae03044296e26e92d5d4b3a03a87ca89471bdaa8
+  image: ghcr.io/ifran-project/nador-n3-oneway:extended-b98fe91553736024ed140cc6677da7d72a0e5715
   sample: 16
   test_port: 5202
   n3:
@@ -19,8 +19,7 @@ one_way:
     peer: 192.0.2.10
 ```
 
-For a private GHCR package, set `one_way.image_pull_secret` to an
-existing registry pull Secret in the monitoring namespace.
+Use an image the cluster can pull without registry credentials.
 In `monitoring.yaml`, configure exactly one gNB or CU-UP and one UPF
 packet target, plus AMF and SMF targets for the UE mapper. Set each
 target's `n3_interface` if it differs from its packet interface. The
@@ -40,6 +39,11 @@ await monitoring.set_one_way(n3=False, upf_transit=True)
 ```
 
 The second call assumes that the UPF transit peer and port were configured.
+The one-way controller is a small background Kubernetes workload. It
+reads those switches and starts or removes the corresponding probe pods.
+`set_one_way` tells the running controller to change a switch; it does
+not measure delay itself, reinstall monitoring, or restart the RAN/core.
+To use YAML only, set the initial switches there and deploy normally.
 The equivalent Kubernetes operation for N3 is:
 
 ```bash

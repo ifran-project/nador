@@ -1,80 +1,80 @@
 {
   "probes": {
-    "probe": "r2labuser/ebpf-latency-probe:2026w43",
-    "throughput": "ghcr.io/yassir63/ebpf-throughput-probe:sha-af0ba1a8430e70dd84141ee71397dbecf6237e89",
-    "amf_sniffer": "ghcr.io/yassir63/amf-sniffer:sha-25abc6620446cfdc994062ae11949132208b0cec",
-    "smf_sniffer": "ghcr.io/yassir63/smf-sniffer:sha-e3e93f1f7094ac86f3d02aa20ac4b8a75d93f2dd"
+    "probe": "ghcr.io/ifran-project/ebpf-latency-probe:extended-fe1764d9f887311be15c6920f4b94d165a04b227",
+    "throughput": "ghcr.io/ifran-project/ebpf-throughput-probe@sha256:ebb036450c9a071b063462e5e767f82251c2092eb11f9d2d2db45a29b0d783e0",
+    "amf_sniffer": "ghcr.io/ifran-project/amf-sniffer@sha256:3ae7ff74a74968a9457454118ad577617aa2a5ee49bd722980a3748e882f7f1f",
+    "smf_sniffer": "ghcr.io/ifran-project/smf-sniffer@sha256:0e9221b9aeac4ae876e1e594ac5c5dd1533ea84015aa763b67b84871c759edda"
   },
   "components": {
     "ue-mapper-api": {
-      "repository": "ghcr.io/yassir63/ue_mapper_api",
-      "image_tag": "sha-e5918cd4c40753ff85bbf2bed48d80ea70d0428e",
+      "repository": "ghcr.io/ifran-project/ue_mapper_api",
+      "image_tag": "sha-4a3672b4f68fae70cde256e6f790c61fc85b1e72",
       "image_pull_policy": "IfNotPresent"
     },
     "packet-pairer": {
-      "repository": "ghcr.io/yassir63/packet-pairer",
-      "image_tag": "sha-af0ba1a8430e70dd84141ee71397dbecf6237e89",
+      "repository": "ghcr.io/ifran-project/packet-pairer",
+      "image_tag": "sha-4a3672b4f68fae70cde256e6f790c61fc85b1e72",
       "image_pull_policy": "Always"
     },
     "kpi-calculator-oai": {
-      "repository": "ghcr.io/yassir63/kpi-calculator-oai",
-      "image_tag": "test-cc2fb205ca284a55492ae72600c0e23a9e01ce7f",
+      "repository": "ghcr.io/ifran-project/kpi-calculator-oai",
+      "image_tag": "sha-4a3672b4f68fae70cde256e6f790c61fc85b1e72",
       "image_pull_policy": "IfNotPresent"
     },
     "monitoring-controller": {
-      "repository": "ghcr.io/yassir63/kopf-controller",
-      "image_tag": "rebuild-5da937d630efaeebfb10d566bb80ce9f7f68950f",
+      "repository": "ghcr.io/ifran-project/kopf-controller",
+      "image_tag": "sha-4a3672b4f68fae70cde256e6f790c61fc85b1e72",
       "image_pull_policy": "Always"
     }
   },
   "builds": {
     "amf-sniffer": {
-      "digest": "sha256:c676c52c8e3480906457400fcac19072f952f1179da6ff75be598220ecf82fef",
-      "source_repository": "yassir63/nador-images",
-      "source_commit": "25abc6620446cfdc994062ae11949132208b0cec",
-      "source_change": "Pinned published build selected by the ML trials"
+      "digest": "sha256:3ae7ff74a74968a9457454118ad577617aa2a5ee49bd722980a3748e882f7f1f",
+      "source_repository": "ifran-project/nador-images",
+      "source_commit": "4a3672b4f68fae70cde256e6f790c61fc85b1e72",
+      "source_change": "Publish branch images to IFRAN Container Registry"
     },
     "controller": {
-      "digest": "sha256:29e1a24830b63cfef548eae07a81a6644de7a5e1fa94c57d3ae6714ddc66af1c",
-      "source_repository": "yassir63/nador-images",
-      "source_commit": "5da937d630efaeebfb10d566bb80ce9f7f68950f",
-      "source_change": "Pinned published build selected by the ML trials"
+      "digest": "sha256:dcf6d5afb8488ef2c36995fe37bccdf6bc4010fc53b7b16075b7fee990a5a4c4",
+      "source_repository": "ifran-project/nador-images",
+      "source_commit": "4a3672b4f68fae70cde256e6f790c61fc85b1e72",
+      "source_change": "Publish branch images to IFRAN Container Registry"
     },
     "kpi-calculator-oai": {
-      "digest": "sha256:32a385c4801a7924b167f7bfa628ca360a2337d5759510cdf4b7b0c4bc7684dc",
-      "source_repository": "yassir63/nador-images",
-      "source_commit": "cc2fb205ca284a55492ae72600c0e23a9e01ce7f",
-      "source_change": "Pinned published build selected by the ML trials"
+      "digest": "sha256:d80fdea4c638fad3fe5f763434548b3e7694a512038f4765514fbc6a3cd90b35",
+      "source_repository": "ifran-project/nador-images",
+      "source_commit": "4a3672b4f68fae70cde256e6f790c61fc85b1e72",
+      "source_change": "Publish branch images to IFRAN Container Registry"
     },
     "latency-probe": {
-      "digest": "sha256:b0444e0d606891f45667c6d05d672be277559a87e4858efc2cd1fd9a0a82e80e",
-      "source_repository": "yassir63/nador-images",
-      "version_record": "versions/latency-probe/2026w43.json",
-      "source_change": "Recorded original selected by the passing trials; no replacement source build claimed"
+      "digest": "sha256:448de9a1214e19c731632f3f8e20d0c059e0db07e713a648fde43d44efe42176",
+      "source_repository": "ifran-project/nador-images",
+      "source_commit": "4a3672b4f68fae70cde256e6f790c61fc85b1e72",
+      "source_change": "Publish branch images to IFRAN Container Registry"
     },
     "packet-pairer": {
-      "digest": "sha256:206cca25e069e3107557576955afa83c77ef3fac29a0d5f5372240f9527cf860",
-      "source_repository": "yassir63/nador-images",
-      "source_commit": "af0ba1a8430e70dd84141ee71397dbecf6237e89",
-      "source_change": "Prepare versioned monitoring images with automatic GHCR builds and update proposals"
+      "digest": "sha256:2cee6d31473b587991da0c76e2e1eb8152fcb27e2f290a78bcf70e9254c8d28b",
+      "source_repository": "ifran-project/nador-images",
+      "source_commit": "4a3672b4f68fae70cde256e6f790c61fc85b1e72",
+      "source_change": "Publish branch images to IFRAN Container Registry"
     },
     "smf-sniffer": {
-      "digest": "sha256:c12f6f84f9e5efdec8d68acc3d0bfbaf32bbc4e27ec8626f3481c8804a219211",
-      "source_repository": "yassir63/nador-images",
-      "source_commit": "e3e93f1f7094ac86f3d02aa20ac4b8a75d93f2dd",
-      "source_change": "Pinned published build selected by the ML trials"
+      "digest": "sha256:0e9221b9aeac4ae876e1e594ac5c5dd1533ea84015aa763b67b84871c759edda",
+      "source_repository": "ifran-project/nador-images",
+      "source_commit": "4a3672b4f68fae70cde256e6f790c61fc85b1e72",
+      "source_change": "Publish branch images to IFRAN Container Registry"
     },
     "throughput-probe": {
-      "digest": "sha256:135e6344aa636dbb9f99705753ee5a72b6941485ab1c910a8dabb2cf84458304",
-      "source_repository": "yassir63/nador-images",
-      "source_commit": "af0ba1a8430e70dd84141ee71397dbecf6237e89",
-      "source_change": "Prepare versioned monitoring images with automatic GHCR builds and update proposals"
+      "digest": "sha256:ebb036450c9a071b063462e5e767f82251c2092eb11f9d2d2db45a29b0d783e0",
+      "source_repository": "ifran-project/nador-images",
+      "source_commit": "4a3672b4f68fae70cde256e6f790c61fc85b1e72",
+      "source_change": "Publish branch images to IFRAN Container Registry"
     },
     "ue-mapper": {
-      "digest": "sha256:edd87dd139caa0df2d92a3732f23efe125ef00e6315af4ea9cc7ecfcde0cdacd",
-      "source_repository": "yassir63/nador-images",
-      "source_commit": "e5918cd4c40753ff85bbf2bed48d80ea70d0428e",
-      "source_change": "Pinned published build selected by the ML trials"
+      "digest": "sha256:74d315eaaa3d742c3615d934402b11beeba4679eb16a2f613875d2f8a02dc04b",
+      "source_repository": "ifran-project/nador-images",
+      "source_commit": "4a3672b4f68fae70cde256e6f790c61fc85b1e72",
+      "source_change": "Publish branch images to IFRAN Container Registry"
     }
   }
 }

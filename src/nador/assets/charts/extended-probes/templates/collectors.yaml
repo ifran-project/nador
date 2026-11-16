@@ -3,13 +3,16 @@
 {{- $service := $s.service_enabled -}}
 {{- $kernel := or (not $s.probe_kind) (eq $s.probe_kind "cpu") (eq $s.probe_kind "drops") -}}
 {{- $base := printf "%s-extended" .Release.Name | trunc 53 | trimSuffix "-" -}}
+{{- /* Existing published collectors expect this key; never schedule active checks. */ -}}
+{{- $config := merge (dict "targets" .Values.targets "prometheus_url" .Values.prometheusUrl) $s -}}
+{{- $_ := set $config "reachability" (list) -}}
 {{- if or $node $service }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ $base }}
 data:
-  config.json: {{ merge (dict "targets" .Values.targets "prometheus_url" .Values.prometheusUrl) $s | toJson | quote }}
+  config.json: {{ $config | toJson | quote }}
 {{- end }}
 {{- if $node }}
 ---
@@ -57,9 +60,13 @@ spec:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9500"
         prometheus.io/path: /metrics
-        checksum/config: {{ merge (dict "targets" .Values.targets "prometheus_url" .Values.prometheusUrl) $s | toJson | sha256sum }}
+        checksum/config: {{ $config | toJson | sha256sum }}
     spec:
       hostPID: true
+      {{- if $s.paused }}
+      nodeSelector:
+        monitoring.blueprint/probe-paused: "true"
+      {{- end }}
       serviceAccountName: {{ $base }}
       tolerations:
         - operator: Exists
@@ -70,7 +77,7 @@ spec:
           securityContext:
             privileged: true
           env:
-            {{- if or $s.packet_concordance $s.qfi $s.tcp_flows }}
+            {{- if $s.tcp_flows }}
             - name: NADOR_PACKET_IDENTITY_KEY
               valueFrom:
                 secretKeyRef:
@@ -142,7 +149,7 @@ kind: Deployment
 metadata:
   name: {{ $base }}-service
 spec:
-  replicas: 1
+  replicas: {{ if $s.paused }}0{{ else }}1{{ end }}
   selector:
     matchLabels:
       app: {{ $base }}-service
@@ -155,7 +162,7 @@ spec:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9501"
         prometheus.io/path: /metrics
-        checksum/config: {{ merge (dict "targets" .Values.targets "prometheus_url" .Values.prometheusUrl) $s | toJson | sha256sum }}
+        checksum/config: {{ $config | toJson | sha256sum }}
     spec:
       automountServiceAccountToken: false
       {{- with .Values.tolerations }}

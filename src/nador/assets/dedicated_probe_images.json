@@ -1,18 +1,23 @@
 {
-  "source_repository": "yassir63/nador-images",
-  "source_commit": "abf15704aee073e0d533c32b5622279541d3b3e6",
-  "workflow_run": "https://github.com/yassir63/nador-images/actions/runs/42868912717",
-  "probe_images": {
-    "cpu": "ghcr.io/yassir63/nador-probe-cpu@sha256:f90b18564f4e952854adbb2e0ad69522d9d1af76335b62ca2289b4cb484b753b",
-    "drops": "ghcr.io/yassir63/nador-probe-drops@sha256:f0c8f2fcee7337b7b44bbf07a27cab869022afc7d92307261fb3bb04300ab19a",
-    "queueing": "ghcr.io/yassir63/nador-probe-queueing@sha256:5ace269a7daa75f94e6702cb6182f4cf70923f4ff83e2e2f6812ef44f455e735",
-    "tcp": "ghcr.io/yassir63/nador-probe-tcp@sha256:5f3fea030d6f09848e449ebb8138b6ace92d526ec7c7bcbf39d23afb2c42829d",
-    "qfi": "ghcr.io/yassir63/nador-probe-qfi@sha256:535b446db390422357b8373b88de787fcf6aceb14cb72e2326b0c446f782c373",
-    "concordance": "ghcr.io/yassir63/nador-probe-concordance@sha256:6d89934ac12249076d5fd3906b89cffafb2703a340e8a2345d0e3fc9e6e92d79",
-    "split-signaling": "ghcr.io/yassir63/nador-probe-split-signaling@sha256:dec09fe6701c5dc8e2b7fb91ba0530fd2a5b73c9dd66d6932e16eff56d3dede6",
-    "source-liveness": "ghcr.io/yassir63/nador-probe-source-liveness@sha256:92631147752746d9799a21bb2e1dad2171682ad91d1a6ce862595b65d58c131d",
-    "nf-liveness": "ghcr.io/yassir63/nador-probe-nf-liveness@sha256:4dfd9cbdc5e7fe798f441aae9fea840d03226bab73604b223c3a84adecab0b19",
-    "measurement-quality": "ghcr.io/yassir63/nador-probe-measurement-quality@sha256:f3216b49d5c00a3736d0f9d91da0481601786a5f900822b82ae98011970c031a"
+  "source_repository": "ifran-project/nador-images",
+  "source_commit": "b98fe91553736024ed140cc6677da7d72a0e5715",
+  "workflow_run": "https://github.com/ifran-project/nador-images/actions/runs/43730970434",
+  "tcp_diagnostics_build": {
+    "source_commit": "b98fe91553736024ed140cc6677da7d72a0e5715",
+    "workflow_run": "https://github.com/ifran-project/nador-images/actions/runs/43730970434"
   },
-  "amf_visibility": "ghcr.io/yassir63/nador-amf-visibility@sha256:a35627045060e4da8390e6b221ed0a8c63b3928e4b73215d264fd2fadfc16d84"
+  "latency_probe_build": {
+    "source_commit": "b98fe91553736024ed140cc6677da7d72a0e5715",
+    "workflow_run": "https://github.com/ifran-project/nador-images/actions/runs/43730970434"
+  },
+  "latency_probe": "ghcr.io/ifran-project/ebpf-latency-probe@sha256:5ee4440babdcd23115b8b74f7a68f11140c35d95a2fe0e52724f1e2b150803bc",
+  "probe_images": {
+    "cpu": "ghcr.io/ifran-project/nador-probe-cpu@sha256:d76b479f156f43c30f57012f8b8f9d42b6d6114cf03bcf4d99da3d3cae63c77d",
+    "drops": "ghcr.io/ifran-project/nador-probe-drops@sha256:1d0482292e38b9115fb8f3f2ca3f11ccdaa921256fceff6c716b2598d3f2d3ff",
+    "queueing": "ghcr.io/ifran-project/nador-probe-queueing@sha256:8323fba56ea9974eebe7ce34e7c5302650e85c9fd946526ae3e405f38872c42c",
+    "tcp": "ghcr.io/ifran-project/nador-probe-tcp@sha256:d39ccd2d3a65c41abfbb58142fc819ac89893dc6d7e3b80c656a1b1400a9979d",
+    "split-signaling": "ghcr.io/ifran-project/nador-probe-split-signaling@sha256:73fb389d527ea11f8c3fff4cdd1b8b188d3ebb57cbf7f22f62a7265719b645ff",
+    "measurement-quality": "ghcr.io/ifran-project/nador-probe-measurement-quality@sha256:6b236865c8bd1c4da5b58e9a08cd7b07845a7a8b11901562396caa45ff09ae5e"
+  },
+  "amf_visibility": "ghcr.io/ifran-project/nador-amf-visibility@sha256:183f7d0f0fdf9ac2c7b0445921a1f8c88fcab0200c304e8192d3e30a5e99c515"
 }

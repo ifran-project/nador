@@ -35,6 +35,9 @@ from nador import MonitoringManagement, MonitoringDeployment
 Start with the [minimal tutorial](examples/quickstart/tutorial.ipynb): installation,
 imports, monitoring deployment and one experiment with artifact collection.
 
+Use [deployment checkpoints](examples/controller-test/README.md#resume-after-a-kernel-restart)
+to restore deployment handles after a notebook restart without reinstalling anything.
+
 Default monitoring image versions live in [`assets/images.json`](src/nador/assets/images.json).
 Image builds can propose updates through a pull request; deployments change after you merge it.
 Explicit scenario overrides still take precedence.
@@ -44,7 +47,11 @@ WebSocket/Telegraf pipeline, according to the RAN implementation. For OCUDU,
 configure telemetry before deploying the RAN, as shown in
 [Monitoring](MONITORING.md#ocudu-native-ran-metrics). This does not enable ML collectors.
 
-Examples are under [examples/monitoring](examples/monitoring):
+For manual deployment with the default dedicated probes, use the
+[live probe notebooks](examples/live-probes) for RFsim, multi-gNB RFsim,
+ZMQ, and split ZMQ. They leave the cluster running for live inspection.
+
+Other examples are under [examples/monitoring](examples/monitoring):
 
 - [RFsim](examples/monitoring/rfsim): monolithic and split OAI radios.
   The monolithic OAI RFsim example uses stock Open5GS SMF and UPF images

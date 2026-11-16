@@ -8,9 +8,8 @@ Linux or 5G measurements.
 ## Scope
 
 Included: sampled session validity within traffic windows; association-scoped
-F1AP/E1AP observations and matching; targeted off-CPU analysis; network-namespace
-drop attribution; GTP-U QFI; observed TCP flow evidence; explicitly matched
-cross-anchor packet evidence; allowlisted source-NF reachability.
+F1AP/E1AP observations and matching; scheduler runnable-wait accounting; network-namespace
+drop attribution; observed TCP flow evidence; and measurement quality.
 
 Excluded by request: E2SM-KPM, power/energy, vendor-specific NIC/hardware queue
 telemetry and SBI HTTP/2/TLS payload instrumentation. Existing portable Linux
@@ -24,25 +23,17 @@ software-qdisc collection remains an optional switch.
   an observed and validated join.
 - Setup timing measures the observed signaling exchange at one anchor,
   not complete registration time or UE application latency.
-- Off-CPU includes both runnable and blocked/sleeping intervals. An interval
-  or a stack sample alone is not an identified root cause.
 - Packet drop evidence is tied to the observed kernel path. A pod namespace
   does not identify the application instruction that caused a drop.
 - TCP transport RTT is not GTP-U/N3 RTT. An idle flow may have no new RTT sample.
-- A QFI label is not proof of QoS enforcement or a validated radio bearer join.
-- Unmatched packets may result from sampling, offloads, missed observations,
-  expiry or path changes. Do not label every unmatched observation as loss.
-- TCP/SCTP connection checks and PFCP heartbeat checks have different meanings.
-  None proves successful NGAP registration or PDU-session establishment.
 
 ## Safety and portability
 
 The node probes require privileged access to selected process/network namespaces.
 Kernel tracing may be unsupported on a node; treat that state as unknown,
 not healthy zero. Do not change host sysctls to make an experiment pass.
-Targets, pending operations and packet identities must be bounded.
-Raw packet payloads and the shared packet-identity key must not be exported.
-Only explicitly allowlisted active checks may send traffic.
+Targets, pending operations and socket identities must be bounded.
+Do not export the socket identity key.
 
 No deployment or live kernel validation is implied by offline tests or image builds.
 First validate each enabled capability on the target kernel and radio/core layout,
@@ -61,25 +52,67 @@ only CPU by default; selecting an image does not enable its probe.
 
 | Image suffix after `nador-probe-` | What the release runs |
 | --- | --- |
-| cpu | Scheduler wait, off-CPU, and optional kernel stack IDs |
+| cpu | Scheduler runnable wait and CPU runtime |
 | drops | Kernel drop reasons and optional namespace attribution |
 | queueing | Software qdisc backlog |
 | tcp | Namespace TCP counters and per-socket evidence |
-| qfi | Observed GTP-U QFI on configured user-plane interfaces |
-| concordance | Bounded matching of observed packet identities |
 | split-signaling | F1AP/E1AP observations, context and setup timing |
-| source-liveness | Explicit checks from selected NF namespaces |
-| nf-liveness | Explicit checks from a separate collector pod |
 | measurement-quality | Prometheus availability, finite values, and freshness |
 
-For example, enable `off_cpu`, set `probe_images.cpu` to the published CPU
+### Passive TCP diagnostics on N3
+
+The experimental latency image reuses the gNB/UPF N3 observation hooks for
+tracked IPv4 GTP-U TCP traffic. It exports
+`gtp_tcp_retransmission_candidates_total` and `gtp_tcp_resets_observed_total`
+by anchor, direction, and available UE/slice metadata. No UE or traffic-server
+agent is required. The existing TCP data/ACK latency measurements are unchanged.
+
+The `gtp_tcp_rtt_variation_seconds` histogram measures the absolute change
+between consecutive accepted data-to-ACK RTT samples of one flow. It uses
+exact ACK matches and skips known repeated data ranges. A tunnel change or
+gap longer than five seconds starts a new comparison. Flow identifiers stay
+internal; the metric works without the packet pairer. It is not one-way jitter
+or the endpoint TCP RTT estimator.
+
+For live validation, use the same uplink UE TCP flow in four windows: clean,
+fixed 40 ms delay, variable delay with the same nominal 40 ms, then recovery.
+Keep induced loss off and place the fault on the 5G path within the measured
+data-to-ACK interval. Exclude transitions, check the histogram sample count
+per anchor, and compare both the existing RTT and the variation histogram.
+Fixed delay should shift RTT; variable delay should also increase variation.
+
+A candidate repeats the same sequence start and payload length on the same
+directional inner flow and receiving GTP-U endpoint/TEID within a bounded
+five-second history. The table holds four entries per hash bucket.
+Report this metric as **N3-observed retransmission candidates**, not total
+UE TCP retransmissions. If a packet is dropped before N3, a retry can appear
+there as the first copy. In one uncapped OAI RFsim uplink, iperf3 reported
+544 sender retransmissions, the N3 capture found 281 repeated ranges, and
+each live probe counted 282. The UE tunnel recorded 263 new TX drops, with
+the two drop bursts aligned with sender retransmission bursts. This is
+aggregate evidence, not packet-by-packet attribution.
+`gtp_tcp_repeat_history_evictions_total` reports still-recent entries
+replaced under pressure; an eviction is not itself a missed retransmission.
+Capture loss, segmentation/offload, eviction, and
+duplicate packets can affect the count. Do not sum anchors as distinct
+retransmissions or interpret the result as a loss percentage. A reset is an
+observed RST packet, not necessarily a failed connection. These counters
+create a label series only after its first event; check capture coverage
+before interpreting an absent series.
+
+The node diagnostics collector separately reports
+`nador_qdisc_dropped_packets_total` when the Linux software queue exposes a
+drop counter. Queue backlog and drops cover all traffic traversing that queue,
+including forwarded 5G traffic when it uses the monitored interface. They
+do not distinguish UEs, slices, or protocols. Kernel drop attribution remains
+separate and best-effort.
+
+For example, enable `scheduler_wait`, set `probe_images.cpu` to the published CPU
 image, and set `probe_targets.cpu: ["core/upf"]` using your deployment's
 component name. Optional `probe_targets.<purpose>` lists select `category/name`
 targets; omitting one uses the normal discovery set. A DaemonSet can still
 run on multiple nodes. Drop tracing observes the local kernel path and the
 selected targets constrain attribution, not which kernel drop events occur.
-QFI is observed in GTP-U packets, not by either attachment sniffer; it is
-not automatically joined to the mapper's UE/session identity.
 
 On a running deployment, after configuring the optional releases and calling
 `monitoring.plan()`, use the existing selected-component actions:
@@ -117,26 +150,13 @@ finished resources also expire automatically.
 
 ### Probe-specific settings
 
-All new switches are off by default: `session_window_validation`, `off_cpu`,
-`off_cpu_stacks`, `attributed_drops`, `qfi`, `tcp_flows`, and
-`packet_concordance`. Use a newly built image from this branch when enabling
+The `attributed_drops` and `tcp_flows` switches are off by default. Use a newly built image from this branch when enabling
 any live probe. The previous branch's images do not contain these collectors.
 
-For QFI, socket, or packet evidence, select an existing Secret in the monitoring
-namespace with a `key` value of at least 32 characters, and set
-`packet_identity_secret`, a unique `packet_run_id`, and the actual capture
-`packet_interfaces`. Only the Secret name is rendered in Helm; its value
-is not written to experiment reports.
+For TCP flow evidence, select an existing Secret in the monitoring namespace
+with a `key` value of at least 32 characters, and set `packet_identity_secret`
+and a unique `packet_run_id`. Only the Secret name is rendered in Helm; its
+value is not written to experiment reports.
 
-The QFI collector reports observed QFI counts, not a validated QFI-to-UE or DRB
-join. Concordance currently compares distinct packet identities across sources
-observed by the same node collector; cross-node aggregation is not implemented.
 F1AP/E1AP provides association-local context and setup timing, not a verified
-cross-protocol subscriber graph. Kernel stack IDs are bounded and unsymbolized.
-
-Source-NF checks require explicit destination IP pins and support TCP/SCTP
-connectivity only. Synthetic PFCP heartbeats are restricted to a collector
-and an explicitly designated isolated test peer, never a real NF association.
-Session-window analysis writes `session_window_validity.json` from sampled mapper
-history and the traffic timeline; it does not override the trial runner's
-strict post-export mapping check.
+cross-protocol subscriber graph.

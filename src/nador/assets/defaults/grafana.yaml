@@ -23,7 +23,7 @@ grafana.ini:
     default_home_dashboard_path: /var/lib/grafana/dashboards/default/monitoring-dashboard.json
     min_refresh_interval: 1s
   users:
-    default_theme: light
+    default_theme: dark
     viewers_can_edit: true
 nodeSelector: {}
 service:
