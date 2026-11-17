@@ -67,5 +67,5 @@ Other examples are under [examples/monitoring](examples/monitoring):
 
 Copyright (c) 2026 Yassir Amami. The extension is licensed under the
 [BSD 3-Clause Clear License](LICENSE). Reused/adapted upstream example and chart
-material retains its [upstream license notice](LICENSES/).
+material retains the [IFRAN license notice](LICENSES/IFRAN.txt).
 External dependencies and container images retain their own licenses.
