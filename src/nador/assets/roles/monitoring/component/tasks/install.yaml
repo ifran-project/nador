@@ -2,6 +2,13 @@
 - name: Prepare local chart
   ansible.builtin.include_tasks: prepare.yaml
 
+- name: Check Helm version for charts with API-managed settings
+  ansible.builtin.command:
+    argv: [helm, version, --short]
+  register: monitoring_helm_cli_version
+  changed_when: false
+  when: component.chart_ref | basename in ['monitoring-controller', 'one-way']
+
 - name: Install Helm application
   kubernetes.core.helm:
     name: "{{ chart_name }}"
@@ -10,6 +17,8 @@
     release_namespace: "{{ component.namespace }}"
     create_namespace: true
     values: "{{ component.chart_values }}"
+    # These releases update a ConfigMap that the probe API also patches.
+    server_side: "{{ 'false' if (monitoring_helm_cli_version.stdout | default('v0')).split('.')[0][1:] | int >= 4 else omit }}"
     wait: true
     wait_timeout: "{{ timeout_seconds }}s"
 

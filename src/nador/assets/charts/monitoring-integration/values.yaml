@@ -4,6 +4,7 @@ dashboards:
   logs: true
   variant: oai
 lokiEnabled: true
+latencyEnabled: false
 throughputEnabled: false
 observability:
   ngap: false

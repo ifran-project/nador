@@ -1,9 +1,14 @@
 {
   "probes": {
-    "probe": "ghcr.io/ifran-project/ebpf-latency-probe:sha-4a3672b4f68fae70cde256e6f790c61fc85b1e72",
-    "throughput": "ghcr.io/ifran-project/ebpf-throughput-probe:sha-4a3672b4f68fae70cde256e6f790c61fc85b1e72",
-    "amf_sniffer": "ghcr.io/ifran-project/amf-sniffer:sha-4a3672b4f68fae70cde256e6f790c61fc85b1e72",
-    "smf_sniffer": "ghcr.io/ifran-project/smf-sniffer:sha-4a3672b4f68fae70cde256e6f790c61fc85b1e72"
+    "probe": "ghcr.io/ifran-project/ebpf-latency-probe:extended-fe1764d9f887311be15c6920f4b94d165a04b227",
+    "throughput": "ghcr.io/ifran-project/ebpf-throughput-probe@sha256:ebb036450c9a071b063462e5e767f82251c2092eb11f9d2d2db45a29b0d783e0",
+    "amf_sniffer": "ghcr.io/ifran-project/amf-sniffer@sha256:3ae7ff74a74968a9457454118ad577617aa2a5ee49bd722980a3748e882f7f1f",
+    "smf_sniffer": "ghcr.io/ifran-project/smf-sniffer@sha256:0e9221b9aeac4ae876e1e594ac5c5dd1533ea84015aa763b67b84871c759edda"
+  },
+  "external_probes": {
+    "controller": "ghcr.io/ifran-project/nador-controller:extended-8092c1760c6a528a316a852f699d43feffc020c9",
+    "throughput": "ghcr.io/ifran-project/nador-throughput-probe:extended-b98fe91553736024ed140cc6677da7d72a0e5715",
+    "user_plane_paths": "ghcr.io/ifran-project/nador-user-plane-path:extended-b98fe91553736024ed140cc6677da7d72a0e5715"
   },
   "components": {
     "ue-mapper-api": {

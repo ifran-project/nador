@@ -1,6 +1,7 @@
 targets: {{ targets | tojson }}
 dashboards:
-  variant: {{ ('srsran' if model.ran.implementation | string == 'srsRAN' else 'oai') | tojson }}
+  variant: {{ ('srsran' if model.ran.implementation | string in ['srsRAN', 'ocudu'] else 'oai') | tojson }}
 lokiEnabled: {{ monitoring.loki | tojson }}
-throughputEnabled: {{ monitoring.throughput | tojson }}
+latencyEnabled: {{ monitoring.latency | tojson }}
+throughputEnabled: {{ (monitoring.throughput or (monitoring.probe_controller_image is not none and monitoring.external_throughput_image is not none)) | tojson }}
 observability: {{ monitoring.observability.model_dump() | tojson }}

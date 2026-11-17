@@ -1,0 +1,831 @@
+{
+  "uid": "nador-on-demand-probes",
+  "title": "Nador On-demand Probes",
+  "description": "Live metrics from the monitoring controller's probes. Panels appear with data when their probes are enabled and have observations.",
+  "editable": true,
+  "schemaVersion": 39,
+  "version": 1,
+  "tags": [
+    "nador",
+    "5g"
+  ],
+  "refresh": "5s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "slice",
+        "label": "Slice",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "monitoring-prometheus"
+        },
+        "query": {
+          "query": "label_values({__name__=~\"gtp_teid_latency_ns|gtp_throughput_bytes_total|nador_(n3_oneway|upf_transit)_slice_seconds_count\",slice!=\"\",slice!=\"unknown\"}, slice)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "imsi",
+        "label": "UE (IMSI)",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "monitoring-prometheus"
+        },
+        "query": {
+          "query": "label_values({__name__=~\"gtp_teid_latency_ns|gtp_throughput_bytes_total\",imsi!=\"\",imsi!=\"unknown\",slice=~\"${slice:regex}\"}, imsi)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "UE and slice traffic",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "RTT · 1 s median",
+      "description": "The exporter median per tunnel and observation point.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "monitoring-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "monitoring-prometheus"
+          },
+          "expr": "gtp_teid_latency_median_1s_ns{imsi=~\"${imsi:regex}\",slice=~\"${slice:regex}\"} / 1e6",
+          "legendFormat": "{{probe_role}} / {{probe_pod}} · {{mode}}/{{kind}} · {{imsi}} · {{slice}} · {{teid}}",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "RTT · P95",
+      "description": "Histogram estimate by UE, slice, observation point, mode and sample kind.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "monitoring-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "monitoring-prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, probe_role, probe_pod, mode, kind, imsi, slice) (rate(gtp_teid_latency_observed_ns_bucket{imsi=~\"${imsi:regex}\",slice=~\"${slice:regex}\"}[$__rate_interval]))) / 1e6",
+          "legendFormat": "{{probe_role}} / {{probe_pod}} · {{mode}}/{{kind}} · {{imsi}} · {{slice}}",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "N3 bitrate",
+      "description": "Inner IP bytes per second converted to bits per second, measured at the UPF.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "monitoring-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "monitoring-prometheus"
+          },
+          "expr": "8 * sum by (probe_pod, direction, imsi, slice) (rate(gtp_throughput_bytes_total{imsi=~\"${imsi:regex}\",slice=~\"${slice:regex}\",probe_role=\"upf\"}[$__rate_interval]))",
+          "legendFormat": "{{probe_pod}} · {{direction}} · {{imsi}} · {{slice}}",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "N3 packet rate",
+      "description": "Inner IP packet rate at the UPF, counted once per datagram.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "monitoring-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "pps",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "monitoring-prometheus"
+          },
+          "expr": "sum by (probe_pod, direction, imsi, slice) (rate(gtp_throughput_packets_total{imsi=~\"${imsi:regex}\",slice=~\"${slice:regex}\",probe_role=\"upf\"}[$__rate_interval]))",
+          "legendFormat": "{{probe_pod}} · {{direction}} · {{imsi}} · {{slice}}",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "row",
+      "title": "TCP diagnostics",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
+      "panels": []
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "TCP RTT variation · 10 s rolling mean",
+      "description": "Mean absolute change between consecutive accepted RTT samples of the same TCP flow. Blank when there are no samples.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "monitoring-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "monitoring-prometheus"
+          },
+          "expr": "1000 * sum by (probe_role, probe_pod, direction, imsi, slice) (rate(gtp_tcp_rtt_variation_seconds_sum{imsi=~\"${imsi:regex}\",slice=~\"${slice:regex}\"}[10s])) / (sum by (probe_role, probe_pod, direction, imsi, slice) (rate(gtp_tcp_rtt_variation_seconds_count{imsi=~\"${imsi:regex}\",slice=~\"${slice:regex}\"}[10s])) > 0)",
+          "legendFormat": "{{probe_role}} / {{probe_pod}} · {{direction}} · {{imsi}} · {{slice}}",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "TCP retransmission candidates and resets",
+      "description": "Repeated data ranges and observed TCP RST packets. Neither is a packet-loss or failed-connection count.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "monitoring-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 18
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "monitoring-prometheus"
+          },
+          "expr": "sum by (probe_role, probe_pod, direction, imsi, slice) (rate(gtp_tcp_retransmission_candidates_total{imsi=~\"${imsi:regex}\",slice=~\"${slice:regex}\"}[$__rate_interval]))",
+          "legendFormat": "Repeat · {{probe_role}} / {{probe_pod}} · {{direction}} · {{imsi}} · {{slice}}",
+          "range": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "monitoring-prometheus"
+          },
+          "expr": "sum by (probe_role, probe_pod, direction, imsi, slice) (rate(gtp_tcp_resets_observed_total{imsi=~\"${imsi:regex}\",slice=~\"${slice:regex}\"}[$__rate_interval]))",
+          "legendFormat": "RST · {{probe_role}} / {{probe_pod}} · {{direction}} · {{imsi}} · {{slice}}",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "row",
+      "title": "One-way latency and user-plane path",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 26
+      },
+      "panels": []
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "N3 one-way delay · P95",
+      "description": "Between gNB and UPF, grouped by slice, protocol and direction. An IMSI selection does not apply to this metric.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "monitoring-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 27
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "monitoring-prometheus"
+          },
+          "expr": "1e3 * histogram_quantile(0.95, sum by (le, protocol, direction, slice) (rate(nador_n3_oneway_slice_seconds_bucket{slice=~\"${slice:regex}\"}[$__rate_interval])))",
+          "legendFormat": "{{protocol}} · {{direction}} · {{slice}}",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "UPF transit delay · P95",
+      "description": "Time through the UPF. An IMSI selection does not apply to this metric.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "monitoring-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 27
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "monitoring-prometheus"
+          },
+          "expr": "1e3 * histogram_quantile(0.95, sum by (le, protocol, direction, slice) (rate(nador_upf_transit_slice_seconds_bucket{slice=~\"${slice:regex}\"}[$__rate_interval])))",
+          "legendFormat": "{{protocol}} · {{direction}} · {{slice}}",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "N3 clock uncertainty",
+      "description": "Uncertainty of cross-host clock calibration at each anchor. This is not a measurement of network delay.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "monitoring-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 35
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "monitoring-prometheus"
+          },
+          "expr": "1e3 * nador_n3_oneway_clock_uncertainty_seconds",
+          "legendFormat": "{{anchor}} · {{pod}}",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "N3 GTP-U packets seen",
+      "description": "Observer packet count by anchor and direction. It is not a per-UE measurement.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "monitoring-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 35
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "pps",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "monitoring-prometheus"
+          },
+          "expr": "rate(user_plane_probe_gtpu_packets_total[$__rate_interval])",
+          "legendFormat": "{{anchor}} · {{direction}} · {{pod}}",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "row",
+      "title": "Node and measurement diagnostics",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 43
+      },
+      "panels": []
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "CPU scheduler wait snapshot",
+      "description": "Time spent runnable but waiting for CPU, summed over currently live threads. The snapshot can decrease when threads exit.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "monitoring-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 44
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "monitoring-prometheus"
+          },
+          "expr": "nador_nf_runqueue_wait_seconds_snapshot",
+          "legendFormat": "{{node}} · {{component}} · {{pod}}",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Software queue backlog",
+      "description": "Queued bytes in software qdiscs. Does not include hardware queues.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "monitoring-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 44
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "monitoring-prometheus"
+          },
+          "expr": "nador_qdisc_backlog_bytes",
+          "legendFormat": "{{node}} · {{component}} · {{pod}} · {{interface}}/{{handle}}",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "Kernel drops by reason",
+      "description": "Cumulative tracepoint observations since probe startup. Reasons are kernel-local codes, and a missing series is not a measured zero.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "monitoring-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 52
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "monitoring-prometheus"
+          },
+          "expr": "nador_kernel_skb_free_reason_count",
+          "legendFormat": "{{node}} · reason {{reason_code}}",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "type": "timeseries",
+      "title": "Software queue drops",
+      "description": "Drops recorded by each software qdisc, not end-to-end or per-UE loss.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "monitoring-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 52
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "pps",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "monitoring-prometheus"
+          },
+          "expr": "rate(nador_qdisc_dropped_packets_total[$__rate_interval])",
+          "legendFormat": "{{node}} · {{component}} · {{pod}} · {{interface}}/{{handle}}",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "type": "timeseries",
+      "title": "TCP namespace events",
+      "description": "Linux TCP namespace counters. These are not per-UE GTP-U measurements.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "monitoring-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 60
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "monitoring-prometheus"
+          },
+          "expr": "rate(nador_tcp_namespace_counter[$__rate_interval])",
+          "legendFormat": "{{node}} · {{component}} · {{pod}} · {{counter}}",
+          "range": true
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "Measurement query success",
+      "description": "1 means the query succeeded. It does not imply that the signal is fresh or valid.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "monitoring-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 60
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "monitoring-prometheus"
+          },
+          "expr": "nador_quality_query_success",
+          "legendFormat": "{{signal}}",
+          "range": true
+        }
+      ]
+    }
+  ]
+}

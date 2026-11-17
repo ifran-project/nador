@@ -1,12 +1,19 @@
 # Control and scheduling node are taken from the deployed Kubernetes model.
 # eth0 carries core/N3 traffic in this example; retain RU-only Multus interfaces.
 # Override a target interface here if you attach N2/N3/N4 to a different pod interface.
+images:
+  probe: ghcr.io/ifran-project/ebpf-latency-probe:extended-fe1764d9f887311be15c6920f4b94d165a04b227
+components:
+  kpi-calculator-oai:
+    image:
+      repository: ghcr.io/ifran-project/kpi-calculator-oai
+      image_tag: sha-4a3672b4f68fae70cde256e6f790c61fc85b1e72
 namespace: monitoring
 latency: true
-packet_pairing: true
+packet_pairing: false
 loki: true
 core_kpis: false
-ran_kpis: false
+ran_kpis: true
 targets:
 - category: core
   component: amf
@@ -31,3 +38,25 @@ targets:
   role: gnb
   container: cuup
   interface: eth0
+throughput: true
+observability:
+  ngap: false
+  pfcp: false
+  mapper_coverage: false
+  user_plane_paths: false
+  node_metrics: false
+extended:
+  scheduler_wait: false
+  kernel_drops: false
+  network_queues: false
+  socket_counters: false
+  split_signaling: false
+  quality: false
+  attributed_drops: false
+  tcp_flows: false
+one_way:
+  n3:
+    enabled: false
+    log_samples: false
+  upf_transit:
+    enabled: false

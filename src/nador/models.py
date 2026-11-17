@@ -1,14 +1,17 @@
 """Monitoring configuration and Helm component models."""
 
 import json
+import re
 from pathlib import Path
 from typing import Any, Literal, Self
 
-from metamodel.models.base import StrictBaseModel
-from orchestrator.models.deployment import DeploymentModel
-from orchestrator.models.k8s import ContainerImage
+from metamodel_3gpp.models.base import StrictBaseModel
+from ifran.models.deployment import DeploymentModel
+from ifran.models.k8s import ContainerImage
 from pydantic import Field, model_validator
 from nador.observability import ObservabilitySettings
+from nador.extended import ExtendedSettings
+from nador.one_way import OneWaySettings
 
 
 DEFAULT_IMAGES = json.loads((Path(__file__).parent / "assets" / "images.json").read_text())
@@ -81,7 +84,18 @@ class MonitoringDeployment(StrictBaseModel):
     packet_pairing: bool = False
     core_kpis: bool = False
     ran_kpis: bool = False
+    ocudu_metrics_port: int = Field(default=8001, ge=1, le=65535)
     observability: ObservabilitySettings = Field(default_factory=ObservabilitySettings)
+    extended: ExtendedSettings = Field(default_factory=ExtendedSettings)
+    one_way: OneWaySettings = Field(default_factory=OneWaySettings)
+    probe_controller_image: str | None = None
+    probe_api_tls_secret: str | None = None
+    probe_api_token_secret: str | None = None
+    external_throughput_image: str | None = None
+    external_path_image: str | None = None
+    rtt_placement: Literal["external"] = "external"
+    rtt_imsis: list[str] = Field(default_factory=list)
+    rtt_slices: list[str] = Field(default_factory=list)
     targets: list[MonitoringTarget] = Field(default_factory=list)
     images: MonitoringImages = Field(default_factory=MonitoringImages)
     components: dict[str, DeployedMonitoringComponent] = Field(default_factory=dict)
@@ -92,11 +106,56 @@ class MonitoringDeployment(StrictBaseModel):
     grafana_node_port: int = Field(default=32005, ge=30000, le=32767)
     loki_node_port: int = Field(default=31000, ge=30000, le=32767)
 
+    @classmethod
+    def from_yaml_file(cls, path: str | Path) -> Self:
+        """Read and check a full monitoring profile before any cluster work."""
+        from nador.validate_monitoring import read_deployment
+
+        return read_deployment(path, cls)
+
     # Check dependencies between enabled features and their targets.
     @model_validator(mode="after")
     def validate_profile(self) -> Self:
-        if self.packet_pairing and not self.latency:
-            raise ValueError("packet_pairing requires latency")
+        if self.packet_pairing:
+            raise ValueError("External RTT does not support packet_pairing; set packet_pairing: false")
+        if self.latency and not self.probe_controller_image:
+            external_images = DEFAULT_IMAGES["external_probes"]
+            self.probe_controller_image = external_images["controller"]
+            if self.throughput and not self.external_throughput_image:
+                self.external_throughput_image = external_images["throughput"]
+            if self.observability.user_plane_paths and not self.external_path_image:
+                self.external_path_image = external_images["user_plane_paths"]
+        if self.probe_controller_image:
+            for enabled, name, image in (
+                (self.throughput, "external_throughput_image", self.external_throughput_image),
+                (self.observability.user_plane_paths, "external_path_image", self.external_path_image),
+            ):
+                if enabled and not image:
+                    raise ValueError(f"Controller mode requires {name} for enabled probes")
+                if image and (":" not in image.rsplit("/", 1)[-1] or any(c.isspace() for c in image)):
+                    raise ValueError(f"{name} must be a tagged image or digest")
+        if self.probe_api_tls_secret or self.probe_api_token_secret:
+            if not (self.probe_controller_image and self.probe_api_tls_secret and self.probe_api_token_secret):
+                raise ValueError("Public probe API requires probe_controller_image and both API secrets")
+        if self.probe_controller_image and any(
+            sum(t.role == role for t in self.targets) > 1 for role in ("gnb", "upf")
+        ):
+            raise ValueError("The external controller supports one gNB and one UPF target; disable RTT or select a single target per role")
+        if self.probe_controller_image and not (
+            ":" in self.probe_controller_image.rsplit("/", 1)[-1]
+            and not any(c.isspace() for c in self.probe_controller_image)
+        ):
+            raise ValueError("probe_controller_image must be a tagged image or digest")
+        if self.latency or self.rtt_imsis or self.rtt_slices:
+            if not self.probe_controller_image:
+                raise ValueError("External RTT requires probe_controller_image")
+            roles = {t.role for t in self.targets}
+            if not {"amf", "smf"} <= roles or roles.isdisjoint({"gnb", "upf"}):
+                raise ValueError("External RTT requires AMF/SMF and a gNB or UPF target")
+        if any(not re.fullmatch(r"[0-9]{5,16}", value) for value in self.rtt_imsis):
+            raise ValueError("rtt_imsis must contain quoted IMSIs")
+        if any(not re.fullmatch(r"[0-9a-f]{2}:[0-9a-f]{6}", value) for value in self.rtt_slices):
+            raise ValueError("rtt_slices must use labels such as 01:ffffff")
         keys = [(t.category, t.component) for t in self.targets]
         if len(keys) != len(set(keys)):
             raise ValueError("Only one monitoring target per component is supported")
@@ -104,11 +163,14 @@ class MonitoringDeployment(StrictBaseModel):
             roles = {t.role for t in self.targets}
             if not {"amf", "smf"} <= roles or not roles & {"gnb", "upf"}:
                 raise ValueError("Packet monitoring requires AMF, SMF and at least one gnb/upf packet target")
-            if self.packet_pairing and not {"gnb", "upf"} <= roles:
-                raise ValueError("Packet pairing requires both gnb and upf targets")
         if self.throughput and self.targets and "upf" not in {t.role for t in self.targets}:
             raise ValueError("Throughput requires a UPF packet target")
         roles = {t.role for t in self.targets}
+        if self.one_way.image and (
+            any(sum(t.role == role for t in self.targets) != 1 for role in ("gnb", "upf"))
+            or not {"amf", "smf"} <= roles
+        ):
+            raise ValueError("One-way monitoring requires one gNB and one UPF target, plus AMF and SMF targets for slice mapping")
         observation = self.observability
         if (observation.ngap or observation.mapper_coverage) and "amf" not in roles:
             raise ValueError("NGAP/mapper coverage requires an AMF target")

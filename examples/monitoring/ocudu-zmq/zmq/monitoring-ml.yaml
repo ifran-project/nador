@@ -1,0 +1,57 @@
+# Single-gNB OCUDU ZMQ with stock Open5GS and ML collectors.
+images:
+  probe: ghcr.io/ifran-project/ebpf-latency-probe:extended-fe1764d9f887311be15c6920f4b94d165a04b227
+namespace: monitoring
+node_name: node4
+operation_timeout_seconds: 600
+latency: true
+packet_pairing: false
+loki: true
+core_kpis: false
+ran_kpis: true
+targets:
+- category: core
+  component: amf
+  role: amf
+  container: amf
+  interface: eth0
+  metrics_port: 9090
+- category: core
+  component: smf
+  role: smf
+  container: smf
+  interface: eth0
+  metrics_port: 9090
+- category: core
+  component: upf
+  role: upf
+  container: upf
+  interface: eth0
+  metrics_port: 9090
+- category: ran
+  component: gnb
+  role: gnb
+  container: gnb
+  interface: eth0
+throughput: true
+observability:
+  ngap: true
+  pfcp: true
+  mapper_coverage: true
+  user_plane_paths: true
+  node_metrics: true
+extended:
+  scheduler_wait: false
+  kernel_drops: false
+  network_queues: false
+  socket_counters: false
+  split_signaling: false
+  quality: false
+  attributed_drops: false
+  tcp_flows: false
+one_way:
+  n3:
+    enabled: false
+    log_samples: false
+  upf_transit:
+    enabled: false

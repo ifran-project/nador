@@ -1,0 +1,5 @@
+apiVersion: v2
+name: extended-probes
+description: Opt-in Nador experimental diagnostics and measurement quality
+type: application
+version: 0.1.0

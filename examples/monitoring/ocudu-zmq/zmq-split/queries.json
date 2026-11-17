@@ -146,5 +146,13 @@
   {
     "name": "smf_session_mappings",
     "query": "fivegs_smffunction_sm_seid_session"
+  },
+  {
+    "name": "n3_throughput_bps",
+    "query": "8 * rate(gtp_throughput_bytes_total{probe_role=\"upf\"}[5s])"
+  },
+  {
+    "name": "ocudu_native_ran_metrics",
+    "query": "{ran_role=~\"gnb|cu|cu_cp|cu_up|du\",source_namespace!=\"\"}"
   }
 ]

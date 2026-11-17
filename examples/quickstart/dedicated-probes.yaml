@@ -1,0 +1,18 @@
+# Overlay for an existing monitoring profile. Only CPU is enabled in this example.
+# Omit bundled extended.node_image and extended.service_image when using this overlay.
+extended:
+  scheduler_wait: true
+  kernel_drops: false
+  network_queues: false
+  socket_counters: false
+  split_signaling: false
+  quality: false
+  attributed_drops: false
+  tcp_flows: false
+  probe_images:
+    cpu: ghcr.io/ifran-project/nador-probe-cpu@sha256:d76b479f156f43c30f57012f8b8f9d42b6d6114cf03bcf4d99da3d3cae63c77d
+    drops: ghcr.io/ifran-project/nador-probe-drops@sha256:1d0482292e38b9115fb8f3f2ca3f11ccdaa921256fceff6c716b2598d3f2d3ff
+    queueing: ghcr.io/ifran-project/nador-probe-queueing@sha256:8323fba56ea9974eebe7ce34e7c5302650e85c9fd946526ae3e405f38872c42c
+    tcp: ghcr.io/ifran-project/nador-probe-tcp@sha256:d39ccd2d3a65c41abfbb58142fc819ac89893dc6d7e3b80c656a1b1400a9979d
+    split-signaling: ghcr.io/ifran-project/nador-probe-split-signaling@sha256:73fb389d527ea11f8c3fff4cdd1b8b188d3ebb57cbf7f22f62a7265719b645ff
+    measurement-quality: ghcr.io/ifran-project/nador-probe-measurement-quality@sha256:6b236865c8bd1c4da5b58e9a08cd7b07845a7a8b11901562396caa45ff09ae5e

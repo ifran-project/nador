@@ -1,0 +1,5 @@
+apiVersion: v2
+name: ocudu-metrics
+description: Native OCUDU WebSocket metrics collected by Telegraf
+type: application
+version: 0.1.0
