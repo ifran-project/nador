@@ -1,0 +1,204 @@
+{{- $s := .Values.settings -}}
+{{- $node := $s.node_enabled -}}
+{{- $service := $s.service_enabled -}}
+{{- $kernel := or (not $s.probe_kind) (eq $s.probe_kind "cpu") (eq $s.probe_kind "drops") -}}
+{{- $base := printf "%s-extended" .Release.Name | trunc 53 | trimSuffix "-" -}}
+{{- /* Existing published collectors expect this key; never schedule active checks. */ -}}
+{{- $config := merge (dict "targets" .Values.targets "prometheus_url" .Values.prometheusUrl) $s -}}
+{{- $_ := set $config "reachability" (list) -}}
+{{- if or $node $service }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $base }}
+data:
+  config.json: {{ $config | toJson | quote }}
+{{- end }}
+{{- if $node }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $base }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ printf "%s-%s-pods" .Release.Namespace $base | trunc 63 }}
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ printf "%s-%s-pods" .Release.Namespace $base | trunc 63 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ printf "%s-%s-pods" .Release.Namespace $base | trunc 63 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $base }}
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ $base }}-node
+spec:
+  selector:
+    matchLabels:
+      app: {{ $base }}-node
+  template:
+    metadata:
+      labels:
+        app: {{ $base }}-node
+        app.kubernetes.io/part-of: nador-extended
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9500"
+        prometheus.io/path: /metrics
+        checksum/config: {{ $config | toJson | sha256sum }}
+    spec:
+      hostPID: true
+      {{- if $s.paused }}
+      nodeSelector:
+        monitoring.blueprint/probe-paused: "true"
+      {{- end }}
+      serviceAccountName: {{ $base }}
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: diagnostics
+          image: {{ required "extended.node_image must select a published build" $s.node_image | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+          env:
+            {{- if $s.tcp_flows }}
+            - name: NADOR_PACKET_IDENTITY_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "packet_identity_secret must be supplied" $s.packet_identity_secret | quote }}
+                  key: key
+            {{- end }}
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          ports:
+            - name: metrics
+              containerPort: 9500
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/nador-extended
+              readOnly: true
+            - name: proc
+              mountPath: /host/proc
+              readOnly: true
+            {{- if $kernel }}
+            - name: sys
+              mountPath: /sys
+              readOnly: true
+            - name: modules
+              mountPath: /lib/modules
+              readOnly: true
+            - name: headers
+              mountPath: /usr/src
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ $base }}
+        - name: proc
+          hostPath:
+            path: /proc
+            type: Directory
+        {{- if $kernel }}
+        - name: sys
+          hostPath:
+            path: /sys
+            type: Directory
+        - name: modules
+          hostPath:
+            path: /lib/modules
+            type: Directory
+        - name: headers
+          hostPath:
+            path: /usr/src
+            type: Directory
+        {{- end }}
+{{- end }}
+{{- if $service }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $base }}-service
+spec:
+  replicas: {{ if $s.paused }}0{{ else }}1{{ end }}
+  selector:
+    matchLabels:
+      app: {{ $base }}-service
+  template:
+    metadata:
+      labels:
+        app: {{ $base }}-service
+        app.kubernetes.io/part-of: nador-extended
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9501"
+        prometheus.io/path: /metrics
+        checksum/config: {{ $config | toJson | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: quality
+          image: {{ required "extended.service_image must select a published build" $s.service_image | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: metrics
+              containerPort: 9501
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/nador-extended
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: {{ $base }}
+{{- end }}

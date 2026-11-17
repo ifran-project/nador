@@ -19,3 +19,25 @@ latency:
 targets: {{ targets | tojson }}
 operationTimeoutSeconds: {{ monitoring.operation_timeout_seconds }}
 observability: {{ monitoring.observability.model_dump() | tojson }}
+probeControllerImage: {{ monitoring.probe_controller_image | tojson }}
+probeControlTargets: {{ packet_targets | tojson }}
+extendedProbeStates: {{ probe_states | tojson }}
+probeApiTlsSecret: {{ monitoring.probe_api_tls_secret | tojson }}
+probeApiTokenSecret: {{ monitoring.probe_api_token_secret | tojson }}
+probeControl: {{ monitoring.one_way.model_dump(mode="json") | tojson }}
+rttRequest:
+  enabled: {{ monitoring.latency | tojson }}
+  allowed: {{ (monitoring.probe_controller_image is not none and (packet_targets | length > 0)) | tojson }}
+  image: {{ monitoring.images.probe | tojson }}
+  imsis: {{ monitoring.rtt_imsis | tojson }}
+  slices: {{ monitoring.rtt_slices | tojson }}
+throughputRequest:
+  enabled: {{ monitoring.throughput | tojson }}
+  allowed: {{ ('upf' in packet_targets and monitoring.external_throughput_image is not none) | tojson }}
+  image: {{ monitoring.external_throughput_image | tojson }}
+pathRequest:
+  enabled: {{ monitoring.observability.user_plane_paths | tojson }}
+  allowed: {{ (packet_targets | length > 0 and monitoring.external_path_image is not none) | tojson }}
+  image: {{ monitoring.external_path_image | tojson }}
+  port: {{ monitoring.observability.path_port }}
+  interval: {{ monitoring.observability.path_interval_seconds }}

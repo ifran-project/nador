@@ -20,12 +20,33 @@ metadata:
   labels:
     {{- include "monitoring.labels" $ | nindent 4 }}
 rules:
+  {{- if and $.Values.probeControllerImage (eq . $.Release.Namespace) }}
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [create, delete]
+  - apiGroups: [""]
+    resources: [configmaps]
+    resourceNames: [nador-one-way]
+    verbs: [get, patch]
+  {{- if $.Values.extendedProbeStates }}
+  - apiGroups: [apps]
+    resources: [daemonsets]
+    resourceNames: [probe-cpu-extended-node, probe-drops-extended-node, probe-queueing-extended-node, probe-tcp-extended-node, probe-split-signaling-extended-node]
+    verbs: [get, patch]
+  - apiGroups: [apps]
+    resources: [deployments]
+    resourceNames: [probe-measurement-quality-extended-service]
+    verbs: [get, patch]
+  {{- end }}
+  {{- end }}
   - apiGroups: [""]
     resources: [pods]
     verbs: [get, list, watch, patch]
+  {{- if not $.Values.probeControllerImage }}
   - apiGroups: [""]
     resources: [pods/ephemeralcontainers]
     verbs: [patch, update]
+  {{- end }}
   - apiGroups: [""]
     resources: [pods/exec]
     verbs: [create, get]

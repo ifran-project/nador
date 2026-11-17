@@ -12,6 +12,9 @@ dependencies = [
     "PyYAML>=6,<7",
 ]
 
+[project.scripts]
+nador-controller = "nador.controller_cli:main"
+
 [tool.poetry]
 packages = [{include = "nador", from = "src"}]
 include = [

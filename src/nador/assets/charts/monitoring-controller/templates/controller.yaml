@@ -1,7 +1,11 @@
 {{- $kinds := list }}
-{{- if .Values.latency.enabled }}{{- $kinds = append $kinds "latency" }}{{- end }}
-{{- if .Values.throughput.enabled }}{{- $kinds = append $kinds "throughput" }}{{- end }}
-{{- if or $kinds .Values.observability.user_plane_paths }}
+{{- if and .Values.latency.enabled (not .Values.probeControllerImage) }}
+{{- fail "RTT requires the external probe controller; injected RTT is not supported" }}
+{{- end }}
+{{- if .Values.probeControllerImage }}{{- $kinds = append $kinds "latency" }}{{- end }}
+{{- if and .Values.throughput.enabled (not .Values.probeControllerImage) }}{{- $kinds = append $kinds "throughput" }}{{- end }}
+{{- $legacyPath := and .Values.observability.user_plane_paths (not .Values.probeControllerImage) }}
+{{- if or $kinds $legacyPath }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -11,6 +15,10 @@ metadata:
     {{- include "monitoring.labels" $ | nindent 4 }}
 spec:
   replicas: 1
+  {{- if .Values.probeControllerImage }}
+  strategy:
+    type: Recreate
+  {{- end }}
   selector:
     matchLabels:
       app: monitoring-controller
@@ -28,12 +36,37 @@ spec:
         {{- $ctx := dict "Values" (deepCopy $.Values) "Release" $.Release }}
         {{- $_ := set $ctx.Values "probeKind" $kind }}
         - name: {{ $kind }}-controller
-          image: {{ printf "%s:%s" $.Values.image.repository $.Values.image.tag | quote }}
+          image: {{ $.Values.probeControllerImage | default (printf "%s:%s" $.Values.image.repository $.Values.image.tag) | quote }}
           imagePullPolicy: {{ $.Values.image.pullPolicy }}
           env:
             {{- include "monitoring.controllerEnv" $ctx | nindent 12 }}
+            {{- if and (eq $kind "latency") $.Values.probeControllerImage }}
+            - name: MANAGE_EXTERNAL_PROBES
+              value: "1"
+            - name: DISABLE_INJECTED_LATENCY
+              value: "1"
+            {{- if $.Values.probeApiTlsSecret }}
+            - name: NADOR_CONTROLLER_API_PUBLIC
+              value: "1"
+            - name: NADOR_CONTROLLER_API_CERT
+              value: /controller-tls/tls.crt
+            - name: NADOR_CONTROLLER_API_KEY
+              value: /controller-tls/tls.key
+            - name: NADOR_CONTROLLER_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.probeApiTokenSecret | quote }}
+                  key: token
+            {{- end }}
+            {{- end }}
+          {{- if and (eq $kind "latency") $.Values.probeApiTlsSecret }}
+          volumeMounts:
+            - name: controller-tls
+              mountPath: /controller-tls
+              readOnly: true
+          {{- end }}
         {{- end }}
-        {{- if .Values.observability.user_plane_paths }}
+        {{- if $legacyPath }}
         - name: path-controller
           image: {{ printf "%s:%s" .Values.image.repository .Values.image.tag | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -49,9 +82,18 @@ spec:
             - name: path-controller
               mountPath: /opt/observability
               readOnly: true
+        {{- end }}
+      {{- if or $legacyPath .Values.probeApiTlsSecret }}
       volumes:
+        {{- if $legacyPath }}
         - name: path-controller
           configMap:
             name: monitoring-path-controller
         {{- end }}
+        {{- if .Values.probeApiTlsSecret }}
+        - name: controller-tls
+          secret:
+            secretName: {{ .Values.probeApiTlsSecret | quote }}
+        {{- end }}
+      {{- end }}
 {{- end }}

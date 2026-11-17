@@ -1,0 +1,45 @@
+{
+  "uid": "monitoring-tcp-diagnostics",
+  "title": "TCP Diagnostics",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "tags": ["5g", "tcp", "latency"],
+  "timezone": "browser",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "TCP RTT Variation (10 s Rolling Mean)",
+      "description": "Mean absolute change between consecutive accepted RTT samples of the same flow. Missing samples are not zero variation.",
+      "type": "timeseries",
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "monitoring-prometheus"},
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "custom": {"spanNulls": false}
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "none"}
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "editorMode": "code",
+          "range": true,
+          "interval": "1s",
+          "legendFormat": "{{probe_role}} / {{probe_pod}} / {{direction}} / {{ue_id}} / {{slice}}",
+          "expr": "1000 * sum by (probe_role, probe_pod, direction, ue_id, slice) (rate(gtp_tcp_rtt_variation_seconds_sum[10s])) / (sum by (probe_role, probe_pod, direction, ue_id, slice) (rate(gtp_tcp_rtt_variation_seconds_count[10s])) > 0)"
+        }
+      ]
+    }
+  ]
+}

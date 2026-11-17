@@ -1,13 +1,17 @@
 """Monitoring deployment lifecycle and workload logs."""
 
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
+from metamodel.models.metamodel import MetaModel
 from orchestrator.deployment.base import BaseManagement
 from orchestrator.deployment.helm import HelmManagement
+from orchestrator.models.deployment import DeploymentModel
 from orchestrator.utils.ansible import get_ansible_inventory_line, run_ansible_role
 
 from nador.models import MonitoringDeployment, MonitoringModel
+from nador.one_way import OneWaySettings
+from nador.validate_monitoring import validate_deployment
 from nador.utils import (
     ASSETS,
     resolve_components,
@@ -20,21 +24,34 @@ class MonitoringManagement(HelmManagement):
     """Deploy monitoring components and attachment sniffers."""
 
     # Take an extension-owned snapshot of an existing orchestrator deployment.
-    def __init__(self, preceding: BaseManagement, *, config: MonitoringDeployment | None = None) -> None:
+    def __init__(self, preceding: BaseManagement, *, config: MonitoringDeployment | str | Path | None = None) -> None:
         super().__init__(preceding=preceding)
         self.deployment_model = MonitoringModel.model_validate(self.deployment_model.model_dump(mode="python"))
+        if isinstance(config, (str, Path)):
+            config = MonitoringDeployment.from_yaml_file(config)
         if config is not None:
             self.deployment_model.monitoring = config.model_copy(deep=True)
+
+    @classmethod
+    def from_yaml_files(cls, metamodel_file: str | Path, deployment_model_file: str | Path) -> Self:
+        """Restore an exported monitoring deployment without contacting its hosts."""
+        model = MonitoringModel.from_yaml_file(str(deployment_model_file))
+        base = BaseManagement(
+            metamodel=MetaModel.from_yaml_file(str(metamodel_file)),
+            deployment_model=DeploymentModel.model_validate(model.model_dump(exclude={"monitoring"})),
+        )
+        return cls(preceding=base, config=model.monitoring)
 
     # Resolve monitoring targets and assemble the Helm installation inputs.
     def plan(self) -> dict[str, Any]:
         """Resolve targets and chart values without contacting deployment hosts."""
-        monitoring = self.deployment_model.monitoring
+        monitoring = validate_deployment(self.deployment_model.monitoring.model_dump(mode="python"))
         if monitoring.throughput and not monitoring.targets:
             raise ValueError("Throughput requires AMF, SMF and UPF packet targets")
         node_name, _ = self._get_deployment_node(None)
         targets = resolve_targets(self.deployment_model)
         monitoring.components = resolve_components(self.deployment_model, targets)
+        self.deployment_model.monitoring.components = monitoring.components
         return {
             "control_node": node_name,
             "targets": targets,
@@ -55,6 +72,8 @@ class MonitoringManagement(HelmManagement):
         **kwargs: Any,
     ) -> dict[str, str | dict[str, str]]:
         """Run a Helm action on selected monitoring components."""
+        if action in ("prepare", "install"):
+            validate_deployment(self.deployment_model.monitoring.model_dump(mode="python"))
         available = self.deployment_model.monitoring.components
         names = available if components is None else components
         unknown = set(names) - available.keys()
@@ -85,9 +104,10 @@ class MonitoringManagement(HelmManagement):
     # Execute a monitoring Ansible action using the selected control node.
     async def _run_tasks(
         self,
-        action: Literal["prepare", "inject_sniffers"],
+        action: Literal["prepare", "inject_sniffers", "set_one_way"],
         *,
         targets: list[dict] | None = None,
+        settings: dict | None = None,
         quiet: bool = False,
     ) -> None:
         """Run preparation or sniffer tasks using the Kubernetes master's inventory."""
@@ -106,12 +126,36 @@ class MonitoringManagement(HelmManagement):
                 "monitoring_control_node": node_name,
                 "monitoring_config": monitoring.model_dump(mode="json", exclude={"components"}),
                 "monitoring_targets": targets or [],
+                "one_way_settings": settings,
             },
             extra_params={"name": "Monitoring"},
             runner_path=str(Path(self.deployment_model.params.ansible.runner_path) / "monitoring"),
             roles_paths=[str(ASSETS / "roles"), *self.deployment_model.params.ansible.roles_paths],
             quiet=quiet,
         )
+
+    async def set_one_way(
+        self, *, n3: bool | None = None, upf_transit: bool | None = None,
+        log_samples: bool | None = None, quiet: bool = False,
+    ) -> None:
+        """Set the running controller's desired state without reinstalling the stack."""
+        monitoring = self.deployment_model.monitoring
+        data = monitoring.one_way.model_dump(mode="json")
+        if not data["image"]:
+            raise ValueError("Provision the one-way controller with one_way.image first")
+        changes = {}
+        for name, values in (
+            ("n3", {"enabled": n3, "log_samples": log_samples}),
+            ("upf_transit", {"enabled": upf_transit}),
+        ):
+            patch = {key: value for key, value in values.items() if value is not None}
+            if patch:
+                changes[name] = patch
+                data[name].update(patch)
+        if changes:
+            planned = OneWaySettings.model_validate(data)
+            await self._run_tasks("set_one_way", settings=changes, quiet=quiet)
+            monitoring.one_way = planned
 
     # Install monitoring components, then inject and start attachment sniffers.
     async def deploy(self, *, quiet: bool = False) -> None:
@@ -120,7 +164,9 @@ class MonitoringManagement(HelmManagement):
         await self._run_tasks("prepare", quiet=quiet)
         await self.install(quiet=quiet)
         if (self.deployment_model.monitoring.latency or self.deployment_model.monitoring.throughput
-                or self.deployment_model.monitoring.observability.active):
+                or self.deployment_model.monitoring.observability.active
+                or self.deployment_model.monitoring.one_way.image
+                or self.deployment_model.monitoring.probe_controller_image):
             await self._run_tasks("inject_sniffers", targets=plan["targets"], quiet=quiet)
 
     # Uninstall monitoring releases in reverse installation order.

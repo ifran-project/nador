@@ -2,14 +2,19 @@
 namespace: monitoring
 operation_timeout_seconds: 600
 images:
-  probe: r2labuser/ebpf-latency-probe:2026w43
+  probe: ghcr.io/ifran-project/ebpf-latency-probe@sha256:448de9a1214e19c731632f3f8e20d0c059e0db07e713a648fde43d44efe42176
 components:
+  kpi-calculator-oai:
+    image:
+      repository: ghcr.io/ifran-project/kpi-calculator-oai
+      image_tag: sha-4a3672b4f68fae70cde256e6f790c61fc85b1e72
   ue-mapper-api:
     image:
       image_pull_policy: Always
 kubeconfig: /etc/kubernetes/admin.conf
-latency: true
-packet_pairing: true
+# External RTT currently supports only one gNB and one UPF target.
+latency: false
+packet_pairing: false
 loki: true
 core_kpis: false
 ran_kpis: true
@@ -59,3 +64,24 @@ targets:
   metrics_port: 9090
 node_name: node11
 throughput: true
+observability:
+  ngap: false
+  pfcp: false
+  mapper_coverage: false
+  user_plane_paths: false
+  node_metrics: false
+extended:
+  scheduler_wait: false
+  kernel_drops: false
+  network_queues: false
+  socket_counters: false
+  split_signaling: false
+  quality: false
+  attributed_drops: false
+  tcp_flows: false
+one_way:
+  n3:
+    enabled: false
+    log_samples: false
+  upf_transit:
+    enabled: false

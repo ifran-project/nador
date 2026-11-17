@@ -1,5 +1,8 @@
 # NADOR
 
+Opt-in collectors on `ml-extended` are described in [Extended ML Observability](EXTENDED.md).
+The portable probes on the same branch are documented in [Portable Extended Observability](PORTABLE.md).
+
 **Network Analytics, Diagnostics, Observability, and Reporting for Mobile Networks.**
 
 Named after Nador, a city in northeastern Morocco associated with the idea of a
@@ -22,7 +25,7 @@ selected collector images and live validation before use in experiments.
 Install from GitHub:
 
 ```bash
-python -m pip install --upgrade "git+https://github.com/yassir63/nador.git@ml-observability" --extra-index-url https://gitlab.inria.fr/api/v4/projects/70914/packages/pypi/simple
+python -m pip install --upgrade "git+https://github.com/ifran-project/nador.git@ml-extended" --extra-index-url https://gitlab.inria.fr/api/v4/projects/70914/packages/pypi/simple
 ```
 
 ```python
@@ -31,6 +34,9 @@ from nador import MonitoringManagement, MonitoringDeployment
 
 Start with the [minimal tutorial](examples/quickstart/tutorial.ipynb): installation,
 imports, monitoring deployment and one experiment with artifact collection.
+
+Use [deployment checkpoints](MONITORING.md#restore-a-monitoring-deployment)
+to restore deployment handles after a notebook restart without reinstalling anything.
 
 Default monitoring image versions live in [`assets/images.json`](src/nador/assets/images.json).
 Image builds can propose updates through a pull request; deployments change after you merge it.
@@ -41,7 +47,10 @@ WebSocket/Telegraf pipeline, according to the RAN implementation. For OCUDU,
 configure telemetry before deploying the RAN, as shown in
 [Monitoring](MONITORING.md#ocudu-native-ran-metrics). This does not enable ML collectors.
 
-Examples are under [examples/monitoring](examples/monitoring):
+Configure optional [dedicated probes](examples/quickstart/dedicated-probes.yaml)
+and manage them through the [controller API](PROBE-CONTROL.md).
+
+Other examples are under [examples/monitoring](examples/monitoring):
 
 - [RFsim](examples/monitoring/rfsim): monolithic and split OAI radios.
   The monolithic OAI RFsim example uses stock Open5GS SMF and UPF images
@@ -49,9 +58,9 @@ Examples are under [examples/monitoring](examples/monitoring):
   images and leaves custom core KPIs off.
 - [Multi-gNB](examples/monitoring/multi-gnb-2du/test.ipynb): 20 UEs, a monolithic
   gNB plus a CU/two DUs, three slices and two UPFs; includes on-demand traffic.
-- [Open5GS throughput](examples/monitoring/throughput/test.ipynb) and
-  [OAI throughput](examples/monitoring/throughput-oai/test.ipynb): small deployments
-  using stock core images and the N3 throughput probe.
+- [Open5GS throughput profile](examples/monitoring/throughput/monitoring.yaml) and
+  [OAI throughput profile](examples/monitoring/throughput-oai/monitoring.yaml):
+  configurations for the N3 throughput probe.
 - [OCUDU ZMQ](examples/monitoring/ocudu-zmq), [B210](examples/monitoring/b210)
   and [R2lab](examples/monitoring/r2lab): additional deployment configurations.
 

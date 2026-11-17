@@ -9,8 +9,31 @@ metadata:
     {{- include "monitoring.labels" . | nindent 4 }}
 data:
   {{- if .Values.dashboards.enabled }}
+  {{- $dashboard := .Files.Get (printf "files/monitoring-dashboard-%s.json" .Values.dashboards.variant) | fromJson }}
+  {{- if .Values.latencyEnabled }}
+    {{- $tcp := .Files.Get "files/tcp-diagnostics-dashboard.json" | fromJson }}
+    {{- $variation := first $tcp.panels }}
+    {{- $_ := set $variation "id" 80 }}
+    {{- $_ := set $variation.gridPos "y" 24 }}
+    {{- $panels := list }}
+    {{- $inserted := false }}
+    {{- range $panel := $dashboard.panels }}
+      {{- $y := int $panel.gridPos.y }}
+      {{- if ge $y 24 }}
+        {{- if not $inserted }}
+          {{- $panels = append $panels $variation }}
+          {{- $inserted = true }}
+        {{- end }}
+        {{- $_ := set $panel.gridPos "y" (add $y $variation.gridPos.h) }}
+      {{- end }}
+      {{- $panels = append $panels $panel }}
+    {{- end }}
+    {{- $_ := set $dashboard "panels" $panels }}
+  {{- end }}
   monitoring-dashboard.json: |-
-    {{- .Files.Get (printf "files/monitoring-dashboard-%s.json" .Values.dashboards.variant) | nindent 4 }}
+    {{- $dashboard | toPrettyJson | nindent 4 }}
+  on-demand-probes-dashboard.json: |-
+    {{- .Files.Get "files/on-demand-probes-dashboard.json" | nindent 4 }}
   {{- end }}
   {{- if and .Values.dashboards.enabled .Values.throughputEnabled }}
   n3-throughput-dashboard.json: |-
