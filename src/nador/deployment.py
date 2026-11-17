@@ -3,9 +3,9 @@
 from pathlib import Path
 from typing import Any, Literal
 
-from orchestrator.deployment.base import BaseManagement
-from orchestrator.deployment.helm import HelmManagement
-from orchestrator.utils.ansible import get_ansible_inventory_line, run_ansible_role
+from ifran.deployment.base import BaseManagement
+from ifran.deployment.helm import HelmManagement
+from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_role
 
 from nador.models import MonitoringDeployment, MonitoringModel
 from nador.utils import (

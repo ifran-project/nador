@@ -2,8 +2,8 @@
 
 from typing import Any
 
-from orchestrator.deployment import RANManagement
-from orchestrator.models.ran import OAIAdvancedDUConfig, OAIAdvancedGNBConfig
+from ifran.deployment import RANManagement
+from ifran.models.ran import OAIAdvancedDUConfig, OAIAdvancedGNBConfig
 
 ADVANCED_CONFIGS = {"gnb": OAIAdvancedGNBConfig, "du": OAIAdvancedDUConfig}
 # "2x2+awgn" reproduces oai5g-rru rru/gnb-config-rfsim.yaml (nb_tx/nb_rx 2, pusch_AntennaPorts 2, maxMIMO_layers 2,

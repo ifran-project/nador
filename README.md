@@ -9,7 +9,7 @@ and report their findings.
 NADOR extends [IFRAN](https://github.com/ifran-project/ifran), the Infrastructure
 Framework for Reproducible Automation of Networks. Inspired by Ifrane and an
 anagram of INFRA, IFRAN handles reproducible network provisioning and slice management.
-Its current Python distribution and imports remain named `orchestrator`.
+It depends on the `ifran` Python distribution and imports.
 
 It integrates Prometheus, Grafana and Loki, correlates UE/slice/tunnel/session
 information, deploys latency and N3 throughput probes, and exports experiment

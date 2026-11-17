@@ -7,8 +7,8 @@ import socket
 import subprocess
 from pathlib import Path
 
-from orchestrator.deployment.base import BaseManagement
-from orchestrator.utils.ansible import get_ansible_inventory_line, run_ansible_role
+from ifran.deployment.base import BaseManagement
+from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_role
 
 from nador.csi.collection import ROLES, CsiCollector
 
