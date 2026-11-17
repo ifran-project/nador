@@ -127,13 +127,12 @@ class MonitoringDeployment(StrictBaseModel):
         if self.packet_pairing:
             raise ValueError("External RTT does not support packet_pairing; set packet_pairing: false")
         roles = {target.role for target in self.targets}
-        if self.multi_anchor and (self.latency or self.rtt_imsis or self.rtt_slices):
-            raise ValueError("RTT requires at most one gNB and one UPF target")
         if not self.probe_controller_image and (
-            (self.observability.user_plane_paths and self.multi_anchor)
+            ((self.latency or self.rtt_imsis or self.rtt_slices or self.observability.user_plane_paths)
+             and self.multi_anchor)
             or (self.one_way.image and self.separate_one_way_targets)
         ):
-            raise ValueError("Set probe_controller_image to a build with multi-anchor path and one-way support")
+            raise ValueError("Set probe_controller_image to a build that supports the requested multi-anchor probes")
         external_images = DEFAULT_IMAGES["external_probes"]
         if (self.latency or self.one_way.image or self.observability.user_plane_paths) and not self.probe_controller_image:
             self.probe_controller_image = external_images["controller"]

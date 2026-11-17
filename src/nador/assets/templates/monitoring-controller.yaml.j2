@@ -32,10 +32,13 @@ probeControl:
 {% endif %}
 rttRequest:
   enabled: {{ monitoring.latency | tojson }}
-  allowed: {{ (monitoring.probe_controller_image is not none and not monitoring.multi_anchor and session_context and (packet_targets | length > 0)) | tojson }}
+  allowed: {{ (monitoring.probe_controller_image is not none and session_context and (packet_anchors | length > 0)) | tojson }}
   image: {{ monitoring.images.probe | tojson }}
   imsis: {{ monitoring.rtt_imsis | tojson }}
   slices: {{ monitoring.rtt_slices | tojson }}
+{% if monitoring.multi_anchor and monitoring.probe_controller_image %}
+  targets: {{ packet_anchors | tojson }}
+{% endif %}
 throughputRequest:
   enabled: {{ monitoring.throughput | tojson }}
   allowed: {{ (monitoring.probe_controller_image is not none and session_context and (throughput_targets | length > 0) and monitoring.external_throughput_image is not none) | tojson }}
