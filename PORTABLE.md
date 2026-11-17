@@ -7,8 +7,8 @@ Linux or 5G measurements.
 
 ## Scope
 
-Included: sampled session validity within traffic windows; association-scoped
-F1AP/E1AP observations and matching; scheduler runnable-wait accounting; network-namespace
+Included: association-scoped F1AP/E1AP observations and matching;
+scheduler runnable-wait accounting; network-namespace
 drop attribution; observed TCP flow evidence; and measurement quality.
 
 Excluded by request: E2SM-KPM, power/energy, vendor-specific NIC/hardware queue
@@ -17,7 +17,6 @@ software-qdisc collection remains an optional switch.
 
 ## Scientific boundaries
 
-- A sampled stable session is not proof that no transition happened between polls.
 - F1AP/E1AP local IDs are scoped to associations and lifetimes, not globally unique
   subscriber IDs. Do not equate F1AP IDs, RNTIs, NGAP IDs or IMSIs without
   an observed and validated join.
@@ -74,23 +73,12 @@ gap longer than five seconds starts a new comparison. Flow identifiers stay
 internal; the metric works without the packet pairer. It is not one-way jitter
 or the endpoint TCP RTT estimator.
 
-For live validation, use the same uplink UE TCP flow in four windows: clean,
-fixed 40 ms delay, variable delay with the same nominal 40 ms, then recovery.
-Keep induced loss off and place the fault on the 5G path within the measured
-data-to-ACK interval. Exclude transitions, check the histogram sample count
-per anchor, and compare both the existing RTT and the variation histogram.
-Fixed delay should shift RTT; variable delay should also increase variation.
-
 A candidate repeats the same sequence start and payload length on the same
 directional inner flow and receiving GTP-U endpoint/TEID within a bounded
 five-second history. The table holds four entries per hash bucket.
 Report this metric as **N3-observed retransmission candidates**, not total
 UE TCP retransmissions. If a packet is dropped before N3, a retry can appear
-there as the first copy. In one uncapped OAI RFsim uplink, iperf3 reported
-544 sender retransmissions, the N3 capture found 281 repeated ranges, and
-each live probe counted 282. The UE tunnel recorded 263 new TX drops, with
-the two drop bursts aligned with sender retransmission bursts. This is
-aggregate evidence, not packet-by-packet attribution.
+there as the first copy.
 `gtp_tcp_repeat_history_evictions_total` reports still-recent entries
 replaced under pressure; an eviction is not itself a missed retransmission.
 Capture loss, segmentation/offload, eviction, and
@@ -125,28 +113,6 @@ await monitoring.uninstall(components=["probe-cpu"])
 Do not run both a legacy bundled release and independent releases for the
 same measurements. Uninstall the bundled release before migrating those probes.
 Removing a probe does not uninstall the NF or any other probe release.
-
-### External AMF visibility test
-
-Use the separately built `nador-amf-visibility` image. Supply the explicit
-Kubernetes context and exact AMF pod/interface used by the working sniffer.
-The command prints a manifest unless you add `--create`:
-
-```bash
-python -m nador.artifacts.amf_visibility \
-  --context YOUR_CONTEXT --amf-namespace YOUR_AMF_NAMESPACE \
-  --amf-pod YOUR_RUNNING_AMF_POD --interface YOUR_N2_INTERFACE \
-  --image ghcr.io/yassir63/nador-amf-visibility@sha256:a35627045060e4da8390e6b221ed0a8c63b3928e4b73215d264fd2fadfc16d84
-```
-
-The temporary Job requires privileged node access and is pinned to the AMF's
-node. It resolves the target network namespace by pod UID, checks the named
-interface and counts decoded NGAP frames without exporting payloads. It does
-not modify the AMF or generate signaling. During the short capture window,
-run a normal test UE registration. Check the Job logs for `ngap_observed`;
-`capture_opened_no_ngap` establishes capture startup only. Other results
-identify the failing step. Delete only that Job after collecting logs; its
-finished resources also expire automatically.
 
 ### Probe-specific settings
 

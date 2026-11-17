@@ -3,10 +3,10 @@
 Follow the [minimal tutorial](examples/quickstart/tutorial.ipynb) for installation,
 configuration, deployment and artifact collection in one notebook.
 
-Install the latest merged library from GitHub `main` in your notebook:
+Install the extended monitoring library from GitHub in your notebook:
 
 ```python
-%pip install --upgrade "git+https://github.com/yassir63/nador.git@main" --extra-index-url https://gitlab.inria.fr/api/v4/projects/70914/packages/pypi/simple
+%pip install --upgrade "git+https://github.com/ifran-project/nador.git@ml-extended" --extra-index-url https://gitlab.inria.fr/api/v4/projects/70914/packages/pypi/simple
 ```
 
 Restart the kernel after installation, then run your core/RAN setup before
@@ -65,6 +65,33 @@ pod's logs. Building this package does not rebuild its container images.
 Default image versions are selected in `src/nador/assets/images.json`.
 Standard profiles inherit them; `images` and `components.<name>.image` remain available
 for deliberate overrides. Image-update pull requests change only that manifest.
+
+## Restore a Monitoring Deployment
+
+Export the metamodel and deployment model while you still have the monitoring
+handle. Keep these files private: they can contain infrastructure connection
+details.
+
+```python
+monitoring.output(
+    metamodel_file="monitoring_metamodel.yaml",
+    deployment_model_file="monitoring_deployment_model.yaml",
+)
+```
+
+After a kernel restart, restore the handle without redeploying anything:
+
+```python
+from nador import MonitoringManagement
+
+monitoring = MonitoringManagement.from_yaml_files(
+    metamodel_file="monitoring_metamodel.yaml",
+    deployment_model_file="monitoring_deployment_model.yaml",
+)
+```
+
+This restores saved configuration, not workloads. The original cluster and
+SSH access must still be available for live operations.
 
 ## OCUDU Native RAN Metrics
 

@@ -1,4 +1,4 @@
-# Minimal N3 throughput and latency validation.
+# N3 throughput monitoring for the OAI core.
 images:
   probe: ghcr.io/ifran-project/ebpf-latency-probe:extended-fe1764d9f887311be15c6920f4b94d165a04b227
 namespace: monitoring

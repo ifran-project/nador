@@ -18,6 +18,5 @@
     "tcp": "ghcr.io/ifran-project/nador-probe-tcp@sha256:d39ccd2d3a65c41abfbb58142fc819ac89893dc6d7e3b80c656a1b1400a9979d",
     "split-signaling": "ghcr.io/ifran-project/nador-probe-split-signaling@sha256:73fb389d527ea11f8c3fff4cdd1b8b188d3ebb57cbf7f22f62a7265719b645ff",
     "measurement-quality": "ghcr.io/ifran-project/nador-probe-measurement-quality@sha256:6b236865c8bd1c4da5b58e9a08cd7b07845a7a8b11901562396caa45ff09ae5e"
-  },
-  "amf_visibility": "ghcr.io/ifran-project/nador-amf-visibility@sha256:183f7d0f0fdf9ac2c7b0445921a1f8c88fcab0200c304e8192d3e30a5e99c515"
+  }
 }

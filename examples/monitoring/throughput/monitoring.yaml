@@ -1,4 +1,4 @@
-# Minimal N3 throughput and latency validation.
+# N3 throughput monitoring for Open5GS.
 images:
   probe: ghcr.io/ifran-project/ebpf-latency-probe@sha256:448de9a1214e19c731632f3f8e20d0c059e0db07e713a648fde43d44efe42176
 namespace: monitoring
