@@ -59,10 +59,10 @@ external path image unless `external_path_image` is explicitly set.
 If gNB or UPF pods still carry the old injected path probes, recreate those
 pods during a maintenance window to remove the ephemeral containers.
 
-Throughput uses the external controller even when RTT is off. Remove any
-existing standalone throughput deployment with its original monitoring release
-before upgrading, so its injected probes stop. Use `external_throughput_image`
-instead of `images.throughput` for custom external probe builds.
+Throughput uses the external controller even when RTT is off. Use
+`external_throughput_image` for custom probe builds. For upgrades from the
+retired standalone deployment, start with clean network-function pods: an
+in-place Helm upgrade does not remove injected probes from existing pods.
 The controller supports multiple targets for RTT, path counters and one-way
 latency. Set `one_way.image` to the matching one-way probe build. N3 latency
 needs gNB and UPF targets; UPF transit needs no gNB target but still needs

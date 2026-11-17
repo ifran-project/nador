@@ -10,7 +10,7 @@ from ifran.utils.utils import deep_merge
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from nador.controller_values import controller_values
-from nador.models import DEFAULT_IMAGES, DeployedMonitoringComponent, MonitoringModel
+from nador.models import DeployedMonitoringComponent, MonitoringModel, component_image_defaults
 from nador.probe_catalog import NODE_PROBES, PROBES, controlled_probes, enabled_probes, probe_values
 from nador.ran_metrics import ocudu_sources
 
@@ -181,13 +181,18 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
             | catalog["defaults"]
             | definition
         )
-        if name in DEFAULT_IMAGES["components"]:
-            data["image"] = DEFAULT_IMAGES["components"][name].copy()
+        image = component_image_defaults(name, monitoring.probe_controller_image)
+        if image:
+            data["image"] = image.copy()
         if name in monitoring.components:
             data = deep_merge(
                 data, monitoring.components[name].model_dump(mode="json", exclude_unset=True, exclude_none=True)
             )
         component = DeployedMonitoringComponent.model_validate(data)
+        if name == "monitoring-controller" and image:
+            # Old snapshots can still store the retired image. Only its pull policy remains relevant.
+            component.image.repository = image["repository"]
+            component.image.image_tag = image["image_tag"]
         if (
             name == "ue-mapper-api"
             and monitoring.observability.mapper_coverage

@@ -7,7 +7,7 @@ import yaml
 from ifran.utils.utils import deep_merge
 from pydantic import ValidationError
 
-from nador.models import DEFAULT_IMAGES, MonitoringDeployment
+from nador.models import MonitoringDeployment, component_image_defaults
 
 
 class ProfileLoader(yaml.SafeLoader):
@@ -18,7 +18,10 @@ class ProfileLoader(yaml.SafeLoader):
         keys = [self.construct_object(key, deep=deep) for key, _ in node.value]
         if len(keys) != len(mapping):
             raise yaml.constructor.ConstructorError(
-                None, None, "duplicate monitoring option", node.start_mark,
+                None,
+                None,
+                "duplicate monitoring option",
+                node.start_mark,
             )
         return mapping
 
@@ -51,8 +54,8 @@ def load_profile(path):
     if isinstance(components, dict):
         for name, override in components.items():
             image = override.get("image") if isinstance(override, dict) else None
-            if isinstance(image, dict) and name in DEFAULT_IMAGES["components"]:
-                override["image"] = deep_merge(DEFAULT_IMAGES["components"][name], image)
+            if isinstance(image, dict) and (default_image := component_image_defaults(name)):
+                override["image"] = deep_merge(default_image.copy(), image)
     return data
 
 
@@ -69,10 +72,7 @@ def validate_deployment(data, model=MonitoringDeployment, *, source="Monitoring 
     try:
         config = model.model_validate(data)
     except ValidationError as exc:
-        errors.extend(
-            f"{'.'.join(map(str, error['loc'])) or 'profile'}: {error['msg']}"
-            for error in exc.errors()
-        )
+        errors.extend(f"{'.'.join(map(str, error['loc'])) or 'profile'}: {error['msg']}" for error in exc.errors())
     if errors:
         raise ValueError(f"{source}:\n  - " + "\n  - ".join(errors))
     return config
