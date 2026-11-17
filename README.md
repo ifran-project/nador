@@ -59,10 +59,11 @@ external path image unless `external_path_image` is explicitly set.
 If gNB or UPF pods still carry the old injected path probes, recreate those
 pods during a maintenance window to remove the ephemeral containers.
 
-Multi-UPF throughput still uses its existing deployment by default. To try the
-external placement on a fresh deployment, set `probe_controller_image` to a
-published controller build with multi-UPF support and keep `throughput: true`.
-The same build supports multiple targets for RTT, path counters and one-way
+Throughput uses the external controller even when RTT is off. Remove any
+existing standalone throughput deployment with its original monitoring release
+before upgrading, so its injected probes stop. Use `external_throughput_image`
+instead of `images.throughput` for custom external probe builds.
+The controller supports multiple targets for RTT, path counters and one-way
 latency. Set `one_way.image` to the matching one-way probe build. N3 latency
 needs gNB and UPF targets; UPF transit needs no gNB target but still needs
 the configured traffic peer and port.

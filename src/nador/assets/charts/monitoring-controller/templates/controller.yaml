@@ -1,50 +1,37 @@
-{{- $kinds := list }}
-{{- if and .Values.latency.enabled (not .Values.probeControllerImage) }}
-{{- fail "RTT requires the external probe controller; injected RTT is not supported" }}
-{{- end }}
-{{- if .Values.probeControllerImage }}{{- $kinds = append $kinds "latency" }}{{- end }}
-{{- if and .Values.throughput.enabled (not .Values.probeControllerImage) }}{{- $kinds = append $kinds "throughput" }}{{- end }}
-{{- if $kinds }}
+{{- if .Values.probeControllerImage }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: monitoring-controller
-  namespace: {{ $.Release.Namespace }}
+  namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "monitoring.labels" $ | nindent 4 }}
+    {{- include "monitoring.labels" . | nindent 4 }}
 spec:
   replicas: 1
-  {{- if .Values.probeControllerImage }}
   strategy:
     type: Recreate
-  {{- end }}
   selector:
     matchLabels:
       app: monitoring-controller
-      monitoring.blueprint/owner: {{ $.Release.Namespace | quote }}
+      monitoring.blueprint/owner: {{ .Release.Namespace | quote }}
   template:
     metadata:
       labels:
         app: monitoring-controller
-        {{- include "monitoring.labels" $ | nindent 8 }}
+        {{- include "monitoring.labels" . | nindent 8 }}
     spec:
-      {{- include "monitoring.placement" $ | nindent 6 }}
+      {{- include "monitoring.placement" . | nindent 6 }}
       serviceAccountName: monitoring
       containers:
-        {{- range $kind := $kinds }}
-        {{- $ctx := dict "Values" (deepCopy $.Values) "Release" $.Release }}
-        {{- $_ := set $ctx.Values "probeKind" $kind }}
-        - name: {{ $kind }}-controller
-          image: {{ $.Values.probeControllerImage | default (printf "%s:%s" $.Values.image.repository $.Values.image.tag) | quote }}
-          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+        - name: latency-controller
+          image: {{ .Values.probeControllerImage | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
-            {{- include "monitoring.controllerEnv" $ctx | nindent 12 }}
-            {{- if and (eq $kind "latency") $.Values.probeControllerImage }}
-            - name: MANAGE_EXTERNAL_PROBES
-              value: "1"
-            - name: DISABLE_INJECTED_LATENCY
-              value: "1"
-            {{- if $.Values.probeApiTlsSecret }}
+            - name: MONITORING_NS
+              value: {{ .Release.Namespace | quote }}
+            - name: UE_MAPPER_URL
+              value: {{ printf "http://ue-mapper-api.%s.svc.cluster.local:8080" .Release.Namespace | quote }}
+            {{- if .Values.probeApiTlsSecret }}
             - name: NADOR_CONTROLLER_API_PUBLIC
               value: "1"
             - name: NADOR_CONTROLLER_API_CERT
@@ -54,23 +41,21 @@ spec:
             - name: NADOR_CONTROLLER_API_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: {{ $.Values.probeApiTokenSecret | quote }}
+                  name: {{ .Values.probeApiTokenSecret | quote }}
                   key: token
             {{- end }}
-            {{- end }}
-          {{- if and (eq $kind "latency") $.Values.probeApiTlsSecret }}
+          {{- if .Values.probeApiTlsSecret }}
           volumeMounts:
             - name: controller-tls
               mountPath: /controller-tls
               readOnly: true
           {{- end }}
-          {{- if and (eq $kind "latency") (get ($.Values.rttRequest | default dict) "pairer_image") }}
+          {{- if get (.Values.rttRequest | default dict) "pairer_image" }}
           # Older images ignore pairer_image. Fail startup rather than silently falling back to unpaired RTT.
           startupProbe:
             exec:
               command: [python3, -c, "from probe_control import PACKET_PAIRER_HOST"]
           {{- end }}
-        {{- end }}
       {{- if .Values.probeApiTlsSecret }}
       volumes:
         - name: controller-tls

@@ -13,14 +13,6 @@ def controller_values(monitoring: MonitoringDeployment, targets: list[dict], pro
     scoped_probes_allowed = controller_image is not None and has_session_context
     observation = monitoring.observability
 
-    legacy = {
-        "watchNamespaces": sorted({target["namespace"] for target in anchors}),
-        "probeMode": next(iter(by_role)) if len(by_role) == 1 else "both",
-    }
-    for role, target in by_role.items():
-        legacy[f"{role}Interface"] = target["interface"]
-        legacy[f"{role}LatencyMode"] = target["latency_mode"]
-
     one_way = monitoring.one_way.model_dump(mode="json")
     if monitoring.one_way.image and monitoring.separate_one_way_targets:
         one_way["one_way_targets"] = anchors
@@ -52,13 +44,10 @@ def controller_values(monitoring: MonitoringDeployment, targets: list[dict], pro
         throughput["targets"] = upfs
 
     return {
-        "controller": legacy,
-        "images": {"probe": monitoring.images.probe},
-        "throughput": {"enabled": monitoring.throughput, "probeImage": monitoring.images.throughput},
-        "latency": {"enabled": monitoring.latency},
-        "targets": targets,
+        "targetNamespaces": sorted({target["namespace"] for target in targets}),
         "operationTimeoutSeconds": monitoring.operation_timeout_seconds,
         "probeControllerImage": controller_image,
+        "cleanupImage": controller_image or DEFAULT_IMAGES["external_probes"]["controller"],
         "probeControlTargets": {} if monitoring.multi_anchor else by_role,
         "extendedProbeStates": probe_states,
         "probeApiTlsSecret": monitoring.probe_api_tls_secret,

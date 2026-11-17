@@ -64,10 +64,9 @@ class MonitoringTarget(StrictBaseModel):
 
 
 class MonitoringImages(StrictBaseModel):
-    """Container versions for probes and sniffers injected into network-function pods."""
+    """Container versions for the RTT probe and session sniffers."""
 
     probe: str = DEFAULT_IMAGES["probes"]["probe"]
-    throughput: str = DEFAULT_IMAGES["probes"]["throughput"]
     amf_sniffer: str = DEFAULT_IMAGES["probes"]["amf_sniffer"]
     smf_sniffer: str = DEFAULT_IMAGES["probes"]["smf_sniffer"]
 
@@ -123,7 +122,7 @@ class MonitoringDeployment(StrictBaseModel):
     @property
     def needs_session_stack(self) -> bool:
         """Whether to deploy session services and start the AMF/SMF sniffers."""
-        return bool(self.probe_controller_image or self.throughput or self.observability.active)
+        return bool(self.probe_controller_image or self.observability.active)
 
     @model_validator(mode="before")
     @classmethod
@@ -145,7 +144,7 @@ class MonitoringDeployment(StrictBaseModel):
             raise ValueError("Set probe_controller_image to a build that supports the requested multi-anchor probes")
         external_images = DEFAULT_IMAGES["external_probes"]
         if (
-            self.latency or self.one_way.image or self.observability.user_plane_paths
+            self.latency or self.throughput or self.one_way.image or self.observability.user_plane_paths
         ) and not self.probe_controller_image:
             self.probe_controller_image = external_images["controller"]
         if self.probe_controller_image and self.throughput and self.external_throughput_image is None:
