@@ -3,11 +3,11 @@
 from pathlib import Path
 
 import yaml
-from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from ifran.models.provisioning import ProvisionableNode
 from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_role
 from ifran.utils.k8s import build_k8s_safe
 from ifran.utils.utils import deep_merge
+from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from nador.controller_values import controller_values
 from nador.models import DEFAULT_IMAGES, DeployedMonitoringComponent, MonitoringModel
@@ -30,15 +30,13 @@ def _probe_states(model):
         return {}
     states = controlled_probes(model.monitoring.extended)
     kinds = {str(nf.type) for nf in model.ran.components.values()}
-    if not (("du" in kinds and kinds.intersection({"cu", "cu_cp", "cu_up"}))
-            or {"cu_cp", "cu_up"} <= kinds):
+    if not (("du" in kinds and kinds.intersection({"cu", "cu_cp", "cu_up"})) or {"cu_cp", "cu_up"} <= kinds):
         if states.get("split-signaling"):
             raise ValueError("split_signaling requires a modeled F1 or E1 split")
         states.pop("split-signaling", None)
     return states
 
 
-# Resolve components into namespaces, pod selectors and capture settings.
 def resolve_targets(model: MonitoringModel) -> list[dict]:
     """Resolve stable selectors from the same release naming used by HelmManagement."""
     result = []
@@ -71,22 +69,28 @@ def _extended_chart_context(model, targets, probe_name, probe_states):
     settings = model.monitoring.extended
     extended_targets = [
         target | {"kind": str(getattr(model, target["category"]).components[target["component"]].type)}
-        for target in targets if target["category"] in ("ran", "core")
+        for target in targets
+        if target["category"] in ("ran", "core")
     ]
     existing = {(target["category"], target["component"]) for target in extended_targets}
     for category in ("ran", "core"):
         for name, nf in getattr(model, category).components.items():
             if (category, name) not in existing and nf.namespace:
-                extended_targets.append({
-                    "category": category, "component": name, "namespace": nf.namespace, "kind": str(nf.type),
-                    "selector": {"app": build_k8s_safe(f"{nf.implementation}-{name}")},
-                })
+                extended_targets.append(
+                    {
+                        "category": category,
+                        "component": name,
+                        "namespace": nf.namespace,
+                        "kind": str(nf.type),
+                        "selector": {"app": build_k8s_safe(f"{nf.implementation}-{name}")},
+                    }
+                )
     selected = settings.probe_targets.get(probe_name)
     if selected:
-        available = {f'{t["category"]}/{t["component"]}' for t in extended_targets}
+        available = {f"{t['category']}/{t['component']}" for t in extended_targets}
         if set(selected) - available:
             raise ValueError(f"Unresolved probe targets for {probe_name}: {sorted(set(selected) - available)}")
-        extended_targets = [t for t in extended_targets if f'{t["category"]}/{t["component"]}' in selected]
+        extended_targets = [t for t in extended_targets if f"{t['category']}/{t['component']}" in selected]
     extended_config = probe_values(settings, probe_name)
     if probe_name in probe_states:
         extended_config["paused"] = not probe_states[probe_name]
@@ -184,8 +188,10 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
                 data, monitoring.components[name].model_dump(mode="json", exclude_unset=True, exclude_none=True)
             )
         component = DeployedMonitoringComponent.model_validate(data)
-        if name == "ue-mapper-api" and monitoring.observability.mapper_coverage and (
-            image := monitoring.observability.mapper_image
+        if (
+            name == "ue-mapper-api"
+            and monitoring.observability.mapper_coverage
+            and (image := monitoring.observability.mapper_image)
         ):
             repository, separator, tag = image.rpartition(":")
             if not separator or not repository or not tag or "/" in tag or "@" in image:
@@ -202,7 +208,6 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
     return components
 
 
-# Execute monitoring's chart role without changing the orchestrator's 5G executor.
 async def run_monitoring_component_action(
     *,
     model: MonitoringModel,

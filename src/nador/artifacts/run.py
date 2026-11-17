@@ -13,11 +13,12 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from nador.deployment import MonitoringManagement
+from nador.probe_catalog import enabled_probes
 
-from . import prometheus_range_export as prometheus
-from . import split_prometheus_by_timeline as splitter
-from . import timeline_finalize as timeline
 from .connection import prometheus_connection
+from .prometheus_range_export import export_ranges, load_queries
+from .split_prometheus_by_timeline import split_windows
+from .timeline_finalize import finalize_timeline
 
 
 class ExperimentRun:
@@ -52,7 +53,7 @@ class ExperimentRun:
         self.run_id = uuid4().hex
         self.names = set()
         self.entered = False
-        self.active_sections = 0
+        self.closed = False
 
     def _event(self, level: str, phase: str, name: str, **extra: Any) -> None:
         now = datetime.now(UTC)
@@ -92,21 +93,20 @@ class ExperimentRun:
 
     def save_json(self, filename: str | Path, data: Any) -> None:
         """Save a JSON artifact inside the active experiment directory."""
-        if not self.entered or getattr(self, "closed", False):
+        if not self.entered or self.closed:
             raise RuntimeError("Save artifacts inside async with ExperimentRun(...)")
         (self.directory / filename).write_text(json.dumps(data, indent=2))
 
     @contextmanager
     def section(self, name: str) -> Iterator[None]:
         """Record the start, end and outcome of one named experiment section."""
-        if not self.entered or getattr(self, "closed", False):
+        if not self.entered or self.closed:
             raise RuntimeError("Use sections inside async with ExperimentRun(...)")
         if name in self.names:
             raise ValueError(f"Duplicate section {name!r}")
         if not name or not name.strip():
             raise ValueError("Section name cannot be empty")
         self.names.add(name)
-        self.active_sections += 1
         self._event("section", "start", name)
         status = "completed"
         try:
@@ -116,15 +116,15 @@ class ExperimentRun:
             raise
         finally:
             self._event("section", "end", name, status=status)
-            self.active_sections -= 1
 
-    def _export_queries(self):
+    def _export_queries(self) -> list[dict[str, str]]:
         """Preserve the original profile and add opt-in extended evidence."""
-        config = self.monitoring.deployment_model.monitoring if self.monitoring is not None else None
-        settings = getattr(config, "extended", None)
-        if settings is None or not settings.active:
-            return self.queries_file
-        queries = prometheus.load_queries(str(self.queries_file) if self.queries_file else None)
+        queries = load_queries(self.queries_file)
+        if self.monitoring is None:
+            return queries
+        settings = self.monitoring.deployment_model.monitoring.extended
+        if not enabled_probes(settings):
+            return queries
         name = "nador_extended_raw"
         query = '{__name__=~"nador_.*"}'
         existing = next((item for item in queries if item["name"] == name), None)
@@ -132,71 +132,38 @@ class ExperimentRun:
             raise ValueError("nador_extended_raw query name is reserved for extended evidence")
         if existing is None:
             queries.append({"name": name, "query": query})
-        output = self.directory / "extended_export_queries.json"
-        output.write_text(json.dumps(queries, indent=2))
+        (self.directory / "extended_export_queries.json").write_text(json.dumps(queries, indent=2))
         (self.directory / "extended_collector_config.json").write_text(
             json.dumps(settings.model_dump(mode="json", exclude={"packet_identity_secret"}), indent=2)
         )
-        return output
+        return queries
 
     def _collect(self, ended: float) -> None:
         errors = self.metadata["collection_errors"]
         try:
-            timeline.main(
-                [
-                    "--timeline-jsonl",
-                    str(self.directory / "timeline_events.jsonl"),
-                    "--out-dir",
-                    str(self.directory),
-                    "--run-id",
-                    self.run_id,
-                    "--timezone",
-                    self.timezone,
-                ]
+            finalize_timeline(
+                self.directory / "timeline_events.jsonl", self.directory, run_id=self.run_id, timezone=self.timezone
             )
         except Exception as exc:
             errors.append(f"timeline: {exc}")
-        if self.prometheus_url:
-            try:
-                summary = self.directory / "prometheus_export_summary.json"
-                args = [
-                    "--prometheus-url",
-                    self.prometheus_url,
-                    "--start",
-                    str(self.started),
-                    "--end",
-                    str(max(ended, self.started + 0.001)),
-                    "--step",
-                    self.step,
-                    "--out",
-                    str(self.directory / "prometheus_timeseries.csv"),
-                    "--summary-json",
-                    str(summary),
-                    "--no-discover-metrics",
-                ]
-                queries_file = self._export_queries()
-                if queries_file:
-                    args += ["--queries-json", str(queries_file)]
-                prometheus.main(args)
-                queries = json.loads(summary.read_text())["queries"]
-                errors.extend(f"{q['name']}: {q['error']}" for q in queries if q.get("error"))
-                if not any(q.get("rows") for q in queries):
-                    errors.append("Prometheus returned no samples")
-                splitter.main(
-                    [
-                        "--full-csv",
-                        str(self.directory / "prometheus_timeseries.csv"),
-                        "--timeline-json",
-                        str(self.directory / "timeline_summary.json"),
-                        "--out-dir",
-                        str(self.directory / "by_window"),
-                        "--window-types",
-                        "campaign,section",
-                        "--compress",
-                    ]
-                )
-            except Exception as exc:
-                errors.append(f"prometheus: {exc}")
+        if not self.prometheus_url:
+            return
+        try:
+            summary = export_ranges(
+                self.directory,
+                url=self.prometheus_url,
+                start=self.started,
+                end=max(ended, self.started + 0.001),
+                step=self.step,
+                queries=self._export_queries(),
+            )
+            queries = summary["queries"]
+            errors.extend(f"{q['name']}: {q['error']}" for q in queries if q.get("error"))
+            if not any(q.get("rows") for q in queries):
+                errors.append("Prometheus returned no samples")
+            split_windows(self.directory)
+        except Exception as exc:
+            errors.append(f"prometheus: {exc}")
 
     async def _finalize(self, ended: float) -> None:
         try:

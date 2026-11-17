@@ -34,7 +34,7 @@ def controller_values(monitoring: MonitoringDeployment, targets: list[dict], pro
     }
     if monitoring.packet_pairing:
         pairer = DEFAULT_IMAGES["components"]["packet-pairer"]
-        rtt["pairer_image"] = f'{pairer["repository"]}:{pairer["image_tag"]}'
+        rtt["pairer_image"] = f"{pairer['repository']}:{pairer['image_tag']}"
     throughput = {
         "enabled": monitoring.throughput,
         "allowed": scoped_probes_allowed and bool(upfs) and monitoring.external_throughput_image is not None,
