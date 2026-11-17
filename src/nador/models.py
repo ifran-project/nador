@@ -129,13 +129,13 @@ class MonitoringDeployment(StrictBaseModel):
     # Check dependencies between enabled features and their targets.
     @model_validator(mode="after")
     def validate_profile(self) -> Self:
-        if self.packet_pairing:
-            raise ValueError("External RTT does not support packet_pairing; set packet_pairing: false")
         roles = {target.role for target in self.targets}
+        if self.packet_pairing and (not self.latency or not {"gnb", "upf"} <= roles):
+            raise ValueError("Packet pairing requires latency and both gNB and UPF targets")
         rtt_requested = self.latency or bool(self.rtt_imsis or self.rtt_slices)
-        multi_target_probes = self.multi_anchor and (rtt_requested or self.observability.user_plane_paths)
+        multi_target_paths = self.multi_anchor and self.observability.user_plane_paths
         separate_one_way = self.one_way.image and self.separate_one_way_targets
-        if not self.probe_controller_image and (multi_target_probes or separate_one_way):
+        if not self.probe_controller_image and (multi_target_paths or separate_one_way):
             raise ValueError("Set probe_controller_image to a build that supports the requested multi-anchor probes")
         external_images = DEFAULT_IMAGES["external_probes"]
         if (self.latency or self.one_way.image or self.observability.user_plane_paths) and not self.probe_controller_image:

@@ -64,6 +64,12 @@ spec:
               mountPath: /controller-tls
               readOnly: true
           {{- end }}
+          {{- if and (eq $kind "latency") (get ($.Values.rttRequest | default dict) "pairer_image") }}
+          # Older images ignore pairer_image. Fail startup rather than silently falling back to unpaired RTT.
+          startupProbe:
+            exec:
+              command: [python3, -c, "from probe_control import PACKET_PAIRER_HOST"]
+          {{- end }}
         {{- end }}
       {{- if .Values.probeApiTlsSecret }}
       volumes:

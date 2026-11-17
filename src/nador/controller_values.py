@@ -1,6 +1,6 @@
 """Build the Helm values for the monitoring controller."""
 
-from .models import MonitoringDeployment
+from .models import DEFAULT_IMAGES, MonitoringDeployment
 
 
 def controller_values(monitoring: MonitoringDeployment, targets: list[dict], probe_states: dict) -> dict:
@@ -32,6 +32,9 @@ def controller_values(monitoring: MonitoringDeployment, targets: list[dict], pro
         "imsis": monitoring.rtt_imsis,
         "slices": monitoring.rtt_slices,
     }
+    if monitoring.packet_pairing:
+        pairer = DEFAULT_IMAGES["components"]["packet-pairer"]
+        rtt["pairer_image"] = f'{pairer["repository"]}:{pairer["image_tag"]}'
     throughput = {
         "enabled": monitoring.throughput,
         "allowed": scoped_probes_allowed and bool(upfs) and monitoring.external_throughput_image is not None,
