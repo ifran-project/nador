@@ -41,18 +41,6 @@ tolerations:
   value: {{ printf "http://ue-mapper-api.%s.svc.cluster.local:8080" .Release.Namespace | quote }}
 - name: PROBE_IMAGE
   value: {{ ternary .Values.throughput.probeImage .Values.images.probe $throughput | quote }}
-- name: PACKET_PAIRING
-  value: {{ ternary "1" "0" (and (not $throughput) .Values.latency.packetPairing) | quote }}
-- name: PACKET_PAIRER_IMAGE
-  value: {{ .Values.images.pairer | quote }}
-- name: PACKET_PAIRER_NAME
-  value: packet-pairer
-- name: PACKET_PAIRER_SERVICE_NAME
-  value: packet-pairer
-- name: PACKET_PAIRER_NAMESPACE
-  value: {{ .Release.Namespace | quote }}
-- name: PACKET_PAIRER_PORT
-  value: "9201"
 - name: PROBE_IFACE
   value: {{ .Values.controller.gnbInterface | quote }}
 - name: UPF_PROBE_IFACE

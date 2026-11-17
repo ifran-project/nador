@@ -71,7 +71,6 @@ def _render_chart_values(
     component: DeployedMonitoringComponent,
     model: MonitoringModel,
     targets: list[dict],
-    components: dict[str, DeployedMonitoringComponent],
 ) -> dict:
     """Render Helm values from chart defaults, deployment settings and user overrides."""
     chart = component.chart_ref.rsplit("/", 1)[-1]
@@ -118,7 +117,6 @@ def _render_chart_values(
                     extended_config[flag] = True
     rendered = template.render(
         component=component,
-        components=components,
         monitoring=model.monitoring,
         model=model,
         targets=targets,
@@ -168,16 +166,13 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
         enabled.update(("loki", "promtail"))
     if monitoring.latency or monitoring.throughput or monitoring.observability.active:
         enabled.update(("redis", "ue-mapper-api", "monitoring-controller"))
-        if monitoring.packet_pairing:
-            enabled.add("packet-pairer")
     if monitoring.core_kpis:
         enabled.add("kpi-calculator-open5gs")
     if monitoring.ran_kpis:
         enabled.add("ocudu-metrics" if str(model.ran.implementation) == "ocudu" else "kpi-calculator-oai")
     components = {}
     for name, definition in defaults["components"].items():
-        # The controller also needs the pairer image when pairing is disabled.
-        if name not in enabled and not (name == "packet-pairer" and "monitoring-controller" in enabled):
+        if name not in enabled:
             continue
         data = (
             {"release_name": name, "chart_ref": name, "pod_selector": ["app=" + name]}
@@ -202,14 +197,13 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
             component.image.image_tag = tag
         component.namespace = monitoring.namespace
         components[name] = component
-    for name in enabled:
-        component = components[name]
-        component.chart_values = _render_chart_values(component, model, targets, components)
+    for name, component in components.items():
+        component.chart_values = _render_chart_values(component, model, targets)
         if name.startswith("probe-") and component.chart_values.get("settings", {}).get("paused"):
             component.pod_selector = []
         if not component.chart_version:
             component.chart_ref = f"{REMOTE_CHARTS}/{Path(component.chart_ref).name}"
-    return {name: component for name, component in components.items() if name in enabled}
+    return components
 
 
 # Execute monitoring's chart role without changing the orchestrator's 5G executor.

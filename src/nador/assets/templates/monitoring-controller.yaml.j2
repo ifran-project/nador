@@ -9,13 +9,11 @@ controller:
 {% endfor %}
 images:
   probe: {{ monitoring.images.probe | tojson }}
-  pairer: {{ (components['packet-pairer'].image.repository ~ ':' ~ components['packet-pairer'].image.image_tag) | tojson }}
 throughput:
   enabled: {{ monitoring.throughput | tojson }}
   probeImage: {{ monitoring.images.throughput | tojson }}
 latency:
   enabled: {{ monitoring.latency | tojson }}
-  packetPairing: {{ monitoring.packet_pairing | tojson }}
 targets: {{ targets | tojson }}
 operationTimeoutSeconds: {{ monitoring.operation_timeout_seconds }}
 observability: {{ monitoring.observability.model_dump() | tojson }}
