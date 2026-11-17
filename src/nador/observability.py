@@ -1,15 +1,8 @@
 """Optional protocol, path and infrastructure collection settings."""
-import json
-from pathlib import Path
 from typing import Self
 
 from metamodel_3gpp.models.base import StrictBaseModel
 from pydantic import Field, model_validator
-
-_SELECTED_IMAGES = json.loads(
-    (Path(__file__).parent / "assets" / "observability_images.json").read_text()
-)["images"]
-
 
 class ObservabilitySettings(StrictBaseModel):
     """Opt-in collectors with optional image overrides."""
@@ -22,7 +15,6 @@ class ObservabilitySettings(StrictBaseModel):
     amf_image: str | None = None
     smf_image: str | None = None
     mapper_image: str | None = None
-    path_image: str | None = _SELECTED_IMAGES["path_image"]
     ngap_port: int = Field(default=9102, ge=1, le=65535)
     pfcp_port: int = Field(default=9104, ge=1, le=65535)
     path_port: int = Field(default=9403, ge=1, le=65535)
@@ -39,8 +31,6 @@ class ObservabilitySettings(StrictBaseModel):
             image = getattr(self, field)
             if image is not None and not image.strip():
                 raise ValueError(f"{field} must be a non-empty image or null to inherit the default")
-        if self.user_plane_paths and (not self.path_image or not self.path_image.strip()):
-            raise ValueError("Enabled path monitoring requires path_image")
         if self.path_port in range(9100, 9200) or self.path_port in range(9300, 9400):
             raise ValueError("path_port overlaps the latency/throughput exporter ranges; use 9403 or another range")
         return self

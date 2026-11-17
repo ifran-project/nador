@@ -7,7 +7,7 @@
     argv: [helm, version, --short]
   register: monitoring_helm_cli_version
   changed_when: false
-  when: component.chart_ref | basename in ['monitoring-controller', 'one-way']
+  when: component.chart_ref | basename == 'monitoring-controller'
 
 - name: Install Helm application
   kubernetes.core.helm:
@@ -17,7 +17,7 @@
     release_namespace: "{{ component.namespace }}"
     create_namespace: true
     values: "{{ component.chart_values }}"
-    # These releases update a ConfigMap that the probe API also patches.
+    # The controller release and probe API both update the probe settings ConfigMap.
     server_side: "{{ 'false' if (monitoring_helm_cli_version.stdout | default('v0')).split('.')[0][1:] | int >= 4 else omit }}"
     wait: true
     wait_timeout: "{{ timeout_seconds }}s"

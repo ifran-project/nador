@@ -13,5 +13,3 @@ latency:
   enabled: true
 targets: []
 operationTimeoutSeconds: 300
-observability:
-  user_plane_paths: false

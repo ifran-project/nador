@@ -4,8 +4,7 @@
 {{- end }}
 {{- if .Values.probeControllerImage }}{{- $kinds = append $kinds "latency" }}{{- end }}
 {{- if and .Values.throughput.enabled (not .Values.probeControllerImage) }}{{- $kinds = append $kinds "throughput" }}{{- end }}
-{{- $legacyPath := and .Values.observability.user_plane_paths (not .Values.probeControllerImage) }}
-{{- if or $kinds $legacyPath }}
+{{- if $kinds }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -66,34 +65,10 @@ spec:
               readOnly: true
           {{- end }}
         {{- end }}
-        {{- if $legacyPath }}
-        - name: path-controller
-          image: {{ printf "%s:%s" .Values.image.repository .Values.image.tag | quote }}
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: [python3, /opt/observability/path_controller.py]
-          env:
-            - name: OBSERVABILITY_SETTINGS
-              value: {{ .Values.observability | toJson | quote }}
-            - name: MONITORING_TARGETS
-              value: {{ .Values.targets | toJson | quote }}
-            - name: MONITORING_OWNER
-              value: {{ .Release.Namespace | quote }}
-          volumeMounts:
-            - name: path-controller
-              mountPath: /opt/observability
-              readOnly: true
-        {{- end }}
-      {{- if or $legacyPath .Values.probeApiTlsSecret }}
+      {{- if .Values.probeApiTlsSecret }}
       volumes:
-        {{- if $legacyPath }}
-        - name: path-controller
-          configMap:
-            name: monitoring-path-controller
-        {{- end }}
-        {{- if .Values.probeApiTlsSecret }}
         - name: controller-tls
           secret:
             secretName: {{ .Values.probeApiTlsSecret | quote }}
-        {{- end }}
       {{- end }}
 {{- end }}

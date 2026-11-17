@@ -50,6 +50,15 @@ NGAP, PFCP, UE-mapper, path, and infrastructure collectors. Use
 `nador.artifacts.ObservabilityRun` to export metrics, sampled UE context, and
 setup snapshots; Loki export is optional.
 
+When upgrading a deployment that used the old standalone `one-way` or bundled
+`extended-probes` releases, uninstall those releases from the monitoring
+namespace before redeploying. In custom profiles, replace bundled
+`extended.node_image`/`extended.service_image` with `extended.probe_images`
+and remove `observability.path_image`. Path probes now inherit the controller's
+external path image unless `external_path_image` is explicitly set.
+If gNB or UPF pods still carry the old injected path probes, recreate those
+pods during a maintenance window to remove the ephemeral containers.
+
 Save both deployment models with `monitoring.output()`. After restarting a
 kernel, use `MonitoringManagement.from_yaml_files(metamodel_file, deployment_model_file)`
 to restore the handle without redeploying. Keep the saved models private.

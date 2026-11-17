@@ -137,11 +137,7 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
     if monitoring.ran_kpis and str(model.ran.implementation) not in {"oai", "ocudu"}:
         raise ValueError("RAN KPIs support OAI and OCUDU")
     enabled = {"integration", "prometheus", "grafana"}
-    if monitoring.one_way.image:
-        enabled.update(("redis", "ue-mapper-api"))
-        if not monitoring.probe_controller_image:
-            enabled.add("one-way")
-    if monitoring.probe_controller_image:
+    if monitoring.probe_controller_image or monitoring.throughput or monitoring.observability.active:
         enabled.update(("redis", "ue-mapper-api", "monitoring-controller"))
     kinds = _probe_states(model) if monitoring.probe_controller_image else enabled_probes(monitoring.extended)
     for kind in kinds:
@@ -154,8 +150,6 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
         enabled.add(name)
     if monitoring.loki:
         enabled.update(("loki", "promtail"))
-    if monitoring.latency or monitoring.throughput or monitoring.observability.active:
-        enabled.update(("redis", "ue-mapper-api", "monitoring-controller"))
     if monitoring.core_kpis:
         enabled.add("kpi-calculator-open5gs")
     if monitoring.ran_kpis:
@@ -171,8 +165,6 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
         )
         if name in DEFAULT_IMAGES["components"]:
             data["image"] = DEFAULT_IMAGES["components"][name].copy()
-        if name == "one-way":
-            data["image"] = DEFAULT_IMAGES["components"]["monitoring-controller"].copy()
         if name in monitoring.components:
             data = deep_merge(
                 data, monitoring.components[name].model_dump(mode="json", exclude_unset=True, exclude_none=True)

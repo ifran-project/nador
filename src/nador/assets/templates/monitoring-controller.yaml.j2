@@ -18,7 +18,6 @@ latency:
   enabled: {{ monitoring.latency | tojson }}
 targets: {{ targets | tojson }}
 operationTimeoutSeconds: {{ monitoring.operation_timeout_seconds }}
-observability: {{ monitoring.observability.model_dump() | tojson }}
 probeControllerImage: {{ monitoring.probe_controller_image | tojson }}
 probeControlTargets: {{ packet_targets | tojson }}
 extendedProbeStates: {{ probe_states | tojson }}
