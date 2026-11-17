@@ -3,27 +3,26 @@
 from pathlib import Path
 from typing import Any, Literal, Self
 
-from metamodel_3gpp.models.metamodel import MetaModel
 from ifran.deployment.base import BaseManagement
 from ifran.deployment.helm import HelmManagement
 from ifran.models.deployment import DeploymentModel
 from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_role
+from metamodel_3gpp.models.metamodel import MetaModel
 
 from nador.models import MonitoringDeployment, MonitoringModel
 from nador.one_way import OneWaySettings
-from nador.validate_monitoring import validate_deployment
 from nador.utils import (
     ASSETS,
     resolve_components,
     resolve_targets,
     run_monitoring_component_action,
 )
+from nador.validate_monitoring import validate_deployment
 
 
 class MonitoringManagement(HelmManagement):
     """Deploy monitoring components and attachment sniffers."""
 
-    # Take an extension-owned snapshot of an existing orchestrator deployment.
     def __init__(self, preceding: BaseManagement, *, config: MonitoringDeployment | str | Path | None = None) -> None:
         super().__init__(preceding=preceding)
         self.deployment_model = MonitoringModel.model_validate(self.deployment_model.model_dump(mode="python"))
@@ -42,7 +41,6 @@ class MonitoringManagement(HelmManagement):
         )
         return cls(preceding=base, config=model.monitoring)
 
-    # Resolve monitoring targets and assemble the Helm installation inputs.
     def plan(self) -> dict[str, Any]:
         """Resolve targets and chart values without contacting deployment hosts."""
         monitoring = validate_deployment(self.deployment_model.monitoring.model_dump(mode="python"))
@@ -58,13 +56,11 @@ class MonitoringManagement(HelmManagement):
             "targets": targets,
         }
 
-    # Resolve configuration and prepare the Kubernetes node and Helm repositories.
     async def prepare(self, *, quiet: bool = False) -> None:
         """Resolve chart values, label the monitoring node and add Helm repositories."""
         self.plan()
         await self._run_tasks("prepare", quiet=quiet)
 
-    # Run monitoring charts in installation order, reversing it for removal.
     async def run_action(
         self,
         action: str,
@@ -72,7 +68,7 @@ class MonitoringManagement(HelmManagement):
         components: list[str] | None = None,
         **kwargs: Any,
     ) -> dict[str, str | dict[str, str]]:
-        """Run a Helm action on selected monitoring components."""
+        """Run a Helm action in installation order, or in reverse for uninstall."""
         if action in ("prepare", "install"):
             validate_deployment(self.deployment_model.monitoring.model_dump(mode="python"))
         available = self.deployment_model.monitoring.components
@@ -102,7 +98,6 @@ class MonitoringManagement(HelmManagement):
                 output[name] = result
         return output
 
-    # Execute a monitoring Ansible action using the selected control node.
     async def _run_tasks(
         self,
         action: Literal["prepare", "inject_sniffers", "set_one_way"],
@@ -111,17 +106,14 @@ class MonitoringManagement(HelmManagement):
         settings: dict | None = None,
         quiet: bool = False,
     ) -> None:
-        """Run preparation or sniffer tasks using the Kubernetes master's inventory."""
+        """Run a monitoring stack task on the Kubernetes control node."""
         monitoring = self.deployment_model.monitoring
         node_name, control_node = self._get_deployment_node(None)
         await run_ansible_role(
-            # The role selects prepare.yml or inject_sniffers.yml from the action.
             role="monitoring/stack",
             hosts=node_name,
             inventory=get_ansible_inventory_line(node_name, control_node),
-            # Node preparation and sniffer injection run with elevated privileges.
             become=True,
-            # Pass configuration and capture targets to the Ansible tasks.
             inputs={
                 "monitoring_action": action,
                 "monitoring_control_node": node_name,
@@ -136,8 +128,12 @@ class MonitoringManagement(HelmManagement):
         )
 
     async def set_one_way(
-        self, *, n3: bool | None = None, upf_transit: bool | None = None,
-        log_samples: bool | None = None, quiet: bool = False,
+        self,
+        *,
+        n3: bool | None = None,
+        upf_transit: bool | None = None,
+        log_samples: bool | None = None,
+        quiet: bool = False,
     ) -> None:
         """Set the running controller's desired state without reinstalling the stack."""
         monitoring = self.deployment_model.monitoring
@@ -160,17 +156,16 @@ class MonitoringManagement(HelmManagement):
             await self._run_tasks("set_one_way", settings=changes, quiet=quiet)
             monitoring.one_way = planned
 
-    # Install monitoring components, then inject and start attachment sniffers.
     async def deploy(self, *, quiet: bool = False) -> None:
         """Deploy monitoring and wait for its components and sniffers."""
         plan = self.plan()
         await self._run_tasks("prepare", quiet=quiet)
         await self.install(quiet=quiet)
         monitoring = self.deployment_model.monitoring
-        if monitoring.throughput or monitoring.observability.active or monitoring.probe_controller_image:
+        if monitoring.needs_session_stack:
+            # Start capture before UEs attach, so the mapper sees session establishment.
             await self._run_tasks("inject_sniffers", targets=plan["targets"], quiet=quiet)
 
-    # Uninstall monitoring releases in reverse installation order.
     async def remove(self, *, quiet: bool = False) -> None:
         """Remove monitoring using the current deployment configuration."""
         await self.uninstall(quiet=quiet)

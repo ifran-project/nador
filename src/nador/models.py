@@ -5,14 +5,14 @@ import re
 from pathlib import Path
 from typing import Any, Literal, Self
 
-from metamodel_3gpp.models.base import StrictBaseModel
 from ifran.models.deployment import DeploymentModel
 from ifran.models.k8s import ContainerImage
+from metamodel_3gpp.models.base import StrictBaseModel
 from pydantic import Field, model_validator
-from nador.observability import ObservabilitySettings
-from nador.extended import ExtendedSettings
-from nador.one_way import OneWaySettings
 
+from nador.extended import ExtendedSettings
+from nador.observability import ObservabilitySettings
+from nador.one_way import OneWaySettings
 
 DEFAULT_IMAGES = json.loads((Path(__file__).parent / "assets" / "images.json").read_text())
 
@@ -50,9 +50,9 @@ class MonitoringTarget(StrictBaseModel):
     n6_interface: str | None = None
     n3_network_names: list[str] = Field(default_factory=list)
 
-    # Require an interface and container for packet capture.
     @model_validator(mode="after")
     def validate_packet_target(self) -> Self:
+        """Require a container and interface for packet capture targets."""
         if not self.component.strip():
             raise ValueError("component must not be empty")
         if self.role and (not self.interface or not self.container):
@@ -64,10 +64,9 @@ class MonitoringTarget(StrictBaseModel):
 
 
 class MonitoringImages(StrictBaseModel):
-    """Container versions for probes and sniffers injected into network-function pods."""
+    """Container versions for the RTT probe and session sniffers."""
 
     probe: str = DEFAULT_IMAGES["probes"]["probe"]
-    throughput: str = DEFAULT_IMAGES["probes"]["throughput"]
     amf_sniffer: str = DEFAULT_IMAGES["probes"]["amf_sniffer"]
     smf_sniffer: str = DEFAULT_IMAGES["probes"]["smf_sniffer"]
 
@@ -93,7 +92,6 @@ class MonitoringDeployment(StrictBaseModel):
     probe_api_token_secret: str | None = None
     external_throughput_image: str | None = None
     external_path_image: str | None = None
-    rtt_placement: Literal["external"] = "external"
     rtt_imsis: list[str] = Field(default_factory=list)
     rtt_slices: list[str] = Field(default_factory=list)
     targets: list[MonitoringTarget] = Field(default_factory=list)
@@ -121,20 +119,33 @@ class MonitoringDeployment(StrictBaseModel):
     def separate_one_way_targets(self) -> bool:
         return self.multi_anchor or not any(t.role == "gnb" for t in self.targets)
 
-    # Check dependencies between enabled features and their targets.
+    @property
+    def needs_session_stack(self) -> bool:
+        """Whether to deploy session services and start the AMF/SMF sniffers."""
+        return bool(self.probe_controller_image or self.observability.active)
+
+    @model_validator(mode="before")
+    @classmethod
+    def read_legacy_rtt_placement(cls, data: Any) -> Any:
+        """Accept saved profiles that explicitly selected the only supported placement."""
+        if isinstance(data, dict) and data.get("rtt_placement") == "external":
+            return {key: value for key, value in data.items() if key != "rtt_placement"}
+        return data
+
     @model_validator(mode="after")
     def validate_profile(self) -> Self:
-        if self.packet_pairing:
-            raise ValueError("External RTT does not support packet_pairing; set packet_pairing: false")
         roles = {target.role for target in self.targets}
-        if not self.probe_controller_image and (
-            ((self.latency or self.rtt_imsis or self.rtt_slices or self.observability.user_plane_paths)
-             and self.multi_anchor)
-            or (self.one_way.image and self.separate_one_way_targets)
-        ):
+        if self.packet_pairing and (not self.latency or not {"gnb", "upf"} <= roles):
+            raise ValueError("Packet pairing requires latency and both gNB and UPF targets")
+        rtt_requested = self.latency or bool(self.rtt_imsis or self.rtt_slices)
+        multi_target_paths = self.multi_anchor and self.observability.user_plane_paths
+        separate_one_way = self.one_way.image and self.separate_one_way_targets
+        if not self.probe_controller_image and (multi_target_paths or separate_one_way):
             raise ValueError("Set probe_controller_image to a build that supports the requested multi-anchor probes")
         external_images = DEFAULT_IMAGES["external_probes"]
-        if (self.latency or self.one_way.image or self.observability.user_plane_paths) and not self.probe_controller_image:
+        if (
+            self.latency or self.throughput or self.one_way.image or self.observability.user_plane_paths
+        ) and not self.probe_controller_image:
             self.probe_controller_image = external_images["controller"]
         if self.probe_controller_image and self.throughput and self.external_throughput_image is None:
             self.external_throughput_image = external_images["throughput"]
@@ -157,7 +168,7 @@ class MonitoringDeployment(StrictBaseModel):
             and not any(c.isspace() for c in self.probe_controller_image)
         ):
             raise ValueError("probe_controller_image must be a tagged image or digest")
-        if self.latency or self.rtt_imsis or self.rtt_slices:
+        if rtt_requested:
             if not self.probe_controller_image:
                 raise ValueError("External RTT requires probe_controller_image")
             if not {"amf", "smf"} <= roles or roles.isdisjoint({"gnb", "upf"}):
@@ -183,8 +194,12 @@ class MonitoringDeployment(StrictBaseModel):
         if observation.user_plane_paths and not roles.intersection({"gnb", "upf"}):
             raise ValueError("Path monitoring requires a gnb/upf target")
         for target in self.targets:
-            port = {"amf": observation.ngap_port, "smf": observation.pfcp_port,
-                    "gnb": observation.path_port, "upf": observation.path_port}.get(target.role)
+            port = {
+                "amf": observation.ngap_port,
+                "smf": observation.pfcp_port,
+                "gnb": observation.path_port,
+                "upf": observation.path_port,
+            }.get(target.role)
             if observation.active and target.metrics_port == port:
                 raise ValueError(f"{target.component}: observability and NF metric ports conflict")
         if len({self.prometheus_node_port, self.grafana_node_port, self.loki_node_port}) != 3:

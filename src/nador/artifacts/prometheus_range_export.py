@@ -1,16 +1,9 @@
-#!/usr/bin/env python3
-"""Export Prometheus query ranges to a flat CSV file.
-
-The script intentionally uses only Python's standard library so it can run on
-the webshell without a dependency install step.
-"""
+"""Export Prometheus query ranges to a flat CSV file."""
 
 from __future__ import annotations
 
-import argparse
 import csv
 import json
-import re
 import sys
 import time
 import urllib.error
@@ -173,7 +166,7 @@ def http_json(url: str, params: dict[str, object] | None = None, timeout: int = 
         return json.loads(resp.read().decode("utf-8"))
 
 
-def load_queries(path: str | None) -> list[dict[str, str]]:
+def load_queries(path: str | Path | None) -> list[dict[str, str]]:
     if not path:
         return list(DEFAULT_QUERIES)
     data = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -183,24 +176,6 @@ def load_queries(path: str | None) -> list[dict[str, str]]:
             raise ValueError(f"Invalid query item: {item!r}")
         queries.append({"name": str(item["name"]), "query": str(item["query"])})
     return queries
-
-
-def discover_metric_queries(
-    prometheus_url: str,
-    regex: str,
-    limit: int,
-) -> list[dict[str, str]]:
-    try:
-        payload = http_json(f"{prometheus_url.rstrip('/')}/api/v1/label/__name__/values")
-    except Exception as exc:  # noqa: BLE001
-        print(f"warning: metric discovery failed: {exc}", file=sys.stderr)
-        return []
-
-    names = payload.get("data", []) if payload.get("status") == "success" else []
-    pattern = re.compile(regex)
-    selected = [name for name in names if pattern.search(name)]
-    selected = sorted(selected)[:limit]
-    return [{"name": f"rf_{name}", "query": name} for name in selected]
 
 
 def query_range(
@@ -246,44 +221,18 @@ def write_rows(
     return count
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--prometheus-url", required=True)
-    parser.add_argument("--start", required=True, type=float)
-    parser.add_argument("--end", required=True, type=float)
-    parser.add_argument("--step", default="2s")
-    parser.add_argument("--out", required=True)
-    parser.add_argument("--queries-json")
-    parser.add_argument(
-        "--discover-metrics-regex",
-        default=r"(?i)(mcs|bler|harq|cqi|rsrp|rsrq|sinr|snr|gtp_tcp|tcp_)",
-    )
-    parser.add_argument("--discover-metrics-limit", type=int, default=40)
-    parser.add_argument("--no-discover-metrics", action="store_true")
-    parser.add_argument("--summary-json")
-    args = parser.parse_args(argv)
-
-    if args.end <= args.start:
-        raise SystemExit("--end must be greater than --start")
-
-    queries = load_queries(args.queries_json)
-    if not args.no_discover_metrics:
-        queries.extend(
-            discover_metric_queries(
-                args.prometheus_url,
-                args.discover_metrics_regex,
-                args.discover_metrics_limit,
-            )
-        )
-
-    out_path = Path(args.out)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-
+def export_ranges(
+    directory: Path, *, url: str, start: float, end: float, step: str, queries: list[dict[str, str]]
+) -> dict:
+    """Write samples and return the same per-query summary saved on disk."""
+    out_path = directory / "prometheus_timeseries.csv"
+    if end <= start:
+        raise ValueError("Prometheus range end must be greater than its start")
     summary = {
-        "prometheus_url": args.prometheus_url,
-        "start": args.start,
-        "end": args.end,
-        "step": args.step,
+        "prometheus_url": url,
+        "start": start,
+        "end": end,
+        "step": step,
         "queries": [],
         "created_at": time.time(),
     }
@@ -298,7 +247,7 @@ def main(argv: list[str] | None = None) -> int:
             query = item["query"]
             query_summary = {"name": name, "query": clean_query(query), "rows": 0}
             try:
-                payload = query_range(args.prometheus_url, query, args.start, args.end, args.step)
+                payload = query_range(url, query, start, end, step)
                 if payload.get("status") != "success":
                     query_summary["error"] = json.dumps(payload)[:500]
                 else:
@@ -308,13 +257,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"warning: query {name!r} failed: {exc}", file=sys.stderr)
             summary["queries"].append(query_summary)
 
-    if args.summary_json:
-        Path(args.summary_json).write_text(json.dumps(summary, indent=2), encoding="utf-8")
-
+    (directory / "prometheus_export_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     total_rows = sum(int(item.get("rows", 0)) for item in summary["queries"])
     print(f"wrote {total_rows} Prometheus samples to {out_path}")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+    return summary

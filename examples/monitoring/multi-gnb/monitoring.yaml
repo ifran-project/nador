@@ -6,8 +6,7 @@ components:
     image:
       image_pull_policy: Always
 kubeconfig: /etc/kubernetes/admin.conf
-# External RTT currently supports only one gNB and one UPF target.
-latency: false
+latency: true
 packet_pairing: false
 loki: true
 core_kpis: false

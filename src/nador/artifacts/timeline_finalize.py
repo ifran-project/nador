@@ -1,9 +1,7 @@
-#!/usr/bin/env python3
 """Build human- and machine-readable timeline summaries for scenario runs."""
 
 from __future__ import annotations
 
-import argparse
 import csv
 import json
 import re
@@ -373,25 +371,18 @@ def write_markdown(path: Path, lines: list[str], summary_json: dict) -> None:
     path.write_text("\n".join(content), encoding="utf-8")
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--timeline-jsonl", required=True)
-    parser.add_argument("--out-dir", required=True)
-    parser.add_argument("--run-id", default="")
-    parser.add_argument("--timezone", default="Europe/Paris")
-    args = parser.parse_args(argv)
-
-    out_dir = Path(args.out_dir)
+def finalize_timeline(events_file: Path, out_dir: Path, *, run_id: str, timezone: str) -> None:
+    """Write the timeline summary and recap from the recorded events."""
     out_dir.mkdir(parents=True, exist_ok=True)
-    events = load_events(Path(args.timeline_jsonl))
-    windows, unmatched_starts, unmatched_ends = pair_windows(events, args.timezone)
+    events = load_events(events_file)
+    windows, unmatched_starts, unmatched_ends = pair_windows(events, timezone)
     iperf_tasks = expand_iperf_tasks(windows)
     all_rows = windows + iperf_tasks
 
-    run_id = args.run_id or (events[0].get("run_id", "") if events else "")
+    run_id = run_id or (events[0].get("run_id", "") if events else "")
     summary = {
         "run_id": run_id,
-        "timezone": args.timezone,
+        "timezone": timezone,
         "events": events,
         "windows": windows,
         "traffic_tasks": iperf_tasks,
@@ -402,14 +393,9 @@ def main(argv: list[str] | None = None) -> int:
 
     (out_dir / "timeline_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     write_csv(out_dir / "timeline_summary.csv", all_rows)
-    lines = recap_lines(run_id, args.timezone, windows, iperf_tasks)
+    lines = recap_lines(run_id, timezone, windows, iperf_tasks)
     (out_dir / "timeline_recap.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
     write_markdown(out_dir / "timeline_summary.md", lines, summary)
     print("\n".join(lines))
     if unmatched_starts or unmatched_ends:
         print(f"warning: unmatched starts={len(unmatched_starts)} unmatched ends={len(unmatched_ends)}")
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

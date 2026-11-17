@@ -6,6 +6,23 @@ metadata:
 data:
   settings.json: {{ merge (dict "rtt" .Values.rttRequest "throughput" .Values.throughputRequest "user_plane_paths" .Values.pathRequest "extended" (.Values.extendedProbeStates | default dict)) .Values.probeControl | toJson | quote }}
   targets.json: {{ .Values.probeControlTargets | toJson | quote }}
+{{- if get (.Values.rttRequest | default dict) "pairer_image" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: packet-pairer
+spec:
+  selector:
+    nador-one-way-managed: "true"
+    nador-one-way-role: rtt-pairer
+  ports:
+    - name: metrics
+      port: 9200
+    - name: samples
+      port: 9201
+      protocol: UDP
+{{- end }}
 ---
 {{ $existing := lookup "v1" "Secret" .Release.Namespace "nador-one-way-token" -}}
 apiVersion: v1

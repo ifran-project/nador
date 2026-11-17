@@ -37,7 +37,7 @@ spec:
             name: monitoring-cleanup-code
       containers:
         - name: cleanup
-          image: {{ printf "%s:%s" .Values.image.repository .Values.image.tag | quote }}
+          image: {{ .Values.cleanupImage | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: [python, /monitoring/cleanup.py]
           volumeMounts:
@@ -45,17 +45,9 @@ spec:
               mountPath: /monitoring
               readOnly: true
           env:
-            # The cleanup script is mounted outside the image's /app module directory.
-            - name: PYTHONPATH
-              value: /app
-            {{- include "monitoring.controllerEnv" . | nindent 12 }}
-            - name: THROUGHPUT_ENABLED
-              value: {{ .Values.throughput.enabled | quote }}
+            - name: MONITORING_NS
+              value: {{ .Release.Namespace | quote }}
             - name: CAPTURE_NAMESPACES
-              {{- $namespaces := .Values.controller.watchNamespaces }}
-              {{- range .Values.targets }}
-              {{- $namespaces = append $namespaces .namespace }}
-              {{- end }}
-              value: {{ join "," ($namespaces | uniq | sortAlpha) | quote }}
+              value: {{ join "," .Values.targetNamespaces | quote }}
             - name: CLEANUP_TIMEOUT_SECONDS
               value: {{ .Values.operationTimeoutSeconds | quote }}
