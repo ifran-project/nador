@@ -1,11 +1,4 @@
 # Monitoring runs on sopnode-f2; core on f3 and gNB on f1.
-images:
-  probe: ghcr.io/ifran-project/ebpf-latency-probe:extended-fe1764d9f887311be15c6920f4b94d165a04b227
-components:
-  kpi-calculator-oai:
-    image:
-      repository: ghcr.io/ifran-project/kpi-calculator-oai
-      image_tag: sha-4a3672b4f68fae70cde256e6f790c61fc85b1e72
 namespace: monitoring
 kubeconfig: /root/.kube/config
 node_name: sopnode-f2

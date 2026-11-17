@@ -1,6 +1,4 @@
 # Single-gNB OCUDU ZMQ with stock Open5GS and ML collectors.
-images:
-  probe: ghcr.io/ifran-project/ebpf-latency-probe:extended-fe1764d9f887311be15c6920f4b94d165a04b227
 namespace: monitoring
 node_name: node4
 operation_timeout_seconds: 600
