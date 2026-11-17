@@ -78,7 +78,8 @@ def _render_chart_values(
     node_selector = component.node_selector
     if component.node_name:
         node_selector = {"kubernetes.io/hostname": component.node_name}
-    packet_targets = {target["role"]: target for target in targets if target["role"] in ("gnb", "upf")}
+    packet_anchors = [target for target in targets if target["role"] in ("gnb", "upf")]
+    packet_targets = {target["role"]: target for target in packet_anchors}
     template = VALUES_TEMPLATES.get_template(f"{chart}.yaml.j2")
     extended_targets = [
         target | {"kind": str(getattr(model, target["category"]).components[target["component"]].type)}
@@ -120,7 +121,8 @@ def _render_chart_values(
         extended_config=extended_config,
         probe_image=model.monitoring.extended.probe_images.get(probe_name),
         packet_targets=packet_targets,
-        throughput_targets=[target for target in targets if target["role"] == "upf"],
+        packet_anchors=packet_anchors,
+        throughput_targets=[target for target in packet_anchors if target["role"] == "upf"],
         probe_states=probe_states,
         packet_namespaces=sorted({target["namespace"] for target in targets if target["role"] in ("gnb", "upf")}),
     )

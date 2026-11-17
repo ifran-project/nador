@@ -154,6 +154,8 @@ class MonitoringManagement(HelmManagement):
                 changes[name] = patch
                 data[name].update(patch)
         if changes:
+            if data["n3"]["enabled"] and not any(t.role == "gnb" for t in monitoring.targets):
+                raise ValueError("N3 one-way monitoring requires a gNB target")
             planned = OneWaySettings.model_validate(data)
             await self._run_tasks("set_one_way", settings=changes, quiet=quiet)
             monitoring.one_way = planned

@@ -62,7 +62,10 @@ pods during a maintenance window to remove the ephemeral containers.
 Multi-UPF throughput still uses its existing deployment by default. To try the
 external placement on a fresh deployment, set `probe_controller_image` to a
 published controller build with multi-UPF support and keep `throughput: true`.
-RTT, one-way latency, and path counters still require single-anchor profiles.
+The same build supports multiple targets for path counters and one-way
+latency. Set `one_way.image` to the matching one-way probe build. N3 latency
+needs gNB and UPF targets; UPF transit needs no gNB target but still needs
+the configured traffic peer and port. RTT retains its single-anchor-per-role limit.
 
 Save both deployment models with `monitoring.output()`. After restarting a
 kernel, use `MonitoringManagement.from_yaml_files(metamodel_file, deployment_model_file)`

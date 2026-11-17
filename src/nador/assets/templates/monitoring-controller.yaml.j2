@@ -23,7 +23,13 @@ probeControlTargets: {{ ({} if monitoring.multi_anchor else packet_targets) | to
 extendedProbeStates: {{ probe_states | tojson }}
 probeApiTlsSecret: {{ monitoring.probe_api_tls_secret | tojson }}
 probeApiTokenSecret: {{ monitoring.probe_api_token_secret | tojson }}
-probeControl: {{ monitoring.one_way.model_dump(mode="json") | tojson }}
+probeControl:
+{% for key, value in monitoring.one_way.model_dump(mode="json").items() %}
+  {{ key }}: {{ value | tojson }}
+{% endfor %}
+{% if monitoring.one_way.image and monitoring.separate_one_way_targets %}
+  one_way_targets: {{ packet_anchors | tojson }}
+{% endif %}
 rttRequest:
   enabled: {{ monitoring.latency | tojson }}
   allowed: {{ (monitoring.probe_controller_image is not none and not monitoring.multi_anchor and session_context and (packet_targets | length > 0)) | tojson }}
@@ -39,7 +45,10 @@ throughputRequest:
 {% endif %}
 pathRequest:
   enabled: {{ monitoring.observability.user_plane_paths | tojson }}
-  allowed: {{ (not monitoring.multi_anchor and (packet_targets | length > 0) and monitoring.external_path_image is not none) | tojson }}
+  allowed: {{ ((packet_anchors | length > 0) and monitoring.external_path_image is not none) | tojson }}
   image: {{ monitoring.external_path_image | tojson }}
   port: {{ monitoring.observability.path_port }}
   interval: {{ monitoring.observability.path_interval_seconds }}
+{% if monitoring.multi_anchor and monitoring.probe_controller_image %}
+  targets: {{ packet_anchors | tojson }}
+{% endif %}
