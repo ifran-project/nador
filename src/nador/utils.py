@@ -9,6 +9,7 @@ from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_role
 from ifran.utils.k8s import build_k8s_safe
 from ifran.utils.utils import deep_merge
 
+from nador.controller_values import controller_values
 from nador.models import DEFAULT_IMAGES, DeployedMonitoringComponent, MonitoringModel
 from nador.probe_catalog import NODE_PROBES, PROBES, controlled_probes, enabled_probes, probe_values
 from nador.ran_metrics import ocudu_sources
@@ -66,104 +67,114 @@ def resolve_targets(model: MonitoringModel) -> list[dict]:
     return result
 
 
-# Render this chart's dynamic values, then apply explicit user overrides.
-def _render_chart_values(
-    component: DeployedMonitoringComponent,
-    model: MonitoringModel,
-    targets: list[dict],
-) -> dict:
-    """Render Helm values from chart defaults, deployment settings and user overrides."""
-    chart = component.chart_ref.rsplit("/", 1)[-1]
-    defaults = ASSETS / "defaults" / f"{chart}.yaml" if component.chart_version else CHARTS / chart / "values.yaml"
-    node_selector = component.node_selector
-    if component.node_name:
-        node_selector = {"kubernetes.io/hostname": component.node_name}
-    packet_anchors = [target for target in targets if target["role"] in ("gnb", "upf")]
-    packet_targets = {target["role"]: target for target in packet_anchors}
-    template = VALUES_TEMPLATES.get_template(f"{chart}.yaml.j2")
+def _extended_chart_context(model, targets, probe_name, probe_states):
+    settings = model.monitoring.extended
     extended_targets = [
         target | {"kind": str(getattr(model, target["category"]).components[target["component"]].type)}
         for target in targets if target["category"] in ("ran", "core")
     ]
-    if chart == "extended-probes":
-        existing = {(target["category"], target["component"]) for target in extended_targets}
-        for category in ("ran", "core"):
-            for name, nf in getattr(model, category).components.items():
-                if (category, name) not in existing and nf.namespace:
-                    extended_targets.append({
-                        "category": category, "component": name, "namespace": nf.namespace, "kind": str(nf.type),
-                        "selector": {"app": build_k8s_safe(f"{nf.implementation}-{name}")},
-                    })
-    probe_name = (component.release_name or "").removeprefix("probe-")
-    selected = model.monitoring.extended.probe_targets.get(probe_name)
+    existing = {(target["category"], target["component"]) for target in extended_targets}
+    for category in ("ran", "core"):
+        for name, nf in getattr(model, category).components.items():
+            if (category, name) not in existing and nf.namespace:
+                extended_targets.append({
+                    "category": category, "component": name, "namespace": nf.namespace, "kind": str(nf.type),
+                    "selector": {"app": build_k8s_safe(f"{nf.implementation}-{name}")},
+                })
+    selected = settings.probe_targets.get(probe_name)
     if selected:
         available = {f'{t["category"]}/{t["component"]}' for t in extended_targets}
         if set(selected) - available:
             raise ValueError(f"Unresolved probe targets for {probe_name}: {sorted(set(selected) - available)}")
         extended_targets = [t for t in extended_targets if f'{t["category"]}/{t["component"]}' in selected]
-    extended_config = probe_values(model.monitoring.extended, probe_name) if chart == "extended-probes" else {}
-    probe_states = _probe_states(model)
+    extended_config = probe_values(settings, probe_name)
     if probe_name in probe_states:
         extended_config["paused"] = not probe_states[probe_name]
         if not probe_states[probe_name]:
             for flag in PROBES[probe_name]:
                 if flag not in ("tcp_flows", "attributed_drops"):
                     extended_config[flag] = True
-    rendered = template.render(
+    return {
+        "extended_targets": extended_targets,
+        "extended_config": extended_config,
+        "probe_image": settings.probe_images.get(probe_name),
+    }
+
+
+def _render_chart_values(
+    component: DeployedMonitoringComponent,
+    model: MonitoringModel,
+    targets: list[dict],
+    probe_states: dict,
+) -> dict:
+    """Render chart configuration before applying explicit user overrides."""
+    chart = component.chart_ref.rsplit("/", 1)[-1]
+    defaults = ASSETS / "defaults" / f"{chart}.yaml" if component.chart_version else CHARTS / chart / "values.yaml"
+    node_selector = component.node_selector
+    if component.node_name:
+        node_selector = {"kubernetes.io/hostname": component.node_name}
+    context = {}
+    if chart == "extended-probes":
+        probe_name = (component.release_name or "").removeprefix("probe-")
+        context = _extended_chart_context(model, targets, probe_name, probe_states)
+    elif chart == "ocudu-metrics":
+        context["ocudu_sources"] = ocudu_sources(model)
+    elif chart == "kube-prometheus-stack":
+        context["target_namespaces"] = sorted({model.monitoring.namespace} | {t["namespace"] for t in targets})
+    rendered = VALUES_TEMPLATES.get_template(f"{chart}.yaml.j2").render(
         component=component,
         monitoring=model.monitoring,
         model=model,
         targets=targets,
         node_selector=node_selector,
-        target_namespaces=sorted({model.monitoring.namespace} | {target["namespace"] for target in targets}),
-        ocudu_sources=ocudu_sources(model),
-        extended_targets=extended_targets,
-        extended_config=extended_config,
-        probe_image=model.monitoring.extended.probe_images.get(probe_name),
-        packet_targets=packet_targets,
-        packet_anchors=packet_anchors,
-        throughput_targets=[target for target in packet_anchors if target["role"] == "upf"],
-        probe_states=probe_states,
-        packet_namespaces=sorted({target["namespace"] for target in targets if target["role"] in ("gnb", "upf")}),
+        **context,
     )
     values = deep_merge(yaml.safe_load(defaults.read_text()) or {}, yaml.safe_load(rendered))
+    if chart == "monitoring-controller":
+        values = deep_merge(values, controller_values(model.monitoring, targets, probe_states))
     return deep_merge(values, component.advanced_config)
 
 
-# Resolve enabled component models once, then build values directly for each chart.
-def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str, DeployedMonitoringComponent]:
-    """Build enabled monitoring components and their Helm values."""
+def _enabled_components(model: MonitoringModel) -> set[str]:
     monitoring = model.monitoring
-    defaults = yaml.safe_load((ASSETS / "components.yaml").read_text())
-    if monitoring.core_kpis and str(model.core.implementation) != "open5gs":
+    core = str(model.core.implementation)
+    ran = str(model.ran.implementation)
+    if monitoring.core_kpis and core != "open5gs":
         raise ValueError("Core KPI calculator requires Open5GS")
-    if monitoring.ran_kpis and str(model.ran.implementation) not in {"oai", "ocudu"}:
+    if monitoring.ran_kpis and ran not in {"oai", "ocudu"}:
         raise ValueError("RAN KPIs support OAI and OCUDU")
     enabled = {"integration", "prometheus", "grafana"}
-    if monitoring.probe_controller_image or monitoring.throughput or monitoring.observability.active:
+    if monitoring.needs_session_stack:
         enabled.update(("redis", "ue-mapper-api", "monitoring-controller"))
-    kinds = _probe_states(model) if monitoring.probe_controller_image else enabled_probes(monitoring.extended)
-    for kind in kinds:
-        name = f"probe-{kind}"
-        workload = "node" if kind in NODE_PROBES else "service"
-        defaults["components"][name] = {
-            "chart_ref": "extended-probes",
-            "pod_selector": [f"app={name}-extended-{workload}"],
-        }
-        enabled.add(name)
     if monitoring.loki:
         enabled.update(("loki", "promtail"))
     if monitoring.core_kpis:
         enabled.add("kpi-calculator-open5gs")
     if monitoring.ran_kpis:
-        enabled.add("ocudu-metrics" if str(model.ran.implementation) == "ocudu" else "kpi-calculator-oai")
+        enabled.add("ocudu-metrics" if ran == "ocudu" else "kpi-calculator-oai")
+    return enabled
+
+
+def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str, DeployedMonitoringComponent]:
+    """Build enabled monitoring components and their Helm values in installation order."""
+    monitoring = model.monitoring
+    catalog = yaml.safe_load((ASSETS / "components.yaml").read_text())
+    enabled = _enabled_components(model)
+    definitions = {name: data for name, data in catalog["components"].items() if name in enabled}
+    probe_states = _probe_states(model)
+    kinds = probe_states if monitoring.probe_controller_image else enabled_probes(monitoring.extended)
+    for kind in kinds:
+        name = f"probe-{kind}"
+        workload = "node" if kind in NODE_PROBES else "service"
+        definitions[name] = {
+            "chart_ref": "extended-probes",
+            "pod_selector": [f"app={name}-extended-{workload}"],
+        }
     components = {}
-    for name, definition in defaults["components"].items():
-        if name not in enabled:
-            continue
+    for name, definition in definitions.items():
         data = (
             {"release_name": name, "chart_ref": name, "pod_selector": ["app=" + name]}
-            | defaults["defaults"]
+            | catalog["defaults"]
             | definition
         )
         if name in DEFAULT_IMAGES["components"]:
@@ -182,13 +193,12 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
             component.image.repository = repository
             component.image.image_tag = tag
         component.namespace = monitoring.namespace
-        components[name] = component
-    for name, component in components.items():
-        component.chart_values = _render_chart_values(component, model, targets)
+        component.chart_values = _render_chart_values(component, model, targets, probe_states)
         if name.startswith("probe-") and component.chart_values.get("settings", {}).get("paused"):
             component.pod_selector = []
         if not component.chart_version:
             component.chart_ref = f"{REMOTE_CHARTS}/{Path(component.chart_ref).name}"
+        components[name] = component
     return components
 
 

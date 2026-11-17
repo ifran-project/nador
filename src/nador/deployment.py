@@ -167,7 +167,7 @@ class MonitoringManagement(HelmManagement):
         await self._run_tasks("prepare", quiet=quiet)
         await self.install(quiet=quiet)
         monitoring = self.deployment_model.monitoring
-        if monitoring.throughput or monitoring.observability.active or monitoring.probe_controller_image:
+        if monitoring.needs_session_stack:
             await self._run_tasks("inject_sniffers", targets=plan["targets"], quiet=quiet)
 
     # Uninstall monitoring releases in reverse installation order.

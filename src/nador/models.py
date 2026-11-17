@@ -121,17 +121,21 @@ class MonitoringDeployment(StrictBaseModel):
     def separate_one_way_targets(self) -> bool:
         return self.multi_anchor or not any(t.role == "gnb" for t in self.targets)
 
+    @property
+    def needs_session_stack(self) -> bool:
+        """Whether to deploy session services and start the AMF/SMF sniffers."""
+        return bool(self.probe_controller_image or self.throughput or self.observability.active)
+
     # Check dependencies between enabled features and their targets.
     @model_validator(mode="after")
     def validate_profile(self) -> Self:
         if self.packet_pairing:
             raise ValueError("External RTT does not support packet_pairing; set packet_pairing: false")
         roles = {target.role for target in self.targets}
-        if not self.probe_controller_image and (
-            ((self.latency or self.rtt_imsis or self.rtt_slices or self.observability.user_plane_paths)
-             and self.multi_anchor)
-            or (self.one_way.image and self.separate_one_way_targets)
-        ):
+        rtt_requested = self.latency or bool(self.rtt_imsis or self.rtt_slices)
+        multi_target_probes = self.multi_anchor and (rtt_requested or self.observability.user_plane_paths)
+        separate_one_way = self.one_way.image and self.separate_one_way_targets
+        if not self.probe_controller_image and (multi_target_probes or separate_one_way):
             raise ValueError("Set probe_controller_image to a build that supports the requested multi-anchor probes")
         external_images = DEFAULT_IMAGES["external_probes"]
         if (self.latency or self.one_way.image or self.observability.user_plane_paths) and not self.probe_controller_image:
@@ -157,7 +161,7 @@ class MonitoringDeployment(StrictBaseModel):
             and not any(c.isspace() for c in self.probe_controller_image)
         ):
             raise ValueError("probe_controller_image must be a tagged image or digest")
-        if self.latency or self.rtt_imsis or self.rtt_slices:
+        if rtt_requested:
             if not self.probe_controller_image:
                 raise ValueError("External RTT requires probe_controller_image")
             if not {"amf", "smf"} <= roles or roles.isdisjoint({"gnb", "upf"}):
