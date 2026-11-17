@@ -1,5 +1,4 @@
 # Overlay for an existing monitoring profile. Only CPU is enabled in this example.
-# Omit bundled extended.node_image and extended.service_image when using this overlay.
 extended:
   scheduler_wait: true
   kernel_drops: false

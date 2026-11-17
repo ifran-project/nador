@@ -1,20 +1,19 @@
 {{- $s := .Values.settings -}}
-{{- $node := $s.node_enabled -}}
-{{- $service := $s.service_enabled -}}
-{{- $kernel := or (not $s.probe_kind) (eq $s.probe_kind "cpu") (eq $s.probe_kind "drops") -}}
+{{- $kind := required "settings.probe_kind must select a dedicated probe" $s.probe_kind -}}
+{{- $service := eq $kind "measurement-quality" -}}
+{{- $kernel := or (eq $kind "cpu") (eq $kind "drops") -}}
+{{- $image := required "probeImage must select a published build" .Values.probeImage -}}
 {{- $base := printf "%s-extended" .Release.Name | trunc 53 | trimSuffix "-" -}}
 {{- /* Existing published collectors expect this key; never schedule active checks. */ -}}
 {{- $config := merge (dict "targets" .Values.targets "prometheus_url" .Values.prometheusUrl) $s -}}
 {{- $_ := set $config "reachability" (list) -}}
-{{- if or $node $service }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ $base }}
 data:
   config.json: {{ $config | toJson | quote }}
-{{- end }}
-{{- if $node }}
+{{- if not $service }}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -72,7 +71,7 @@ spec:
         - operator: Exists
       containers:
         - name: diagnostics
-          image: {{ required "extended.node_image must select a published build" $s.node_image | quote }}
+          image: {{ $image | quote }}
           imagePullPolicy: IfNotPresent
           securityContext:
             privileged: true
@@ -141,8 +140,7 @@ spec:
             path: /usr/src
             type: Directory
         {{- end }}
-{{- end }}
-{{- if $service }}
+{{- else }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -171,7 +169,7 @@ spec:
       {{- end }}
       containers:
         - name: quality
-          image: {{ required "extended.service_image must select a published build" $s.service_image | quote }}
+          image: {{ $image | quote }}
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: true

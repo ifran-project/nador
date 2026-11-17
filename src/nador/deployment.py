@@ -143,7 +143,7 @@ class MonitoringManagement(HelmManagement):
         monitoring = self.deployment_model.monitoring
         data = monitoring.one_way.model_dump(mode="json")
         if not data["image"]:
-            raise ValueError("Provision the one-way controller with one_way.image first")
+            raise ValueError("Configure one_way.image before deploying monitoring")
         changes = {}
         for name, values in (
             ("n3", {"enabled": n3, "log_samples": log_samples}),
@@ -154,6 +154,8 @@ class MonitoringManagement(HelmManagement):
                 changes[name] = patch
                 data[name].update(patch)
         if changes:
+            if data["n3"]["enabled"] and not any(t.role == "gnb" for t in monitoring.targets):
+                raise ValueError("N3 one-way monitoring requires a gNB target")
             planned = OneWaySettings.model_validate(data)
             await self._run_tasks("set_one_way", settings=changes, quiet=quiet)
             monitoring.one_way = planned
@@ -164,10 +166,8 @@ class MonitoringManagement(HelmManagement):
         plan = self.plan()
         await self._run_tasks("prepare", quiet=quiet)
         await self.install(quiet=quiet)
-        if (self.deployment_model.monitoring.latency or self.deployment_model.monitoring.throughput
-                or self.deployment_model.monitoring.observability.active
-                or self.deployment_model.monitoring.one_way.image
-                or self.deployment_model.monitoring.probe_controller_image):
+        monitoring = self.deployment_model.monitoring
+        if monitoring.throughput or monitoring.observability.active or monitoring.probe_controller_image:
             await self._run_tasks("inject_sniffers", targets=plan["targets"], quiet=quiet)
 
     # Uninstall monitoring releases in reverse installation order.

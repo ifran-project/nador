@@ -113,19 +113,33 @@ class MonitoringDeployment(StrictBaseModel):
 
         return read_deployment(path, cls)
 
+    @property
+    def multi_anchor(self) -> bool:
+        return any(sum(t.role == role for t in self.targets) > 1 for role in ("gnb", "upf"))
+
+    @property
+    def separate_one_way_targets(self) -> bool:
+        return self.multi_anchor or not any(t.role == "gnb" for t in self.targets)
+
     # Check dependencies between enabled features and their targets.
     @model_validator(mode="after")
     def validate_profile(self) -> Self:
         if self.packet_pairing:
             raise ValueError("External RTT does not support packet_pairing; set packet_pairing: false")
         roles = {target.role for target in self.targets}
-        if self.latency and not self.probe_controller_image:
-            external_images = DEFAULT_IMAGES["external_probes"]
+        if not self.probe_controller_image and (
+            ((self.latency or self.rtt_imsis or self.rtt_slices or self.observability.user_plane_paths)
+             and self.multi_anchor)
+            or (self.one_way.image and self.separate_one_way_targets)
+        ):
+            raise ValueError("Set probe_controller_image to a build that supports the requested multi-anchor probes")
+        external_images = DEFAULT_IMAGES["external_probes"]
+        if (self.latency or self.one_way.image or self.observability.user_plane_paths) and not self.probe_controller_image:
             self.probe_controller_image = external_images["controller"]
-            if self.throughput and not self.external_throughput_image:
-                self.external_throughput_image = external_images["throughput"]
-            if self.observability.user_plane_paths and not self.external_path_image:
-                self.external_path_image = external_images["user_plane_paths"]
+        if self.probe_controller_image and self.throughput and self.external_throughput_image is None:
+            self.external_throughput_image = external_images["throughput"]
+        if self.observability.user_plane_paths and self.external_path_image is None:
+            self.external_path_image = external_images["user_plane_paths"]
         if self.probe_controller_image:
             for enabled, name, image in (
                 (self.throughput, "external_throughput_image", self.external_throughput_image),
@@ -138,10 +152,6 @@ class MonitoringDeployment(StrictBaseModel):
         if self.probe_api_tls_secret or self.probe_api_token_secret:
             if not (self.probe_controller_image and self.probe_api_tls_secret and self.probe_api_token_secret):
                 raise ValueError("Public probe API requires probe_controller_image and both API secrets")
-        if self.probe_controller_image and any(
-            sum(t.role == role for t in self.targets) > 1 for role in ("gnb", "upf")
-        ):
-            raise ValueError("The external controller supports one gNB and one UPF target; disable RTT or select a single target per role")
         if self.probe_controller_image and not (
             ":" in self.probe_controller_image.rsplit("/", 1)[-1]
             and not any(c.isspace() for c in self.probe_controller_image)
@@ -161,11 +171,10 @@ class MonitoringDeployment(StrictBaseModel):
             raise ValueError("Only one monitoring target per component is supported")
         if self.throughput and self.targets and not {"amf", "smf", "upf"} <= roles:
             raise ValueError("Throughput requires AMF, SMF and UPF packet targets")
-        if self.one_way.image and (
-            any(sum(t.role == role for t in self.targets) != 1 for role in ("gnb", "upf"))
-            or not {"amf", "smf"} <= roles
-        ):
-            raise ValueError("One-way monitoring requires one gNB and one UPF target, plus AMF and SMF targets for slice mapping")
+        if self.one_way.image and not {"amf", "smf", "upf"} <= roles:
+            raise ValueError("One-way monitoring requires UPF, AMF and SMF targets for slice mapping")
+        if self.one_way.n3.enabled and "gnb" not in roles:
+            raise ValueError("N3 one-way monitoring requires at least one gNB and one UPF target")
         observation = self.observability
         if (observation.ngap or observation.mapper_coverage) and "amf" not in roles:
             raise ValueError("NGAP/mapper coverage requires an AMF target")
