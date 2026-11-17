@@ -59,6 +59,11 @@ external path image unless `external_path_image` is explicitly set.
 If gNB or UPF pods still carry the old injected path probes, recreate those
 pods during a maintenance window to remove the ephemeral containers.
 
+Multi-UPF throughput still uses its existing deployment by default. To try the
+external placement on a fresh deployment, set `probe_controller_image` to a
+published controller build with multi-UPF support and keep `throughput: true`.
+RTT, one-way latency, and path counters still require single-anchor profiles.
+
 Save both deployment models with `monitoring.output()`. After restarting a
 kernel, use `MonitoringManagement.from_yaml_files(metamodel_file, deployment_model_file)`
 to restore the handle without redeploying. Keep the saved models private.

@@ -113,6 +113,10 @@ class MonitoringDeployment(StrictBaseModel):
 
         return read_deployment(path, cls)
 
+    @property
+    def multi_anchor(self) -> bool:
+        return any(sum(t.role == role for t in self.targets) > 1 for role in ("gnb", "upf"))
+
     # Check dependencies between enabled features and their targets.
     @model_validator(mode="after")
     def validate_profile(self) -> Self:
@@ -122,8 +126,8 @@ class MonitoringDeployment(StrictBaseModel):
         external_images = DEFAULT_IMAGES["external_probes"]
         if (self.latency or self.one_way.image or self.observability.user_plane_paths) and not self.probe_controller_image:
             self.probe_controller_image = external_images["controller"]
-            if self.throughput and not self.external_throughput_image:
-                self.external_throughput_image = external_images["throughput"]
+        if self.probe_controller_image and self.throughput and self.external_throughput_image is None:
+            self.external_throughput_image = external_images["throughput"]
         if self.observability.user_plane_paths and self.external_path_image is None:
             self.external_path_image = external_images["user_plane_paths"]
         if self.probe_controller_image:
@@ -138,10 +142,11 @@ class MonitoringDeployment(StrictBaseModel):
         if self.probe_api_tls_secret or self.probe_api_token_secret:
             if not (self.probe_controller_image and self.probe_api_tls_secret and self.probe_api_token_secret):
                 raise ValueError("Public probe API requires probe_controller_image and both API secrets")
-        if self.probe_controller_image and any(
-            sum(t.role == role for t in self.targets) > 1 for role in ("gnb", "upf")
+        if self.multi_anchor and (
+            self.latency or self.rtt_imsis or self.rtt_slices
+            or self.one_way.image or self.observability.user_plane_paths
         ):
-            raise ValueError("The external controller supports at most one gNB and one UPF target; select a single target per role or disable external probes")
+            raise ValueError("RTT, one-way and path probes require at most one gNB and one UPF target; multi-anchor support is for throughput only")
         if self.probe_controller_image and not (
             ":" in self.probe_controller_image.rsplit("/", 1)[-1]
             and not any(c.isspace() for c in self.probe_controller_image)

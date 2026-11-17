@@ -120,6 +120,7 @@ def _render_chart_values(
         extended_config=extended_config,
         probe_image=model.monitoring.extended.probe_images.get(probe_name),
         packet_targets=packet_targets,
+        throughput_targets=[target for target in targets if target["role"] == "upf"],
         probe_states=probe_states,
         packet_namespaces=sorted({target["namespace"] for target in targets if target["role"] in ("gnb", "upf")}),
     )
