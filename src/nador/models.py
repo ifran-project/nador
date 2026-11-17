@@ -118,6 +118,7 @@ class MonitoringDeployment(StrictBaseModel):
     def validate_profile(self) -> Self:
         if self.packet_pairing:
             raise ValueError("External RTT does not support packet_pairing; set packet_pairing: false")
+        roles = {target.role for target in self.targets}
         if self.latency and not self.probe_controller_image:
             external_images = DEFAULT_IMAGES["external_probes"]
             self.probe_controller_image = external_images["controller"]
@@ -149,7 +150,6 @@ class MonitoringDeployment(StrictBaseModel):
         if self.latency or self.rtt_imsis or self.rtt_slices:
             if not self.probe_controller_image:
                 raise ValueError("External RTT requires probe_controller_image")
-            roles = {t.role for t in self.targets}
             if not {"amf", "smf"} <= roles or roles.isdisjoint({"gnb", "upf"}):
                 raise ValueError("External RTT requires AMF/SMF and a gNB or UPF target")
         if any(not re.fullmatch(r"[0-9]{5,16}", value) for value in self.rtt_imsis):
@@ -159,13 +159,8 @@ class MonitoringDeployment(StrictBaseModel):
         keys = [(t.category, t.component) for t in self.targets]
         if len(keys) != len(set(keys)):
             raise ValueError("Only one monitoring target per component is supported")
-        if self.latency or (self.throughput and self.targets):
-            roles = {t.role for t in self.targets}
-            if not {"amf", "smf"} <= roles or not roles & {"gnb", "upf"}:
-                raise ValueError("Packet monitoring requires AMF, SMF and at least one gnb/upf packet target")
-        if self.throughput and self.targets and "upf" not in {t.role for t in self.targets}:
-            raise ValueError("Throughput requires a UPF packet target")
-        roles = {t.role for t in self.targets}
+        if self.throughput and self.targets and not {"amf", "smf", "upf"} <= roles:
+            raise ValueError("Throughput requires AMF, SMF and UPF packet targets")
         if self.one_way.image and (
             any(sum(t.role == role for t in self.targets) != 1 for role in ("gnb", "upf"))
             or not {"amf", "smf"} <= roles
