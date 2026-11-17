@@ -17,7 +17,7 @@ timelines and metrics. Network deployment remains handled by upstream managers.
 Install from GitHub. NADOR installs the supported IFRAN release from PyPI:
 
 ```bash
-python -m pip install --upgrade "git+https://github.com/ifran-project/nador.git@ml-observability"
+python -m pip install --upgrade "git+https://github.com/ifran-project/nador.git@main"
 ```
 
 ```python
