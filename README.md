@@ -1,8 +1,5 @@
 # NADOR
 
-See [Extended ML Observability](EXTENDED.md) for available collectors and
-[Portable Extended Observability](PORTABLE.md) for their measurement limits.
-
 **Network Analytics, Diagnostics, Observability, and Reporting for Mobile Networks.**
 
 Named after Nador, a city in northeastern Morocco associated with the idea of a
@@ -47,9 +44,6 @@ WebSocket/Telegraf pipeline, according to the RAN implementation. For OCUDU,
 configure telemetry before deploying the RAN, as shown in
 [Monitoring](MONITORING.md#ocudu-native-ran-metrics). This does not enable ML collectors.
 
-Configure optional [dedicated probes](examples/quickstart/dedicated-probes.yaml)
-and manage them through the [controller API](PROBE-CONTROL.md).
-
 Other examples are under [examples/monitoring](examples/monitoring):
 
 - [RFsim](examples/monitoring/rfsim): monolithic and split OAI radios.
@@ -65,6 +59,42 @@ Other examples are under [examples/monitoring](examples/monitoring):
   [single-gNB ML profile](examples/monitoring/ocudu-zmq/zmq/monitoring-ml.yaml),
   [B210](examples/monitoring/b210)
   and [R2lab](examples/monitoring/r2lab): additional deployment configurations.
+
+## On-demand probes
+
+Set `latency: true` to enable external RTT. The controller supports one gNB
+and one UPF target; AMF and SMF sniffers provide UE mapping. Same-packet
+pairing is not supported. If upgrading from injected RTT, recreate the gNB
+and UPF pods to clear the old probes before enabling external RTT.
+
+Configure [dedicated probes](examples/quickstart/dedicated-probes.yaml) in your
+monitoring profile. The controller can start and stop configured probes without
+redeploying the network. Its HTTP API listens on loopback by default:
+
+```bash
+kubectl -n monitoring port-forward deployment/monitoring-controller 8787:8787
+```
+
+In another terminal:
+
+```bash
+nador-controller list
+nador-controller start throughput --slice 01:ffffff
+nador-controller start rtt --imsi 001010000000100
+nador-controller stop rtt
+```
+
+RTT and throughput support IMSI and slice filters. When both are set, both
+must match. Omitted filters keep their previous values; use `--all` to clear
+them. Path probes report interface-wide counters. For one-way probes, set
+`one_way.image` and the target interfaces. UPF transit also requires
+`one_way.upf_transit.peer` and `one_way.test_port`, the traffic service port.
+
+Check pod readiness or Prometheus after changing a probe: API responses
+confirm the requested state, not workload readiness. A Helm upgrade reapplies
+the YAML settings. To expose the API remotely, configure `probe_api_tls_secret`
+and `probe_api_token_secret` and restrict network access. The CLI uses
+`NADOR_CONTROLLER_URL` and `NADOR_CONTROLLER_TOKEN` for remote HTTPS.
 
 Copyright (c) 2026 Yassir Amami. The extension is licensed under the
 [BSD 3-Clause Clear License](LICENSE). Reused/adapted upstream example and chart
