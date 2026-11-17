@@ -1,4 +1,6 @@
 {% from '_component.yaml.j2' import settings with context %}
+{% set roles = targets | map(attribute='role') | list %}
+{% set session_context = 'amf' in roles and 'smf' in roles %}
 {{ settings() }}
 controller:
   watchNamespaces: {{ packet_namespaces | tojson }}
@@ -25,13 +27,13 @@ probeApiTokenSecret: {{ monitoring.probe_api_token_secret | tojson }}
 probeControl: {{ monitoring.one_way.model_dump(mode="json") | tojson }}
 rttRequest:
   enabled: {{ monitoring.latency | tojson }}
-  allowed: {{ (monitoring.probe_controller_image is not none and (packet_targets | length > 0)) | tojson }}
+  allowed: {{ (monitoring.probe_controller_image is not none and session_context and (packet_targets | length > 0)) | tojson }}
   image: {{ monitoring.images.probe | tojson }}
   imsis: {{ monitoring.rtt_imsis | tojson }}
   slices: {{ monitoring.rtt_slices | tojson }}
 throughputRequest:
   enabled: {{ monitoring.throughput | tojson }}
-  allowed: {{ ('upf' in packet_targets and monitoring.external_throughput_image is not none) | tojson }}
+  allowed: {{ (monitoring.probe_controller_image is not none and session_context and 'upf' in packet_targets and monitoring.external_throughput_image is not none) | tojson }}
   image: {{ monitoring.external_throughput_image | tojson }}
 pathRequest:
   enabled: {{ monitoring.observability.user_plane_paths | tojson }}
