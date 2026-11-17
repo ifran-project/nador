@@ -1,7 +1,6 @@
 {
   "probes": {
     "probe": "ghcr.io/ifran-project/ebpf-latency-probe:sha-75a58721962c2e237babeb0b95354bec22296616",
-    "throughput": "ghcr.io/ifran-project/ebpf-throughput-probe:sha-3b3938074e454ba3396b869ea1a529b27a6e3fdd",
     "amf_sniffer": "ghcr.io/ifran-project/amf-sniffer:sha-75a58721962c2e237babeb0b95354bec22296616",
     "smf_sniffer": "ghcr.io/ifran-project/smf-sniffer:sha-75a58721962c2e237babeb0b95354bec22296616"
   },
@@ -26,11 +25,6 @@
       "repository": "ghcr.io/ifran-project/kpi-calculator-oai",
       "image_tag": "sha-75a58721962c2e237babeb0b95354bec22296616",
       "image_pull_policy": "IfNotPresent"
-    },
-    "monitoring-controller": {
-      "repository": "ghcr.io/ifran-project/kopf-controller",
-      "image_tag": "sha-3b3938074e454ba3396b869ea1a529b27a6e3fdd",
-      "image_pull_policy": "Always"
     }
   },
   "builds": {
@@ -39,12 +33,6 @@
       "source_repository": "ifran-project/nador-images",
       "source_commit": "75a58721962c2e237babeb0b95354bec22296616",
       "source_change": "Merge pull request #5 from ifran-project/multi-upf-throughput"
-    },
-    "controller": {
-      "digest": "sha256:bf630d3c51e1bd4b0ddd3dc90111d1db602d8bcc9958d1af180021c2b678bea8",
-      "source_repository": "ifran-project/nador-images",
-      "source_commit": "3b3938074e454ba3396b869ea1a529b27a6e3fdd",
-      "source_change": "Merge pull request #4 from ifran-project/multi-upf-throughput"
     },
     "kpi-calculator-oai": {
       "digest": "sha256:5c331ad16b8019bb983a44b84259f563ebc8e5e96088167df7b73789afe175b4",

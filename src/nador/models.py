@@ -17,6 +17,15 @@ from nador.one_way import OneWaySettings
 DEFAULT_IMAGES = json.loads((Path(__file__).parent / "assets" / "images.json").read_text())
 
 
+def component_image_defaults(name: str, controller_image: str | None = None) -> dict | None:
+    """Derive controller chart defaults from the same image used for probes and cleanup."""
+    if name == "monitoring-controller":
+        reference = controller_image or DEFAULT_IMAGES["external_probes"]["controller"]
+        repository, _, tag = reference.rpartition(":")
+        return {"repository": repository, "image_tag": tag, "image_pull_policy": "Always"}
+    return DEFAULT_IMAGES["components"].get(name)
+
+
 class DeployedMonitoringComponent(StrictBaseModel):
     """Helm release with optional monitoring configuration overrides."""
 
