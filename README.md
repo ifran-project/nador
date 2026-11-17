@@ -15,10 +15,6 @@ It integrates Prometheus, Grafana and Loki, correlates UE/slice/tunnel/session
 information, deploys latency and N3 throughput probes, and exports experiment
 timelines and metrics. Network deployment remains handled by upstream managers.
 
-Optional protocol/path collectors and richer experiment collection are described
-in [ML observability](OBSERVABILITY.md). These additions require explicitly
-selected collector images and live validation before use in experiments.
-
 Install from GitHub:
 
 ```bash
@@ -32,17 +28,31 @@ from nador import MonitoringManagement, MonitoringDeployment
 Start with the [minimal tutorial](examples/quickstart/tutorial.ipynb): installation,
 imports, monitoring deployment and one experiment with artifact collection.
 
-Use [deployment checkpoints](MONITORING.md#restore-a-monitoring-deployment)
-to restore deployment handles after a notebook restart without reinstalling anything.
-
 Default monitoring image versions live in [`assets/images.json`](src/nador/assets/images.json).
 Image builds can propose updates through a pull request; deployments change after you merge it.
 Explicit scenario overrides still take precedence.
 
-`ran_kpis: true` selects OAI's existing KPI pipeline or OCUDU's native JSON
-WebSocket/Telegraf pipeline, according to the RAN implementation. For OCUDU,
-configure telemetry before deploying the RAN, as shown in
-[Monitoring](MONITORING.md#ocudu-native-ran-metrics). This does not enable ML collectors.
+## Monitoring
+
+Deploy monitoring after the RAN and before UE attachment, so the sniffers
+observe session establishment. Use a topology-specific profile:
+
+```python
+config = MonitoringDeployment.from_yaml_file("monitoring.yaml")
+monitoring = MonitoringManagement(preceding=ran, config=config)
+await monitoring.deploy()
+```
+
+For OCUDU native KPIs, set `ran_kpis: true` and call
+`nador.configure_ran_kpis(ran, config)` **before** deploying the RAN. This does
+not enable ML collectors. Use `monitoring-ml.yaml` to enable the optional
+NGAP, PFCP, UE-mapper, path, and infrastructure collectors. Use
+`nador.artifacts.ObservabilityRun` to export metrics, sampled UE context, and
+setup snapshots; Loki export is optional.
+
+Save both deployment models with `monitoring.output()`. After restarting a
+kernel, use `MonitoringManagement.from_yaml_files(metamodel_file, deployment_model_file)`
+to restore the handle without redeploying. Keep the saved models private.
 
 Other examples are under [examples/monitoring](examples/monitoring):
 
