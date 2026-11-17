@@ -28,13 +28,7 @@ def probe_values(settings, name):
         data["quality_queries"] = []
     if not data["tcp_flows"]:
         data["packet_identity_secret"] = None
-    data.update(
-        node_enabled=name in NODE_PROBES,
-        service_enabled=name in SERVICE_PROBES,
-        node_image=settings.probe_images[name] if name in NODE_PROBES else None,
-        service_image=settings.probe_images[name] if name in SERVICE_PROBES else None,
-        probe_kind=name,
-    )
+    data["probe_kind"] = name
     return data
 
 

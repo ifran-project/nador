@@ -84,7 +84,7 @@ def _render_chart_values(
         target | {"kind": str(getattr(model, target["category"]).components[target["component"]].type)}
         for target in targets if target["category"] in ("ran", "core")
     ]
-    if model.monitoring.extended.active or (model.monitoring.probe_controller_image and model.monitoring.extended.probe_images):
+    if chart == "extended-probes":
         existing = {(target["category"], target["component"]) for target in extended_targets}
         for category in ("ran", "core"):
             for name, nf in getattr(model, category).components.items():
@@ -100,14 +100,7 @@ def _render_chart_values(
         if set(selected) - available:
             raise ValueError(f"Unresolved probe targets for {probe_name}: {sorted(set(selected) - available)}")
         extended_targets = [t for t in extended_targets if f'{t["category"]}/{t["component"]}' in selected]
-    extended_config = (
-        probe_values(model.monitoring.extended, probe_name)
-        if model.monitoring.extended.probe_images and (component.release_name or "").startswith("probe-")
-        else model.monitoring.extended.model_dump(mode="json") | {
-            "node_enabled": model.monitoring.extended.node_enabled,
-            "service_enabled": model.monitoring.extended.service_enabled,
-        }
-    )
+    extended_config = probe_values(model.monitoring.extended, probe_name) if chart == "extended-probes" else {}
     probe_states = _probe_states(model)
     if probe_name in probe_states:
         extended_config["paused"] = not probe_states[probe_name]
@@ -125,6 +118,7 @@ def _render_chart_values(
         ocudu_sources=ocudu_sources(model),
         extended_targets=extended_targets,
         extended_config=extended_config,
+        probe_image=model.monitoring.extended.probe_images.get(probe_name),
         packet_targets=packet_targets,
         probe_states=probe_states,
         packet_namespaces=sorted({target["namespace"] for target in targets if target["role"] in ("gnb", "upf")}),
@@ -149,19 +143,15 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
             enabled.add("one-way")
     if monitoring.probe_controller_image:
         enabled.update(("redis", "ue-mapper-api", "monitoring-controller"))
-    if monitoring.extended.active or (monitoring.probe_controller_image and monitoring.extended.probe_images):
-        if monitoring.extended.probe_images:
-            kinds = _probe_states(model) if monitoring.probe_controller_image else enabled_probes(monitoring.extended)
-            for kind in kinds:
-                name = f"probe-{kind}"
-                workload = "node" if kind in NODE_PROBES else "service"
-                defaults["components"][name] = {
-                    "chart_ref": "extended-probes",
-                    "pod_selector": [f"app={name}-extended-{workload}"],
-                }
-                enabled.add(name)
-        else:
-            enabled.add("extended-probes")
+    kinds = _probe_states(model) if monitoring.probe_controller_image else enabled_probes(monitoring.extended)
+    for kind in kinds:
+        name = f"probe-{kind}"
+        workload = "node" if kind in NODE_PROBES else "service"
+        defaults["components"][name] = {
+            "chart_ref": "extended-probes",
+            "pod_selector": [f"app={name}-extended-{workload}"],
+        }
+        enabled.add(name)
     if monitoring.loki:
         enabled.update(("loki", "promtail"))
     if monitoring.latency or monitoring.throughput or monitoring.observability.active:
