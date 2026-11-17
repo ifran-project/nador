@@ -28,8 +28,9 @@ Start with the [minimal tutorial](examples/quickstart/tutorial.ipynb): installat
 imports, monitoring deployment and one experiment with artifact collection.
 
 Default monitoring image versions live in [`assets/images.json`](src/nador/assets/images.json).
-Image builds can propose updates through a pull request; deployments change after you merge it.
-Explicit scenario overrides still take precedence.
+The notebook profiles inherit these defaults, including the AMF/SMF sniffers
+and UE mapper in ML mode. After merging an image update, reinstall Nador,
+restart the notebook kernel, and redeploy. Explicit overrides still take precedence.
 
 ## Monitoring
 

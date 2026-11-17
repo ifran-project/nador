@@ -1,13 +1,7 @@
 # Shared monitoring for the monolithic gNB and the CU/DU gNB.
 namespace: monitoring
 operation_timeout_seconds: 600
-images:
-  probe: ghcr.io/ifran-project/ebpf-latency-probe@sha256:448de9a1214e19c731632f3f8e20d0c059e0db07e713a648fde43d44efe42176
 components:
-  kpi-calculator-oai:
-    image:
-      repository: ghcr.io/ifran-project/kpi-calculator-oai
-      image_tag: sha-4a3672b4f68fae70cde256e6f790c61fc85b1e72
   ue-mapper-api:
     image:
       image_pull_policy: Always

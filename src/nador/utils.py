@@ -188,8 +188,9 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
                 data, monitoring.components[name].model_dump(mode="json", exclude_unset=True, exclude_none=True)
             )
         component = DeployedMonitoringComponent.model_validate(data)
-        if name == "ue-mapper-api" and monitoring.observability.mapper_coverage:
-            image = monitoring.observability.mapper_image
+        if name == "ue-mapper-api" and monitoring.observability.mapper_coverage and (
+            image := monitoring.observability.mapper_image
+        ):
             repository, separator, tag = image.rpartition(":")
             if not separator or not repository or not tag or "/" in tag or "@" in image:
                 raise ValueError("mapper_image must use an explicit repository:tag")

@@ -12,16 +12,16 @@ _SELECTED_IMAGES = json.loads(
 
 
 class ObservabilitySettings(StrictBaseModel):
-    """Opt-in collectors with verified ML image selections and explicit overrides."""
+    """Opt-in collectors with optional image overrides."""
 
     ngap: bool = False
     pfcp: bool = False
     mapper_coverage: bool = False
     user_plane_paths: bool = False
     node_metrics: bool = False
-    amf_image: str | None = _SELECTED_IMAGES["amf_image"]
-    smf_image: str | None = _SELECTED_IMAGES["smf_image"]
-    mapper_image: str | None = _SELECTED_IMAGES["mapper_image"]
+    amf_image: str | None = None
+    smf_image: str | None = None
+    mapper_image: str | None = None
     path_image: str | None = _SELECTED_IMAGES["path_image"]
     ngap_port: int = Field(default=9102, ge=1, le=65535)
     pfcp_port: int = Field(default=9104, ge=1, le=65535)
@@ -35,10 +35,12 @@ class ObservabilitySettings(StrictBaseModel):
 
     @model_validator(mode="after")
     def require_collector_images(self) -> Self:
-        for enabled, image in [(self.ngap, self.amf_image), (self.pfcp, self.smf_image),
-                               (self.mapper_coverage, self.mapper_image), (self.user_plane_paths, self.path_image)]:
-            if enabled and (not image or not image.strip()):
-                raise ValueError("Enabled observability collectors require their matching image")
+        for field in ("amf_image", "smf_image", "mapper_image"):
+            image = getattr(self, field)
+            if image is not None and not image.strip():
+                raise ValueError(f"{field} must be a non-empty image or null to inherit the default")
+        if self.user_plane_paths and (not self.path_image or not self.path_image.strip()):
+            raise ValueError("Enabled path monitoring requires path_image")
         if self.path_port in range(9100, 9200) or self.path_port in range(9300, 9400):
             raise ValueError("path_port overlaps the latency/throughput exporter ranges; use 9403 or another range")
         return self
