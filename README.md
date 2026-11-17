@@ -6,19 +6,18 @@ Named after Nador, a city in northeastern Morocco associated with the idea of a
 lookout, NADOR helps teams monitor mobile network performance, investigate issues,
 and report their findings.
 
-NADOR extends [IFRAN](https://github.com/ifran-project/ifran), the Infrastructure
-Framework for Reproducible Automation of Networks. Inspired by Ifrane and an
-anagram of INFRA, IFRAN handles reproducible network provisioning and slice management.
-Its current Python distribution and imports remain named `orchestrator`.
+NADOR extends [IFRAN](https://github.com/ifran-project/ifran), the Interoperable
+Framework for Reproducible Automation of Networks. IFRAN handles network
+provisioning and slice management; NADOR adds monitoring and experiment collection.
 
 It integrates Prometheus, Grafana and Loki, correlates UE/slice/tunnel/session
 information, deploys latency and N3 throughput probes, and exports experiment
 timelines and metrics. Network deployment remains handled by upstream managers.
 
-Install from GitHub:
+Install from GitHub. NADOR installs the supported IFRAN release from PyPI:
 
 ```bash
-python -m pip install --upgrade "git+https://github.com/ifran-project/nador.git@ml-observability" --extra-index-url https://gitlab.inria.fr/api/v4/projects/70914/packages/pypi/simple
+python -m pip install --upgrade "git+https://github.com/ifran-project/nador.git@ml-observability"
 ```
 
 ```python
@@ -58,16 +57,12 @@ Other examples are under [examples/monitoring](examples/monitoring):
 
 - [RFsim](examples/monitoring/rfsim): monolithic and split OAI radios.
   The monolithic OAI RFsim example uses stock Open5GS SMF and UPF images
-  selected by the orchestrator. Its ML profile uses separate collector
+  selected by IFRAN. Its ML profile uses separate collector
   images and leaves custom core KPIs off.
 - [Multi-gNB](examples/monitoring/multi-gnb-2du/test.ipynb): 20 UEs, a monolithic
   gNB plus a CU/two DUs, three slices and two UPFs; includes on-demand traffic.
-- [Open5GS throughput profile](examples/monitoring/throughput/monitoring.yaml) and
-  [OAI throughput profile](examples/monitoring/throughput-oai/monitoring.yaml):
-  configurations for the N3 throughput probe.
 - [OCUDU ZMQ](examples/monitoring/ocudu-zmq), including a
   [single-gNB ML profile](examples/monitoring/ocudu-zmq/zmq/monitoring-ml.yaml),
-  [B210](examples/monitoring/b210)
   and [R2lab](examples/monitoring/r2lab): additional deployment configurations.
 
 ## On-demand probes
@@ -108,5 +103,5 @@ and `probe_api_token_secret` and restrict network access. The CLI uses
 
 Copyright (c) 2026 Yassir Amami. The extension is licensed under the
 [BSD 3-Clause Clear License](LICENSE). Reused/adapted upstream example and chart
-material retains the [SLICES orchestrator notice](LICENSES/SLICES-orchestrator.txt).
+material retains its [upstream license notice](LICENSES/).
 External dependencies and container images retain their own licenses.
