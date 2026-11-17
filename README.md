@@ -1,7 +1,7 @@
 # NADOR
 
-Opt-in collectors on `ml-extended` are described in [Extended ML Observability](EXTENDED.md).
-The portable probes on the same branch are documented in [Portable Extended Observability](PORTABLE.md).
+See [Extended ML Observability](EXTENDED.md) for available collectors and
+[Portable Extended Observability](PORTABLE.md) for their measurement limits.
 
 **Network Analytics, Diagnostics, Observability, and Reporting for Mobile Networks.**
 
@@ -25,7 +25,7 @@ selected collector images and live validation before use in experiments.
 Install from GitHub:
 
 ```bash
-python -m pip install --upgrade "git+https://github.com/ifran-project/nador.git@ml-extended" --extra-index-url https://gitlab.inria.fr/api/v4/projects/70914/packages/pypi/simple
+python -m pip install --upgrade "git+https://github.com/ifran-project/nador.git@ml-observability" --extra-index-url https://gitlab.inria.fr/api/v4/projects/70914/packages/pypi/simple
 ```
 
 ```python
@@ -61,7 +61,9 @@ Other examples are under [examples/monitoring](examples/monitoring):
 - [Open5GS throughput profile](examples/monitoring/throughput/monitoring.yaml) and
   [OAI throughput profile](examples/monitoring/throughput-oai/monitoring.yaml):
   configurations for the N3 throughput probe.
-- [OCUDU ZMQ](examples/monitoring/ocudu-zmq), [B210](examples/monitoring/b210)
+- [OCUDU ZMQ](examples/monitoring/ocudu-zmq), including a
+  [single-gNB ML profile](examples/monitoring/ocudu-zmq/zmq/monitoring-ml.yaml),
+  [B210](examples/monitoring/b210)
   and [R2lab](examples/monitoring/r2lab): additional deployment configurations.
 
 Copyright (c) 2026 Yassir Amami. The extension is licensed under the

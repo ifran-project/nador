@@ -1,10 +1,9 @@
 # Extended ML Observability
 
-This branch adds opt-in experimental collectors without changing the original
-ML switches, default probe images, upstream orchestrator, or 5G binaries.
-The same branch name, `ml-extended`, exists in `nador-images`.
+Nador deploys these optional collectors without modifying the upstream
+orchestrator or 5G binaries.
 
-## Implemented for initial testing
+## Available collectors
 
 | Switch | Collection | Interpretation and limitations |
 | --- | --- | --- |
@@ -41,8 +40,8 @@ extended:
   socket_counters: true
   split_signaling: true
   quality: true
-  node_image: ghcr.io/yassir63/nador-extended-node:extended-REPLACE_WITH_PUBLISHED_COMMIT
-  service_image: ghcr.io/yassir63/nador-extended-service:extended-REPLACE_WITH_PUBLISHED_COMMIT
+  node_image: ghcr.io/ifran-project/nador-extended-node:extended-REPLACE_WITH_PUBLISHED_COMMIT
+  service_image: ghcr.io/ifran-project/nador-extended-service:extended-REPLACE_WITH_PUBLISHED_COMMIT
   quality_queries:
     - name: user_plane_events
       query: user_plane_probe_gtpu_last_packet_timestamp_seconds
@@ -56,9 +55,8 @@ for unchanged monitoring behavior. For an existing deployment, remove the
 `extended-probes` Helm release before disabling it; switches do not undo
 previously installed releases automatically.
 
-The main measurement-quality gap still requiring implementation is historical
-session validity over the traffic window. These quality metrics alone do not
-fix the post-export session identity comparison in the private trial runner.
+Measurement-quality checks do not prove a session stayed unchanged throughout
+the traffic window.
 
 When an experiment receives a monitoring manager with the extension active,
 `ExperimentRun` preserves its query profile and additionally exports all
@@ -73,17 +71,8 @@ driver-specific NIC telemetry, energy attribution, E2SM-KPM adapters and SBI
 HTTP/2/TLS instrumentation remain separate implementation and validation tasks.
 Do not present them as available from this branch.
 
-## Validation
+## References
 
-Start offline: models and chart rendering, thread/cgroup parsing fixtures,
-decoder PDML fixtures, and finite/stale/missing quality cases.
-GitHub then builds both images and checks packaged dependencies.
-Only then test in a Linux cluster: scheduling contention, controlled qdisc/drop
-faults, and F1/E1 session procedures.
-Capture kernel/config versions, image digests, overhead and event-loss bounds.
-No live validation or image publication is claimed by adding this source.
-
-Primary references:
 - https://docs.kernel.org/scheduler/sched-stats.html
 - https://github.com/torvalds/linux/blob/master/include/trace/events/skb.h
 - https://www.wireshark.org/docs/dfref/f/f1ap.html

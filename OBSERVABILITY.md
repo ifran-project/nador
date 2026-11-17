@@ -25,7 +25,7 @@ The existing `monitoring.yaml` profiles remain opt-out. For other deployments,
 enable the same `observability` switches in their configuration; image references
 default to the selected published builds and can still be overridden explicitly.
 
-In the monolithic OAI RFsim example and its live trial, the orchestrator selects
+In the monolithic OAI RFsim example, the orchestrator selects
 the stock Open5GS SMF and UPF images. The pinned images above are for monitoring
 collectors, not core network functions. Custom core KPIs are off in the
 supplied RFsim profiles.
@@ -133,15 +133,13 @@ on the control node (mapper service port 8080). Direct URLs are also supported.
 Workload exceptions are preserved; collection errors are retained in metadata.
 Artifacts contain UE identities and topology: treat them as sensitive research data.
 
-Single-gNB OAI RFsim and the multi-gNB/two-DU OAI trial passed the live
-monitoring/ML artifact checks. OCUDU ZeroMQ passed the NGAP, mapping, probe and
-traffic stages but its complete artifact export remains unvalidated after
-high-volume PHY logs exhausted the export budget. Physical-RU portability
-has not yet been validated.
+On single-gNB OAI RFsim and OCUDU ZMQ, live runs verified external probe
+lifecycle, RTT, Prometheus export, and sampled UE context. The OCUDU run did
+not export Loki logs. Multi-anchor RTT, isolation between slices, and physical
+RUs are not covered by these checks.
 
-The OAI validator checks native per-radio/per-RNTI DL and UL goodput rather
-than requiring the removed calculator `mac_throughput` metric. Goodput is a
-gNB-reported rate; it is not relabeled as a cumulative byte counter.
+Native OAI DL and UL goodput is a per-radio/per-RNTI rate, not a cumulative
+byte counter.
 
 Loki exports split full query pages into disjoint time windows and stream the
 accepted pages to disk. The default budget is 1,024 queries; set
@@ -154,7 +152,7 @@ For noisy ZeroMQ PHY logs, an explicit selector can omit routine info messages:
 loki_selector = r'{namespace=~".+"} !~ `\[(PHY_LIB|PHY[0-9]*(-NR)?|MAC(-NR)?|RLC(-NR)?|PDCP(-NR)?|GTPU|GW|SCHED)[ ]*\] \[I\]|^[ ]+[0-9a-fA-F]{4}:`'
 ```
 
-For these ZMQ trials, the selector omits routine packet-layer INFO messages
+For ZMQ deployments, the selector omits routine packet-layer INFO messages
 and packet hex-dump lines. It retains signaling INFO and warning/error messages.
 This filters only the exported evidence, not ingestion or retention in Loki.
 The selector is recorded in the export summary. Warnings and errors are retained.

@@ -6,7 +6,7 @@ configuration, deployment and artifact collection in one notebook.
 Install the extended monitoring library from GitHub in your notebook:
 
 ```python
-%pip install --upgrade "git+https://github.com/ifran-project/nador.git@ml-extended" --extra-index-url https://gitlab.inria.fr/api/v4/projects/70914/packages/pypi/simple
+%pip install --upgrade "git+https://github.com/ifran-project/nador.git@ml-observability" --extra-index-url https://gitlab.inria.fr/api/v4/projects/70914/packages/pypi/simple
 ```
 
 Restart the kernel after installation, then run your core/RAN setup before

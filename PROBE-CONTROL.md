@@ -1,15 +1,12 @@
 # External RTT and on-demand probes
 
-Use a fresh monitoring deployment for the first external RTT test. Set
-the following in an otherwise complete monitoring profile:
+Enable external RTT in your monitoring profile:
 
 ```yaml
 latency: true
 packet_pairing: false
 rtt_imsis: []
 rtt_slices: ["01:ffffff"]
-images:
-  probe: ghcr.io/ifran-project/ebpf-latency-probe:extended-fe1764d9f887311be15c6920f4b94d165a04b227
 ```
 
 RTT uses disposable external probe pods only. Enabling `latency` selects the
@@ -33,24 +30,10 @@ gNB and UPF pods first so their ephemeral containers and filters are gone.
 If the separate one-way Helm release was previously installed, remove
 it before handing the ConfigMap and Service over to the external controller.
 
-Request RTT for a specific UE while the deployment is running:
-
-```bash
-ns=monitoring
-kubectl -n "$ns" get configmap nador-one-way -o json |
-  jq '.data["settings.json"] |= (fromjson |
-      .rtt.enabled = true | .rtt.imsis = ["001010000000100"] | .rtt.slices = [] | tojson)' |
-  kubectl replace -f -
-```
-
-Use `.rtt.enabled = false` to stop RTT, or edit `.n3.enabled` or
-`.upf_transit.enabled` to control either one-way probe. The Nador
-`set_one_way()` method works on the same ConfigMap. User and slice
-selection applies to external RTT and throughput. The one-way measurements
-are slice-labeled but not filtered by these selectors. Other diagnostics
-and the AMF/SMF sniffers retain their existing deployment paths.
-ConfigMap writes are administrative operations: grant them only to
-trusted monitoring operators. A Helm upgrade restores the YAML settings.
+Use the API below to change probe state at runtime. IMSI and slice selectors
+apply to external RTT and throughput. One-way metrics carry slice labels but
+are not filtered by these selectors. You can also use the Python
+`monitoring.set_one_way()` method. A Helm upgrade restores the YAML settings.
 
 ## HTTP API
 
@@ -88,9 +71,7 @@ Split signaling is only available for a modeled split.
 In controller mode, `throughput` and `user_plane_paths` also run as
 disposable pods. Throughput accepts IMSI/slice selectors like RTT.
 Path counters cover interfaces, not individual UEs. AMF/SMF sniffers,
-mapper and node exporters remain monitoring infrastructure. Use one
-gNB and one UPF for this test, with no legacy external or injected
-workloads left over. Do not enable same-packet pairing in external RTT.
+mapper and node exporters remain monitoring infrastructure.
 
 ## Public HTTPS
 
