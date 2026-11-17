@@ -1,6 +1,6 @@
 """Configure and resolve implementation-native RAN telemetry."""
 
-from orchestrator.utils.k8s import build_k8s_safe
+from ifran.utils.k8s import build_k8s_safe
 
 
 OCUDU_LAYERS = {

@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from metamodel.models.base import StrictBaseModel
+from metamodel_3gpp.models.base import StrictBaseModel
 from pydantic import Field, model_validator
 from .probe_catalog import PROBES, enabled_probes
 

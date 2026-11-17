@@ -3,11 +3,11 @@
 from pathlib import Path
 from typing import Any, Literal, Self
 
-from metamodel.models.metamodel import MetaModel
-from orchestrator.deployment.base import BaseManagement
-from orchestrator.deployment.helm import HelmManagement
-from orchestrator.models.deployment import DeploymentModel
-from orchestrator.utils.ansible import get_ansible_inventory_line, run_ansible_role
+from metamodel_3gpp.models.metamodel import MetaModel
+from ifran.deployment.base import BaseManagement
+from ifran.deployment.helm import HelmManagement
+from ifran.models.deployment import DeploymentModel
+from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_role
 
 from nador.models import MonitoringDeployment, MonitoringModel
 from nador.one_way import OneWaySettings
@@ -49,9 +49,10 @@ class MonitoringManagement(HelmManagement):
         if monitoring.throughput and not monitoring.targets:
             raise ValueError("Throughput requires AMF, SMF and UPF packet targets")
         node_name, _ = self._get_deployment_node(None)
-        targets = resolve_targets(self.deployment_model)
-        monitoring.components = resolve_components(self.deployment_model, targets)
-        self.deployment_model.monitoring.components = monitoring.components
+        model = self.deployment_model.model_copy(update={"monitoring": monitoring})
+        targets = resolve_targets(model)
+        monitoring.components = resolve_components(model, targets)
+        self.deployment_model.monitoring = monitoring
         return {
             "control_node": node_name,
             "targets": targets,

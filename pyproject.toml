@@ -7,7 +7,7 @@ license = {text = "BSD-3-Clause-Clear"}
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "orchestrator @ git+https://gitlab.inria.fr/slices-ri/blueprints/post-5g/orchestrator.git@main",
+    "ifran==0.0.6",
     "Jinja2>=3.1,<4",
     "PyYAML>=6,<7",
 ]

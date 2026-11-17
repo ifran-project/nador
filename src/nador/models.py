@@ -5,9 +5,9 @@ import re
 from pathlib import Path
 from typing import Any, Literal, Self
 
-from metamodel.models.base import StrictBaseModel
-from orchestrator.models.deployment import DeploymentModel
-from orchestrator.models.k8s import ContainerImage
+from metamodel_3gpp.models.base import StrictBaseModel
+from ifran.models.deployment import DeploymentModel
+from ifran.models.k8s import ContainerImage
 from pydantic import Field, model_validator
 from nador.observability import ObservabilitySettings
 from nador.extended import ExtendedSettings
@@ -15,8 +15,6 @@ from nador.one_way import OneWaySettings
 
 
 DEFAULT_IMAGES = json.loads((Path(__file__).parent / "assets" / "images.json").read_text())
-EXTERNAL_CONTROLLER_IMAGE = "ghcr.io/ifran-project/nador-controller:extended-8092c1760c6a528a316a852f699d43feffc020c9"
-EXTERNAL_PROBE_BUILD = "extended-b98fe91553736024ed140cc6677da7d72a0e5715"
 
 
 class DeployedMonitoringComponent(StrictBaseModel):
@@ -121,11 +119,12 @@ class MonitoringDeployment(StrictBaseModel):
         if self.packet_pairing:
             raise ValueError("External RTT does not support packet_pairing; set packet_pairing: false")
         if self.latency and not self.probe_controller_image:
-            self.probe_controller_image = EXTERNAL_CONTROLLER_IMAGE
+            external_images = DEFAULT_IMAGES["external_probes"]
+            self.probe_controller_image = external_images["controller"]
             if self.throughput and not self.external_throughput_image:
-                self.external_throughput_image = f"ghcr.io/ifran-project/nador-throughput-probe:{EXTERNAL_PROBE_BUILD}"
+                self.external_throughput_image = external_images["throughput"]
             if self.observability.user_plane_paths and not self.external_path_image:
-                self.external_path_image = f"ghcr.io/ifran-project/nador-user-plane-path:{EXTERNAL_PROBE_BUILD}"
+                self.external_path_image = external_images["user_plane_paths"]
         if self.probe_controller_image:
             for enabled, name, image in (
                 (self.throughput, "external_throughput_image", self.external_throughput_image),

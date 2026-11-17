@@ -3,7 +3,7 @@
 from ipaddress import IPv4Address
 from typing import Self
 
-from metamodel.models.base import StrictBaseModel
+from metamodel_3gpp.models.base import StrictBaseModel
 from pydantic import Field, model_validator
 
 

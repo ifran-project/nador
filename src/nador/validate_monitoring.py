@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 
 import yaml
-from orchestrator.utils.utils import deep_merge
+from ifran.utils.utils import deep_merge
 from pydantic import ValidationError
 
 from nador.models import DEFAULT_IMAGES, MonitoringDeployment
