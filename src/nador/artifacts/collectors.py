@@ -12,8 +12,7 @@ from typing import TYPE_CHECKING
 from nador.probes import enabled_probes
 
 from .loki_export import collect_logs
-from .prometheus_export import export_ranges, load_queries
-from .split_by_window import split_windows
+from .prometheus_export import export_ranges, load_queries, split_windows
 from .ssh_tunnel import loki_connection, prometheus_connection
 
 if TYPE_CHECKING:

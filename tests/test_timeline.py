@@ -65,7 +65,7 @@ def test_malformed_lines_are_reported_not_fatal(tmp_path):
 def test_prometheus_samples_are_split_by_window(tmp_path):
     import gzip
 
-    from nador.artifacts.split_by_window import split_windows
+    from nador.artifacts.prometheus_export import split_windows
 
     write_events(
         tmp_path / "timeline_events.jsonl",
