@@ -240,6 +240,18 @@ class MonitoringTarget(StrictBaseModel):
         return self
 
 
+class ResolvedTarget(MonitoringTarget):
+    """A monitoring target located in the deployed network: its namespace and pod selector are known."""
+
+    namespace: str
+    implementation: str
+    label_selectors: list[str]
+
+    def values(self) -> dict[str, Any]:
+        """The target as plain data for Helm values and Ansible inputs."""
+        return self.model_dump(mode="json")
+
+
 class MonitoringImages(StrictBaseModel):
     """Container versions for the RTT probe and session sniffers."""
 

@@ -17,6 +17,7 @@ from nador.config import (
     DeployedMonitoringComponent,
     MonitoringDeployment,
     MonitoringModel,
+    ResolvedTarget,
     component_image_defaults,
     split_image,
 )
@@ -56,7 +57,7 @@ def _probe_states(model):
     return states
 
 
-def resolve_targets(model: MonitoringModel) -> list[dict]:
+def resolve_targets(model: MonitoringModel) -> list[ResolvedTarget]:
     """Resolve stable selectors from the same release naming used by HelmManagement."""
     result = []
     for target in model.monitoring.targets:
@@ -73,23 +74,25 @@ def resolve_targets(model: MonitoringModel) -> list[dict]:
                 raise ValueError(f"{target.component}: {component.type} cannot be a {target.role} packet target")
         selector = target.selector or {"app": build_k8s_safe(f"{component.implementation}-{target.component}")}
         result.append(
-            target.model_dump()
-            | {
-                "namespace": namespace,
-                "implementation": str(component.implementation),
-                "selector": selector,
-                "label_selectors": [f"{key}={value}" for key, value in selector.items()],
-            }
+            ResolvedTarget(
+                **target.model_dump(exclude={"selector"}),
+                selector=selector,
+                namespace=namespace,
+                implementation=str(component.implementation),
+                label_selectors=[f"{key}={value}" for key, value in selector.items()],
+            )
         )
     return result
 
 
-def _extended_chart_context(model, targets, probe_name, probe_states):
+def _extended_chart_context(
+    model: MonitoringModel, targets: list[ResolvedTarget], probe_name: str, probe_states: dict[str, bool]
+) -> dict:
     settings = model.monitoring.extended
     extended_targets = [
-        target | {"kind": str(getattr(model, target["category"]).components[target["component"]].type)}
+        target.values() | {"kind": str(getattr(model, target.category).components[target.component].type)}
         for target in targets
-        if target["category"] in ("ran", "core")
+        if target.category in ("ran", "core")
     ]
     existing = {(target["category"], target["component"]) for target in extended_targets}
     for category in ("ran", "core"):
@@ -123,17 +126,19 @@ def _extended_chart_context(model, targets, probe_name, probe_states):
     }
 
 
-def _controller_values(monitoring: MonitoringDeployment, targets: list[dict], probe_states: dict) -> dict:
+def _controller_values(
+    monitoring: MonitoringDeployment, targets: list[ResolvedTarget], probe_states: dict[str, bool]
+) -> dict:
     """Build controller values.
 
     Single-anchor deployments describe their gNB/UPF through probeControlTargets (targets.json);
     multi-anchor deployments pass explicit per-request target lists instead.
     """
-    anchors = [target for target in targets if target["role"] in ("gnb", "upf")]
+    anchors = [target.values() for target in targets if target.role in ("gnb", "upf")]
     upfs = [target for target in anchors if target["role"] == "upf"]
     by_role = {target["role"]: target for target in anchors}
     controller_image = monitoring.probe_controller_image
-    has_session_context = {"amf", "smf"} <= {target["role"] for target in targets}
+    has_session_context = {"amf", "smf"} <= {target.role for target in targets}
     scoped_probes_allowed = controller_image is not None and has_session_context
     observation = monitoring.observability
 
@@ -168,7 +173,7 @@ def _controller_values(monitoring: MonitoringDeployment, targets: list[dict], pr
         throughput["targets"] = upfs
 
     return {
-        "targetNamespaces": sorted({target["namespace"] for target in targets}),
+        "targetNamespaces": sorted({target.namespace for target in targets}),
         "operationTimeoutSeconds": monitoring.operation_timeout_seconds,
         "probeControllerImage": controller_image,
         "cleanupImage": controller_image or DEFAULT_IMAGES["external_probes"]["controller"],
@@ -190,8 +195,8 @@ def _controller_values(monitoring: MonitoringDeployment, targets: list[dict], pr
 def _render_chart_values(
     component: DeployedMonitoringComponent,
     model: MonitoringModel,
-    targets: list[dict],
-    probe_states: dict,
+    targets: list[ResolvedTarget],
+    probe_states: dict[str, bool],
 ) -> dict:
     """Render chart configuration before applying explicit user overrides."""
     chart = component.chart_ref.rsplit("/", 1)[-1]
@@ -206,12 +211,12 @@ def _render_chart_values(
     elif chart == "ocudu-metrics":
         context["ocudu_sources"] = ocudu_sources(model)
     elif chart == "kube-prometheus-stack":
-        context["target_namespaces"] = sorted({model.monitoring.namespace} | {t["namespace"] for t in targets})
+        context["target_namespaces"] = sorted({model.monitoring.namespace} | {t.namespace for t in targets})
     rendered = VALUES_TEMPLATES.get_template(f"{chart}.yaml.j2").render(
         component=component,
         monitoring=model.monitoring,
         model=model,
-        targets=targets,
+        targets=[target.values() for target in targets],
         node_selector=node_selector,
         **context,
     )
@@ -241,7 +246,7 @@ def _enabled_components(model: MonitoringModel) -> set[str]:
     return enabled
 
 
-def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str, DeployedMonitoringComponent]:
+def resolve_components(model: MonitoringModel, targets: list[ResolvedTarget]) -> dict[str, DeployedMonitoringComponent]:
     """Build enabled monitoring components and their Helm values in installation order."""
     monitoring = model.monitoring
     catalog = yaml.safe_load((ASSETS / "components.yaml").read_text())

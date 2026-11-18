@@ -1,5 +1,6 @@
 """Monitoring deployment lifecycle and workload logs."""
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, Self
 
@@ -15,9 +16,19 @@ from nador.config import (
     MonitoringDeployment,
     MonitoringModel,
     OneWaySettings,
+    ResolvedTarget,
     validate_deployment,
 )
 from nador.planner import ASSETS, resolve_components, resolve_targets
+
+
+@dataclass(frozen=True)
+class Plan:
+    """What deploy() will install: the control node, the located targets and every Helm release."""
+
+    control_node: str
+    targets: list[ResolvedTarget]
+    components: dict[str, DeployedMonitoringComponent]
 
 
 class MonitoringManagement(HelmManagement):
@@ -41,7 +52,7 @@ class MonitoringManagement(HelmManagement):
         )
         return cls(preceding=base, config=model.monitoring)
 
-    def plan(self) -> dict[str, Any]:
+    def plan(self) -> Plan:
         """Resolve targets and chart values without contacting deployment hosts."""
         monitoring = validate_deployment(self.deployment_model.monitoring.model_dump(mode="python"))
         if monitoring.throughput and not monitoring.targets:
@@ -51,10 +62,7 @@ class MonitoringManagement(HelmManagement):
         targets = resolve_targets(model)
         monitoring.components = resolve_components(model, targets)
         self.deployment_model.monitoring = monitoring
-        return {
-            "control_node": node_name,
-            "targets": targets,
-        }
+        return Plan(control_node=node_name, targets=targets, components=monitoring.components)
 
     async def prepare(self, *, quiet: bool = False) -> None:
         """Resolve chart values, label the monitoring node and add Helm repositories."""
@@ -102,7 +110,7 @@ class MonitoringManagement(HelmManagement):
         self,
         action: Literal["prepare", "inject_sniffers", "set_one_way"],
         *,
-        targets: list[dict] | None = None,
+        targets: list[ResolvedTarget] | None = None,
         settings: dict | None = None,
         quiet: bool = False,
     ) -> None:
@@ -118,7 +126,7 @@ class MonitoringManagement(HelmManagement):
                 "monitoring_action": action,
                 "monitoring_control_node": node_name,
                 "monitoring_config": monitoring.model_dump(mode="json", exclude={"components"}),
-                "monitoring_targets": targets or [],
+                "monitoring_targets": [target.values() for target in targets or []],
                 "one_way_settings": settings,
             },
             extra_params={"name": "Monitoring"},
@@ -164,7 +172,7 @@ class MonitoringManagement(HelmManagement):
         monitoring = self.deployment_model.monitoring
         if monitoring.needs_session_stack:
             # Start capture before UEs attach, so the mapper sees session establishment.
-            await self._run_tasks("inject_sniffers", targets=plan["targets"], quiet=quiet)
+            await self._run_tasks("inject_sniffers", targets=plan.targets, quiet=quiet)
 
     async def remove(self, *, quiet: bool = False) -> None:
         """Remove monitoring using the current deployment configuration."""

@@ -59,7 +59,7 @@ def render(path, overlay) -> dict:
     targets = resolve_targets(model)
     components = resolve_components(model, targets)
     return {
-        "targets": targets,
+        "targets": [target.values() for target in targets],
         "components": {name: c.model_dump(mode="json") for name, c in components.items()},
     }
 
