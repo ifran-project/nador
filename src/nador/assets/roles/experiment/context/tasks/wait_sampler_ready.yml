@@ -1,0 +1,6 @@
+# Inputs: sampler_dir, sampler_timeout_seconds.
+---
+- name: Wait until the sampler has written its first sample
+  ansible.builtin.wait_for:
+    path: "{{ sampler_dir }}/ready.json"
+    timeout: "{{ sampler_timeout_seconds }}"

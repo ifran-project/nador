@@ -1,0 +1,32 @@
+# Inputs: sampler_dir, sampler_job_id (may be empty), sampler_timeout_seconds, fetch_dir.
+---
+- name: Stop the sampler and fetch its evidence
+  block:
+    - name: Ask the sampler to stop
+      ansible.builtin.copy:
+        dest: "{{ sampler_dir }}/STOP"
+        content: "stop\n"
+        mode: "0600"
+
+    - name: Wait for the sampler summary
+      ansible.builtin.wait_for:
+        path: "{{ sampler_dir }}/summary.json"
+        timeout: "{{ 2 * (sampler_timeout_seconds | int) + 15 }}"
+
+    - name: Wait for the sampler process to exit
+      ansible.builtin.async_status:
+        jid: "{{ sampler_job_id }}"
+      register: sampler_exit
+      until: sampler_exit.finished | default(false)
+      retries: "{{ (sampler_timeout_seconds | int) + 15 }}"
+      delay: 1
+      when: sampler_job_id | default('', true) | length > 0
+
+  always:
+    # Retrieve partial evidence even if stopping failed.
+    - name: Fetch sampler files
+      ansible.builtin.fetch:
+        src: "{{ sampler_dir }}/{{ item }}"
+        dest: "{{ fetch_dir }}/"
+        flat: true
+      loop: [history.jsonl, summary.json, ready.json]

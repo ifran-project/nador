@@ -1,0 +1,13 @@
+# Inputs: snapshot_script (path on the controller), snapshot_args (list).
+---
+- name: Read setup snapshot
+  ansible.builtin.script:
+    cmd: "{{ ([snapshot_script] + snapshot_args) | map('quote') | join(' ') }}"
+    executable: python3
+  register: snapshot
+  changed_when: false
+
+- name: Return the snapshot
+  ansible.builtin.set_stats:
+    data:
+      snapshot: "{{ snapshot.stdout }}"

@@ -1,0 +1,4 @@
+# Experiment context collected by ObservabilityRun on the cluster hosts.
+---
+- name: Run experiment context action
+  ansible.builtin.include_tasks: "{{ context_action }}.yml"

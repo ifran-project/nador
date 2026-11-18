@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import shlex
 import threading
 from contextlib import AsyncExitStack
 from pathlib import Path
@@ -12,8 +11,10 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Annotated, Any
 from urllib.parse import urlsplit
 
-from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_playbook
+from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_role
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from nador.planner import ASSETS
 
 from . import ue_sampler
 from .experiment_run import ExperimentRun
@@ -78,7 +79,7 @@ class ObservabilityRun(ExperimentRun):
     def __init__(self, directory: str | Path, *, monitoring: MonitoringManagement | None = None, **kwargs: Any) -> None:
         settings = {key: kwargs.pop(key) for key in list(kwargs) if key in ObservabilityOptions.model_fields}
         options = ObservabilityOptions(**settings)
-        kwargs.setdefault("queries_file", Path(__file__).resolve().parents[1] / "assets" / "observability_queries.json")
+        kwargs.setdefault("queries_file", ASSETS / "observability_queries.json")
         super().__init__(directory, monitoring=monitoring, **kwargs)
         if options.setup_hosts and (
             monitoring is None or any(host not in monitoring.deployment_model.nodes for host in options.setup_hosts)
@@ -148,24 +149,20 @@ class ObservabilityRun(ExperimentRun):
             self._remote_config = (name, cfg.kubeconfig, self.settings.namespace or cfg.namespace)
         return self._remote_config
 
-    async def _run(self, tasks, *, host=None, output_keys=None):
+    async def _run(self, action: str, inputs: dict, *, host: str | None = None, output_keys=None):
+        """Run one action of the experiment/context Ansible role on a cluster host."""
         model = self.monitoring.deployment_model
         host = host or self._control()[0]
-        inventory = "[ml_context]\n" + get_ansible_inventory_line(host, model.nodes[host]) + "\n"
-        return await run_ansible_playbook(
-            playbook=[
-                {
-                    "name": "ML experiment context",
-                    "hosts": "ml_context",
-                    "gather_facts": False,
-                    "become": True,
-                    "tasks": tasks,
-                }
-            ],
-            inventory=inventory,
+        return await run_ansible_role(
+            role="experiment/context",
+            hosts=host,
+            inventory=get_ansible_inventory_line(host, model.nodes[host]),
+            become=True,
+            inputs={"context_action": action, **inputs},
             output_keys=output_keys,
+            runner_path=str(Path(model.params.ansible.runner_path) / "ml-artifacts" / self.run_id / action),
+            roles_paths=[str(ASSETS / "roles"), *model.params.ansible.roles_paths],
             quiet=True,
-            runner_path=str(Path(model.params.ansible.runner_path) / "ml-artifacts" / self.run_id),
         )
 
     async def _snapshot(self, phase):
@@ -201,17 +198,7 @@ class ObservabilityRun(ExperimentRun):
 
     async def _read_snapshot(self, script, args, host):
         result = await self._run(
-            [
-                {
-                    "name": "Read setup snapshot",
-                    "ansible.builtin.script": {"cmd": shlex.join([str(script), *args]), "executable": "python3"},
-                    "register": "snapshot",
-                    "changed_when": False,
-                },
-                {"ansible.builtin.set_stats": {"data": {"snapshot": "{{ snapshot.stdout }}"}}},
-            ],
-            host=host,
-            output_keys=["snapshot"],
+            "snapshot", {"snapshot_script": str(script), "snapshot_args": args}, host=host, output_keys=["snapshot"]
         )
         snapshot = json.loads(result["snapshot"])
         if not isinstance(snapshot, dict) or not isinstance(snapshot.get("data"), dict):
@@ -265,73 +252,29 @@ class ObservabilityRun(ExperimentRun):
         ]
         for key, value in self.options.items():
             argv += ["--" + key.replace("_", "-"), str(value)]
+        sampler = {"sampler_dir": remote, "sampler_timeout_seconds": self.options["timeout_seconds"] + 15}
         result = await self._run(
-            [
-                {"ansible.builtin.file": {"path": remote, "state": "directory", "mode": "0700"}},
-                {
-                    "ansible.builtin.copy": {
-                        "src": str(Path(__file__).with_name("ue_sampler.py")),
-                        "dest": remote + "/probe.py",
-                        "mode": "0700",
-                    }
-                },
-                {
-                    "name": "Start bounded UE context sampling",
-                    "ansible.builtin.command": {"argv": argv},
-                    "async": self.options["max_seconds"] + self.options["timeout_seconds"] + 30,
-                    "poll": 0,
-                    "register": "sampler",
-                },
-                {"ansible.builtin.set_stats": {"data": {"job_id": "{{ sampler.ansible_job_id }}"}}},
-            ],
+            "start_sampler",
+            {
+                **sampler,
+                "sampler_script": str(Path(__file__).with_name("ue_sampler.py")),
+                "sampler_argv": argv,
+                "sampler_async_seconds": self.options["max_seconds"] + self.options["timeout_seconds"] + 30,
+            },
             output_keys=["job_id"],
         )
         self._job_id = result["job_id"]
-        await self._run(
-            [
-                {
-                    "ansible.builtin.wait_for": {
-                        "path": remote + "/ready.json",
-                        "timeout": self.options["timeout_seconds"] + 15,
-                    }
-                }
-            ]
-        )
+        await self._run("wait_sampler_ready", sampler)
 
     async def _fetch_remote_samples(self, output: Path) -> None:
         """Stop the remote sampler, fetch whatever it recorded, then remove its directory."""
-        remote = self._remote_directory
-        wait = [
-            {"ansible.builtin.copy": {"dest": remote + "/STOP", "content": "stop\n", "mode": "0600"}},
-            {
-                "ansible.builtin.wait_for": {
-                    "path": remote + "/summary.json",
-                    "timeout": 2 * self.options["timeout_seconds"] + 15,
-                }
-            },
-        ]
-        if self._job_id:
-            wait.append(
-                {
-                    "ansible.builtin.async_status": {"jid": self._job_id},
-                    "register": "sampler_exit",
-                    "until": "sampler_exit.finished | default(false)",
-                    "retries": self.options["timeout_seconds"] + 15,
-                    "delay": 1,
-                }
-            )
+        sampler = {"sampler_dir": self._remote_directory, "sampler_job_id": self._job_id or ""}
         output.mkdir(parents=True, exist_ok=True)
-        fetch = {
-            "ansible.builtin.fetch": {"src": remote + "/{{ item }}", "dest": str(output.resolve()) + "/", "flat": True},
-            "loop": ["history.jsonl", "summary.json", "ready.json"],
-        }
-        # Always try to retrieve partial evidence, even if stopping failed.
-        await self._run([{"block": wait, "always": [fetch]}])
-        cleanup = []
-        if self._job_id:
-            cleanup.append({"ansible.builtin.async_status": {"jid": self._job_id, "mode": "cleanup"}})
-        cleanup.append({"ansible.builtin.file": {"path": remote, "state": "absent"}})
-        await self._run(cleanup)
+        await self._run(
+            "stop_sampler",
+            {**sampler, "sampler_timeout_seconds": self.options["timeout_seconds"], "fetch_dir": str(output.resolve())},
+        )
+        await self._run("cleanup_sampler", sampler)
 
     def _check_samples(self, output: Path) -> None:
         summary = json.loads((output / "summary.json").read_text())
