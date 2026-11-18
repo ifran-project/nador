@@ -6,8 +6,7 @@ from types import SimpleNamespace
 import pytest
 import yaml
 
-from nador.models import MonitoringDeployment
-from nador.validate_monitoring import load_profile, validate_deployment
+from nador.config import MonitoringDeployment, load_profile, validate_deployment
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES = ROOT / "examples"

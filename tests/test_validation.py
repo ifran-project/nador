@@ -5,8 +5,7 @@ import copy
 import pytest
 from conftest import EXAMPLES, example_profiles
 
-from nador.models import MonitoringDeployment
-from nador.validate_monitoring import read_deployment
+from nador.config import MonitoringDeployment, read_deployment
 
 CONTROLLER = "ghcr.io/ifran-project/nador-controller:sha-1"
 
@@ -146,14 +145,13 @@ def test_yes_is_not_a_boolean(tmp_path):
     ],
 )
 def test_image_pinning(reference, pinned):
-    from nador.images import is_pinned
+    from nador.config import is_pinned
 
     assert is_pinned(reference) is pinned
 
 
 def test_one_way_and_extended_images_must_be_pinned():
-    from nador.extended import ExtendedSettings
-    from nador.one_way import OneWaySettings
+    from nador.config import ExtendedSettings, OneWaySettings
 
     with pytest.raises(ValueError, match="must be a tagged image"):
         OneWaySettings(image="ghcr.io/x/one-way")
@@ -181,7 +179,7 @@ def test_rtt_placement_is_no_longer_accepted(quickstart):
 
 
 def test_default_images_are_pinned_to_their_recorded_builds():
-    from nador.models import DEFAULT_IMAGES
+    from nador.config import DEFAULT_IMAGES
 
     builds = DEFAULT_IMAGES["builds"]
     digests = {build["digest"] for build in builds.values()}

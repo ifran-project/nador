@@ -6,18 +6,18 @@ from typing import Any, Literal, Self
 from ifran.deployment.base import BaseManagement
 from ifran.deployment.helm import HelmManagement
 from ifran.models.deployment import DeploymentModel
+from ifran.models.provisioning import ProvisionableNode
 from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_role
 from metamodel_3gpp.models.metamodel import MetaModel
 
-from nador.models import MonitoringDeployment, MonitoringModel
-from nador.one_way import OneWaySettings
-from nador.utils import (
-    ASSETS,
-    resolve_components,
-    resolve_targets,
-    run_monitoring_component_action,
+from nador.config import (
+    DeployedMonitoringComponent,
+    MonitoringDeployment,
+    MonitoringModel,
+    OneWaySettings,
+    validate_deployment,
 )
-from nador.validate_monitoring import validate_deployment
+from nador.planner import ASSETS, resolve_components, resolve_targets
 
 
 class MonitoringManagement(HelmManagement):
@@ -86,7 +86,7 @@ class MonitoringManagement(HelmManagement):
         node = self._get_deployment_node(None)
         output = {}
         for name, component in selected:
-            result = await run_monitoring_component_action(
+            result = await _run_component_action(
                 model=self.deployment_model,
                 component=component,
                 component_name=name,
@@ -169,3 +169,57 @@ class MonitoringManagement(HelmManagement):
     async def remove(self, *, quiet: bool = False) -> None:
         """Remove monitoring using the current deployment configuration."""
         await self.uninstall(quiet=quiet)
+
+
+async def _run_component_action(
+    *,
+    model: MonitoringModel,
+    component: DeployedMonitoringComponent,
+    component_name: str,
+    node: tuple[str, ProvisionableNode],
+    action: str,
+    command: list[str] | None = None,
+    quiet: bool = False,
+    containers: list[str] | None = None,
+    since_seconds: int = 3600,
+) -> str | dict[str, str] | None:
+    """Run a component action and record whether its Helm release is installed."""
+    monitoring = model.monitoring
+    component.namespace = monitoring.namespace
+    ansible = model.params.ansible
+    node_name, node_data = node
+    if action in ("get_logs", "run_cmd") and not component.pod_selector:
+        raise ValueError(f"Monitoring component {component_name!r} has no workload")
+    if action == "run_cmd" and not command:
+        raise ValueError("A command is required for run_cmd")
+
+    output_key = {
+        "get_logs": "logs",
+        "run_cmd": "command_output",
+    }.get(action)
+    result = await run_ansible_role(
+        role="monitoring/component",
+        hosts=node_name,
+        inventory=get_ansible_inventory_line(node_name, node_data),
+        become=True,
+        inputs={
+            "helm_action": action,
+            "component": component.model_dump(mode="json", exclude_none=True),
+            "chart_name": component.release_name or component_name,
+            "kubeconfig": monitoring.kubeconfig,
+            "timeout_seconds": monitoring.operation_timeout_seconds,
+            "since_seconds": since_seconds,
+            "containers": containers or [],
+            "command": command,
+        },
+        output_keys=[output_key] if output_key else None,
+        runner_path=f"{ansible.runner_path}/monitoring/{component_name}/{action}",
+        roles_paths=[str(ASSETS / "roles"), *ansible.roles_paths],
+        quiet=quiet,
+    )
+
+    if action in ("install", "uninstall"):
+        component.is_installed = action == "install"
+    elif output_key:
+        return result[output_key]
+    return None

@@ -3,7 +3,7 @@
 import csv
 import json
 
-from nador.artifacts.timeline_finalize import WINDOW_FIELDS, finalize_timeline
+from nador.artifacts.timeline import WINDOW_FIELDS, finalize_timeline
 
 T0 = 1_700_000_000.0
 

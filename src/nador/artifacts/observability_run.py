@@ -15,10 +15,10 @@ from urllib.parse import urlsplit
 from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_playbook
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from . import ue_context
-from .connection import loki_connection
+from . import ue_sampler
+from .experiment_run import ExperimentRun
 from .loki_export import collect_logs
-from .run import ExperimentRun
+from .ssh_tunnel import loki_connection
 
 if TYPE_CHECKING:
     from nador.deployment import MonitoringManagement
@@ -172,7 +172,7 @@ class ObservabilityRun(ExperimentRun):
         if not self.monitoring or not self.settings.collect_setup:
             return
         output = self.directory / "setup" / phase
-        script = Path(__file__).with_name("collect_setup.py")
+        script = Path(__file__).with_name("setup_snapshot.py")
         hosts = []
         nodes = self.monitoring.deployment_model.nodes
         selected = self.settings.setup_hosts
@@ -223,7 +223,7 @@ class ObservabilityRun(ExperimentRun):
 
     def _sample_direct(self, args):
         try:
-            ue_context.sample(args, lambda: ue_context.fetch_inventory(args, []), self._stop, self._ready)
+            ue_sampler.sample(args, lambda: ue_sampler.fetch_inventory(args, []), self._stop, self._ready)
         except Exception as exc:
             self._thread_error = exc
         finally:
@@ -270,7 +270,7 @@ class ObservabilityRun(ExperimentRun):
                 {"ansible.builtin.file": {"path": remote, "state": "directory", "mode": "0700"}},
                 {
                     "ansible.builtin.copy": {
-                        "src": str(Path(__file__).with_name("ue_context.py")),
+                        "src": str(Path(__file__).with_name("ue_sampler.py")),
                         "dest": remote + "/probe.py",
                         "mode": "0700",
                     }

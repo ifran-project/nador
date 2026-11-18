@@ -10,7 +10,7 @@ import time
 from collections import Counter
 from pathlib import Path
 
-from .prometheus_range_export import http_json, load_queries, query_range
+from .prometheus_export import http_json, load_queries, query_range
 
 MIN_LOOKBACK_SECONDS = 120  # rate() windows need several scrapes
 STEP = "15s"

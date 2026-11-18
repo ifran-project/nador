@@ -7,7 +7,7 @@ controller's RBAC rules cannot drift apart.
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from nador.extended import ExtendedSettings
+    from nador.config import ExtendedSettings
 
 # Probes that run as a DaemonSet on every node, keyed by kind, with the flags that enable them.
 NODE_PROBES = {

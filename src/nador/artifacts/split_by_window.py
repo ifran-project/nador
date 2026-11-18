@@ -9,7 +9,7 @@ import logging
 from contextlib import ExitStack
 from pathlib import Path
 
-from nador.artifacts.timeline_finalize import safe_name
+from nador.artifacts.timeline import safe_name
 
 logger = logging.getLogger(__name__)
 

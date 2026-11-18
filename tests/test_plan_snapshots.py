@@ -11,7 +11,7 @@ import pytest
 import yaml
 from conftest import EXAMPLES, SNAPSHOTS, example_profiles, fake_model, implementation_for, load_example
 
-from nador.utils import resolve_components, resolve_targets
+from nador.planner import resolve_components, resolve_targets
 
 PROFILES = example_profiles()
 DEDICATED = yaml.safe_load((EXAMPLES / "quickstart" / "dedicated-probes.yaml").read_text())

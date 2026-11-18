@@ -13,12 +13,12 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from nador.deployment import MonitoringManagement
-from nador.probe_catalog import enabled_probes
+from nador.probes import enabled_probes
 
-from .connection import prometheus_connection
-from .prometheus_range_export import export_ranges, load_queries
-from .split_prometheus_by_timeline import split_windows
-from .timeline_finalize import finalize_timeline
+from .prometheus_export import export_ranges, load_queries
+from .split_by_window import split_windows
+from .ssh_tunnel import prometheus_connection
+from .timeline import finalize_timeline
 
 
 class ExperimentRun:

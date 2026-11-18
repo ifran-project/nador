@@ -96,6 +96,6 @@ def test_failed_section_marks_run_failed(tmp_path):
 def test_controller_cli_only_sends_tokens_safely(url, safe):
     from urllib.parse import urlsplit
 
-    from nador.controller_cli import _is_safe_endpoint
+    from nador.probe_control_cli import _is_safe_endpoint
 
     assert _is_safe_endpoint(urlsplit(url)) is safe

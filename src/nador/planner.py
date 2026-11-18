@@ -1,18 +1,26 @@
-"""Resolve model components and prepare monitoring Helm values."""
+"""Turn a monitoring profile and the deployed network into Helm releases and their values.
+
+Nothing here contacts a cluster: ``resolve_targets`` finds each monitored network
+function, and ``resolve_components`` decides which charts to install and renders
+their values.
+"""
 
 from pathlib import Path
 
 import yaml
-from ifran.models.provisioning import ProvisionableNode
-from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_role
 from ifran.utils.k8s import build_k8s_safe
 from ifran.utils.utils import deep_merge
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
-from nador.controller_values import controller_values
-from nador.images import split_image
-from nador.models import DeployedMonitoringComponent, MonitoringModel, component_image_defaults
-from nador.probe_catalog import (
+from nador.config import (
+    DEFAULT_IMAGES,
+    DeployedMonitoringComponent,
+    MonitoringDeployment,
+    MonitoringModel,
+    component_image_defaults,
+    split_image,
+)
+from nador.probes import (
     NOT_ENABLED_WHILE_PAUSED,
     PROBES,
     SPLIT_SIGNALING,
@@ -23,7 +31,7 @@ from nador.probe_catalog import (
     release_name,
     workload,
 )
-from nador.ran_metrics import ocudu_sources
+from nador.ran_kpis import ocudu_sources
 
 ASSETS = Path(__file__).resolve().parent / "assets"
 CHARTS = ASSETS / "charts"
@@ -115,6 +123,70 @@ def _extended_chart_context(model, targets, probe_name, probe_states):
     }
 
 
+def _controller_values(monitoring: MonitoringDeployment, targets: list[dict], probe_states: dict) -> dict:
+    """Build controller values.
+
+    Single-anchor deployments describe their gNB/UPF through probeControlTargets (targets.json);
+    multi-anchor deployments pass explicit per-request target lists instead.
+    """
+    anchors = [target for target in targets if target["role"] in ("gnb", "upf")]
+    upfs = [target for target in anchors if target["role"] == "upf"]
+    by_role = {target["role"]: target for target in anchors}
+    controller_image = monitoring.probe_controller_image
+    has_session_context = {"amf", "smf"} <= {target["role"] for target in targets}
+    scoped_probes_allowed = controller_image is not None and has_session_context
+    observation = monitoring.observability
+
+    one_way = monitoring.one_way.model_dump(mode="json")
+    if monitoring.one_way.image and monitoring.separate_one_way_targets:
+        one_way["one_way_targets"] = anchors
+
+    rtt = {
+        "enabled": monitoring.latency,
+        "allowed": scoped_probes_allowed and bool(anchors),
+        "image": monitoring.images.probe,
+        "imsis": monitoring.rtt_imsis,
+        "slices": monitoring.rtt_slices,
+    }
+    if monitoring.packet_pairing:
+        pairer = DEFAULT_IMAGES["components"]["packet-pairer"]
+        rtt["pairer_image"] = f"{pairer['repository']}:{pairer['image_tag']}"
+    throughput = {
+        "enabled": monitoring.throughput,
+        "allowed": scoped_probes_allowed and bool(upfs) and monitoring.external_throughput_image is not None,
+        "image": monitoring.external_throughput_image,
+    }
+    paths = {
+        "enabled": observation.user_plane_paths,
+        "allowed": bool(anchors) and monitoring.external_path_image is not None,
+        "image": monitoring.external_path_image,
+        "port": observation.path_port,
+        "interval": observation.path_interval_seconds,
+    }
+    if monitoring.multi_anchor and controller_image:
+        rtt["targets"] = paths["targets"] = anchors
+        throughput["targets"] = upfs
+
+    return {
+        "targetNamespaces": sorted({target["namespace"] for target in targets}),
+        "operationTimeoutSeconds": monitoring.operation_timeout_seconds,
+        "probeControllerImage": controller_image,
+        "cleanupImage": controller_image or DEFAULT_IMAGES["external_probes"]["controller"],
+        "probeControlTargets": {} if monitoring.multi_anchor else by_role,
+        "extendedProbeStates": probe_states,
+        # Workloads the controller may pause and resume; RBAC is generated from this list.
+        "extendedProbeWorkloads": [
+            dict(zip(("resource", "name"), workload(kind), strict=True)) for kind in sorted(probe_states)
+        ],
+        "probeApiTlsSecret": monitoring.probe_api_tls_secret,
+        "probeApiTokenSecret": monitoring.probe_api_token_secret,
+        "probeControl": one_way,
+        "rttRequest": rtt,
+        "throughputRequest": throughput,
+        "pathRequest": paths,
+    }
+
+
 def _render_chart_values(
     component: DeployedMonitoringComponent,
     model: MonitoringModel,
@@ -145,7 +217,7 @@ def _render_chart_values(
     )
     values = deep_merge(yaml.safe_load(defaults.read_text()) or {}, yaml.safe_load(rendered))
     if chart == "monitoring-controller":
-        values = deep_merge(values, controller_values(model.monitoring, targets, probe_states))
+        values = deep_merge(values, _controller_values(model.monitoring, targets, probe_states))
     return deep_merge(values, component.advanced_config)
 
 
@@ -215,57 +287,3 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
             component.chart_ref = f"{REMOTE_CHARTS}/{Path(component.chart_ref).name}"
         components[name] = component
     return components
-
-
-async def run_monitoring_component_action(
-    *,
-    model: MonitoringModel,
-    component: DeployedMonitoringComponent,
-    component_name: str,
-    node: tuple[str, ProvisionableNode],
-    action: str,
-    command: list[str] | None = None,
-    quiet: bool = False,
-    containers: list[str] | None = None,
-    since_seconds: int = 3600,
-) -> str | dict[str, str] | None:
-    """Run a component action and record whether its Helm release is installed."""
-    monitoring = model.monitoring
-    component.namespace = monitoring.namespace
-    ansible = model.params.ansible
-    node_name, node_data = node
-    if action in ("get_logs", "run_cmd") and not component.pod_selector:
-        raise ValueError(f"Monitoring component {component_name!r} has no workload")
-    if action == "run_cmd" and not command:
-        raise ValueError("A command is required for run_cmd")
-
-    output_key = {
-        "get_logs": "logs",
-        "run_cmd": "command_output",
-    }.get(action)
-    result = await run_ansible_role(
-        role="monitoring/component",
-        hosts=node_name,
-        inventory=get_ansible_inventory_line(node_name, node_data),
-        become=True,
-        inputs={
-            "helm_action": action,
-            "component": component.model_dump(mode="json", exclude_none=True),
-            "chart_name": component.release_name or component_name,
-            "kubeconfig": monitoring.kubeconfig,
-            "timeout_seconds": monitoring.operation_timeout_seconds,
-            "since_seconds": since_seconds,
-            "containers": containers or [],
-            "command": command,
-        },
-        output_keys=[output_key] if output_key else None,
-        runner_path=f"{ansible.runner_path}/monitoring/{component_name}/{action}",
-        roles_paths=[str(ASSETS / "roles"), *ansible.roles_paths],
-        quiet=quiet,
-    )
-
-    if action in ("install", "uninstall"):
-        component.is_installed = action == "install"
-    elif output_key:
-        return result[output_key]
-    return None
