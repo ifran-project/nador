@@ -5,21 +5,18 @@ import json
 
 import pytest
 
-from nador.artifacts import ExperimentRun, ObservabilityOptions, ObservabilityRun
+from nador.artifacts import Collector, ExperimentRun, LokiExport, ObservabilityOptions, ObservabilityRun
 
 
 def test_observability_defaults(tmp_path):
     run = ObservabilityRun(tmp_path / "run", name="x")
     assert run.name == "x"
-    assert run.options == {
-        "interval_seconds": 2,
-        "timeout_seconds": 5,
-        "max_seconds": 7200,
-        "limit": 5000,
-        "service": "ue-mapper-api",
-        "service_port": 8080,
-    }
+    assert run.settings.sampler_args() == [
+        *("--interval-seconds", "2", "--timeout-seconds", "5", "--max-seconds", "7200"),
+        *("--limit", "5000", "--service", "ue-mapper-api", "--service-port", "8080"),
+    ]
     assert run.queries_file.name == "observability_queries.json"
+    assert run.collectors == []  # no monitoring manager, mapper URL or Loki URL: nothing to collect
 
 
 @pytest.mark.parametrize(
@@ -50,7 +47,7 @@ def test_unknown_arguments_are_rejected(tmp_path):
 def test_loki_url_enables_loki_export():
     assert ObservabilityOptions(loki_url="http://loki:3100").loki_url
     run = ObservabilityRun("unused", loki_url="http://loki:3100")
-    assert run.collect_loki
+    assert [type(collector) for collector in run.collectors] == [LokiExport]
 
 
 def test_run_without_prometheus_writes_timeline(tmp_path):
@@ -99,3 +96,100 @@ def test_controller_cli_only_sends_tokens_safely(url, safe):
     from nador.probe_control_cli import _is_safe_endpoint
 
     assert _is_safe_endpoint(urlsplit(url)) is safe
+
+
+class Recorder(Collector):
+    """Records the order of lifecycle calls; can be told to fail a step."""
+
+    def __init__(self, label, calls, fail=None):
+        self.label = label
+        self.calls = calls
+        self.fail = fail
+
+    async def _step(self, step):
+        self.calls.append(f"{self.label}.{step}")
+        if step == self.fail:
+            raise RuntimeError("boom")
+
+    async def start(self, run):
+        await self._step("start")
+
+    async def stop(self, run):
+        await self._step("stop")
+
+    async def collect(self, run, start, end):
+        assert (run.directory / "timeline_summary.json").exists()
+        assert start < end
+        await self._step("collect")
+
+
+def test_collectors_run_in_order_and_failures_are_isolated(tmp_path):
+    calls = []
+    collectors = [Recorder("a", calls, fail="start"), Recorder("b", calls)]
+
+    async def experiment():
+        async with ExperimentRun(tmp_path / "run", timezone="UTC", collectors=collectors) as run:
+            calls.append("workload")
+        return run
+
+    with pytest.raises(RuntimeError, match="Artifact collection incomplete"):
+        asyncio.run(experiment())
+    assert calls == ["a.start", "b.start", "workload", "b.stop", "a.stop", "a.collect", "b.collect"]
+    metadata = json.loads((tmp_path / "run" / "experiment_metadata.json").read_text())
+    assert metadata["status"] == "completed"
+    assert metadata["collection_errors"] == ["a start: boom"]
+
+
+def test_cancelled_run_still_stops_collectors(tmp_path):
+    calls = []
+
+    async def experiment():
+        async with ExperimentRun(tmp_path / "run", timezone="UTC", collectors=[Recorder("a", calls)]):
+            await asyncio.sleep(3600)
+
+    async def main():
+        task = asyncio.create_task(experiment())
+        await asyncio.sleep(0.1)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(main())
+    assert calls == ["a.start", "a.stop", "a.collect"]
+    assert json.loads((tmp_path / "run" / "experiment_metadata.json").read_text())["status"] == "cancelled"
+
+
+def test_local_ue_sampler_runs_as_a_subprocess(tmp_path):
+    import http.server
+    import threading
+
+    class Mapper(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802
+            body = json.dumps({"ues": [{"imsi": "001010000000001"}], "count": 1, "limit": 5000}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *_args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Mapper)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+
+        async def experiment():
+            url = f"http://127.0.0.1:{server.server_port}"
+            async with ObservabilityRun(tmp_path / "run", mapper_url=url, interval_seconds=0.2, timezone="UTC"):
+                await asyncio.sleep(0.6)
+
+        asyncio.run(experiment())
+    finally:
+        server.shutdown()
+
+    output = tmp_path / "run" / "ue_context"
+    assert json.loads((output / "collection_status.json").read_text())["status"] == "completed"
+    summary = json.loads((output / "summary.json").read_text())
+    assert summary["samples"] >= 2
+    assert summary["errors"] == 0
+    assert summary["stop_reason"] == "requested"

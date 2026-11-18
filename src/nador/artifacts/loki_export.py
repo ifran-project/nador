@@ -6,7 +6,6 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-MAX_LIMIT = 100_000
 PAGE_LIMIT = 5000  # Loki's default max_entries_limit_per_query
 
 
@@ -37,10 +36,6 @@ def _query(url, selector, start_ns, end_ns, limit):
 
 def collect_logs(directory, *, url, selector, start, end, limit=5000, max_queries=1024):
     """Split full pages into disjoint Loki windows, with a bounded query budget."""
-    if type(limit) is not int or not 1 <= limit <= MAX_LIMIT:
-        raise ValueError(f"Loki limit must be between 1 and {MAX_LIMIT}")
-    if type(max_queries) is not int or not 1 <= max_queries <= MAX_LIMIT:
-        raise ValueError(f"Loki max_queries must be between 1 and {MAX_LIMIT}")
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
     page_limit = min(limit, PAGE_LIMIT)

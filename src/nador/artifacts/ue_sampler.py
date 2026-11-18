@@ -106,7 +106,7 @@ def fetch_inventory(args, kube_args: list[str]) -> dict:
     return json.loads(result.stdout)
 
 
-def sample(args, fetch, stop: threading.Event, ready: threading.Event | None = None) -> dict:
+def sample(args, fetch, stop: threading.Event) -> dict:
     """Poll the inventory until stopped, appending history and writing a summary."""
     output = Path(args.out_dir)
     output.mkdir(parents=True, exist_ok=True)
@@ -147,8 +147,6 @@ def sample(args, fetch, stop: threading.Event, ready: threading.Event | None = N
             summary["samples"] += 1
             if summary["samples"] == 1:
                 (output / "ready.json").write_text(json.dumps(record), encoding="utf-8")
-                if ready is not None:
-                    ready.set()
             if final or expired:
                 summary["stop_reason"] = "requested" if final else "max_seconds"
                 break

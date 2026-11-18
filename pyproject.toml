@@ -14,6 +14,7 @@ dependencies = [
 
 [project.scripts]
 nador-controller = "nador.probe_control_cli:main"
+nador-check-metrics = "nador.artifacts.metrics_check_cli:main"
 
 [tool.poetry]
 packages = [{include = "nador", from = "src"}]

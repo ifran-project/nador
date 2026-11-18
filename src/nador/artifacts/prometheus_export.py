@@ -13,123 +13,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_QUERIES = [
-    {
-        "name": "direct_rtt_mean_ms",
-        "query": """
-(
-  sum by (imsi, ue_ip, slice, probe_role, mode) (
-    rate(gtp_teid_latency_observed_ns_sum[30s])
-  )
-/
-  sum by (imsi, ue_ip, slice, probe_role, mode) (
-    rate(gtp_teid_latency_observed_ns_count[30s])
-  )
-) / 1000000
-""",
-    },
-    {
-        "name": "direct_rtt_p95_ms",
-        "query": """
-histogram_quantile(
-  0.95,
-  sum by (le, imsi, ue_ip, slice, probe_role, mode) (
-    rate(gtp_teid_latency_observed_ns_bucket[30s])
-  )
-) / 1000000
-""",
-    },
-    {
-        "name": "direct_median_1s_ms",
-        "query": "gtp_teid_latency_median_1s_ns / 1000000",
-    },
-    {
-        "name": "direct_event_rate_hz",
-        "query": """
-sum by (imsi, ue_ip, slice, probe_role, mode) (
-  rate(gtp_teid_latency_observed_ns_count[30s])
-)
-""",
-    },
-    {
-        "name": "direct_latest_ms",
-        "query": "gtp_teid_latency_ns / 1000000",
-    },
-    {
-        "name": "same_packet_upf_rtt_mean_ms",
-        "query": """
-(
-  sum by (imsi, ue_ip, slice, probe_role, mode, direction) (
-    rate(gtp_same_packet_upf_rtt_ns_sum[30s])
-  )
-/
-  sum by (imsi, ue_ip, slice, probe_role, mode, direction) (
-    rate(gtp_same_packet_upf_rtt_ns_count[30s])
-  )
-) / 1000000
-""",
-    },
-    {
-        "name": "same_packet_gnb_rtt_mean_ms",
-        "query": """
-(
-  sum by (imsi, ue_ip, slice, probe_role, mode, direction) (
-    rate(gtp_same_packet_gnb_rtt_ns_sum[30s])
-  )
-/
-  sum by (imsi, ue_ip, slice, probe_role, mode, direction) (
-    rate(gtp_same_packet_gnb_rtt_ns_count[30s])
-  )
-) / 1000000
-""",
-    },
-    {
-        "name": "same_packet_gap_mean_ms",
-        "query": """
-(
-  sum by (imsi, ue_ip, slice, probe_role, mode, direction) (
-    rate(gtp_same_packet_rtt_gap_ns_sum[30s])
-  )
-/
-  sum by (imsi, ue_ip, slice, probe_role, mode, direction) (
-    rate(gtp_same_packet_rtt_gap_ns_count[30s])
-  )
-) / 1000000
-""",
-    },
-    {
-        "name": "same_packet_pair_rate_hz",
-        "query": """
-sum by (imsi, ue_ip, slice, probe_role, mode, direction) (
-  rate(gtp_same_packet_pairs_total[30s])
-)
-""",
-    },
-    {
-        "name": "lost_observation_events_hz",
-        "query": """
-sum by (probe_role, stream) (
-  rate(gtp_teid_latency_lost_events_total[30s])
-)
-""",
-    },
-    {
-        "name": "container_cpu_cores",
-        "query": """
-sum by (namespace, pod, container) (
-  rate(container_cpu_usage_seconds_total{container!="POD", image!=""}[30s])
-)
-""",
-    },
-    {
-        "name": "container_memory_mib",
-        "query": """
-sum by (namespace, pod, container) (
-  container_memory_working_set_bytes{container!="POD", image!=""}
-) / 1024 / 1024
-""",
-    },
-]
+DEFAULT_QUERIES_FILE = Path(__file__).resolve().parents[1] / "assets" / "default_queries.json"
 
 COMMON_LABELS = [
     "__name__",
@@ -173,10 +57,8 @@ def http_json(url: str, params: dict[str, object] | None = None, timeout: int = 
 
 
 def load_queries(path: str | Path | None) -> list[dict[str, str]]:
-    """Read named PromQL queries from a JSON file, or return the defaults."""
-    if not path:
-        return list(DEFAULT_QUERIES)
-    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    """Read named PromQL queries from a JSON file (default: assets/default_queries.json)."""
+    data = json.loads(Path(path or DEFAULT_QUERIES_FILE).read_text(encoding="utf-8"))
     queries = []
     for item in data:
         if not item.get("name") or not item.get("query"):

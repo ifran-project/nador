@@ -64,6 +64,12 @@ NGAP, PFCP, UE-mapper, path, and infrastructure collectors. Use
 `nador.artifacts.ObservabilityRun` to export metrics, sampled UE context, and
 setup snapshots; Loki export is optional.
 
+Both runs are built from collectors: anything with `start`, `stop` and `collect`
+steps (see `nador.artifacts.Collector`) can be passed as
+`ExperimentRun(..., collectors=[...])` to gather more evidence around a workload.
+To check that the monitoring stack actually produces data, run
+`nador-check-metrics --prometheus-url <url> --out report.json`.
+
 Throughput uses the external controller even when RTT is off. Use
 `external_throughput_image` for custom probe builds. Path probes inherit the
 controller's external path image unless `external_path_image` is set.
