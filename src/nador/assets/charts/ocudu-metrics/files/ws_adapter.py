@@ -31,12 +31,16 @@ def run():
     last_message = 0
 
     def health(connected):
-        emit({"internal_": {
-            "connected": int(connected),
-            "messages_total": received,
-            "decode_errors_total": errors,
-            "last_message_timestamp_seconds": last_message,
-        }})
+        emit(
+            {
+                "internal_": {
+                    "connected": int(connected),
+                    "messages_total": received,
+                    "decode_errors_total": errors,
+                    "last_message_timestamp_seconds": last_message,
+                }
+            }
+        )
 
     while True:
         connection = None

@@ -66,9 +66,11 @@ CASES = {
         "NGAP/mapper coverage requires an AMF target",
     ),
     "metric port conflict": (
-        lambda p: p
-        | {"observability": {"ngap": True}}
-        | {"targets": [p["targets"][0] | {"metrics_port": 9102}, *p["targets"][1:]]},
+        lambda p: (
+            p
+            | {"observability": {"ngap": True}}
+            | {"targets": [p["targets"][0] | {"metrics_port": 9102}, *p["targets"][1:]]}
+        ),
         "amf: observability and NF metric ports conflict",
     ),
     "one-way needs image": (
@@ -76,9 +78,11 @@ CASES = {
         "Enabled one-way probes require one_way.image",
     ),
     "multi-anchor paths need explicit controller": (
-        lambda p: p
-        | {"observability": {"user_plane_paths": True}}
-        | {"targets": [*p["targets"], p["targets"][2] | {"component": "upf2"}]},
+        lambda p: (
+            p
+            | {"observability": {"user_plane_paths": True}}
+            | {"targets": [*p["targets"], p["targets"][2] | {"component": "upf2"}]}
+        ),
         "Set probe_controller_image to a build that supports the requested multi-anchor probes",
     ),
     "extended needs image": (

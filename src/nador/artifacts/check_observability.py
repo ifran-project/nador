@@ -117,8 +117,7 @@ def main() -> int:
     parser.add_argument(
         "--expectations-json",
         help=(
-            "Optional JSON list of required readiness queries. "
-            "Each condition must return at least one finite sample."
+            "Optional JSON list of required readiness queries. Each condition must return at least one finite sample."
         ),
     )
     parser.add_argument("--lookback-seconds", type=int, default=300)

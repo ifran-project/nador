@@ -40,7 +40,11 @@ CASES["variants/multi-upf-controller"] = (
     {
         "probe_controller_image": CONTROLLER,
         "observability": {
-            "ngap": True, "pfcp": True, "mapper_coverage": True, "user_plane_paths": True, "node_metrics": True,
+            "ngap": True,
+            "pfcp": True,
+            "mapper_coverage": True,
+            "user_plane_paths": True,
+            "node_metrics": True,
             "mapper_image": "ghcr.io/ifran-project/ue_mapper_api:v1",
         },
         "one_way": {"image": ONE_WAY, "n3": {"enabled": True, "log_samples": False}, "upf_transit": {"enabled": False}},

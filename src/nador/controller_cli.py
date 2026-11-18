@@ -36,8 +36,13 @@ def main():
         loopback = ipaddress.ip_address(url.hostname).is_loopback
     except ValueError:
         loopback = url.hostname == "localhost"
-    if not url.hostname or url.username or url.password or url.query or url.fragment or (
-        url.scheme != "https" and not (url.scheme == "http" and loopback)
+    if (
+        not url.hostname
+        or url.username
+        or url.password
+        or url.query
+        or url.fragment
+        or (url.scheme != "https" and not (url.scheme == "http" and loopback))
     ):
         parser.error("Use HTTPS for remote controllers; HTTP is only allowed on loopback")
     token = os.getenv("NADOR_CONTROLLER_TOKEN")
@@ -60,8 +65,7 @@ def main():
                 payload["log_samples"] = args.log_samples
         data = json.dumps(payload).encode()
         headers["Content-Type"] = "application/json"
-    request = urllib.request.Request(endpoint, data=data, headers=headers,
-                                     method="GET" if data is None else "PUT")
+    request = urllib.request.Request(endpoint, data=data, headers=headers, method="GET" if data is None else "PUT")
     try:
         with urllib.request.build_opener(NoRedirect()).open(request, timeout=10) as response:
             print(json.dumps(json.load(response), indent=2))

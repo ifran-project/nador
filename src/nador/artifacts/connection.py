@@ -79,12 +79,14 @@ async def _connection(monitoring: MonitoringManagement, node_port: int, service:
 @asynccontextmanager
 async def prometheus_connection(monitoring: MonitoringManagement) -> AsyncIterator[str]:
     """Open Prometheus access only for the duration of collection."""
-    async with _connection(monitoring, monitoring.deployment_model.monitoring.prometheus_node_port, 'Prometheus') as url:
+    async with _connection(
+        monitoring, monitoring.deployment_model.monitoring.prometheus_node_port, "Prometheus"
+    ) as url:
         yield url
 
 
 @asynccontextmanager
 async def loki_connection(monitoring: MonitoringManagement) -> AsyncIterator[str]:
     """Open Loki access through the same route as the monitoring manager."""
-    async with _connection(monitoring, monitoring.deployment_model.monitoring.loki_node_port, 'Loki') as url:
+    async with _connection(monitoring, monitoring.deployment_model.monitoring.loki_node_port, "Loki") as url:
         yield url

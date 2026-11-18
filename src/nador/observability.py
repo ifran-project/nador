@@ -1,8 +1,10 @@
 """Optional protocol, path and infrastructure collection settings."""
+
 from typing import Self
 
 from metamodel_3gpp.models.base import StrictBaseModel
 from pydantic import Field, model_validator
+
 
 class ObservabilitySettings(StrictBaseModel):
     """Opt-in collectors with optional image overrides."""
@@ -19,7 +21,7 @@ class ObservabilitySettings(StrictBaseModel):
     pfcp_port: int = Field(default=9104, ge=1, le=65535)
     path_port: int = Field(default=9403, ge=1, le=65535)
     pending_timeout_seconds: float = Field(default=30, gt=0, le=3600)
-    path_interval_seconds: float = Field(default=5, ge=.1, le=3600)
+    path_interval_seconds: float = Field(default=5, ge=0.1, le=3600)
 
     @property
     def active(self) -> bool:

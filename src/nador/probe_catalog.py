@@ -13,10 +13,7 @@ PROBES = NODE_PROBES | SERVICE_PROBES
 
 def enabled_probes(settings):
     """Resolve release names from enabled features, never from image presence alone."""
-    return [
-        name for name, flags in PROBES.items()
-        if any(getattr(settings, flag) for flag in flags)
-    ]
+    return [name for name, flags in PROBES.items() if any(getattr(settings, flag) for flag in flags)]
 
 
 def probe_values(settings, name):

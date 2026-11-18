@@ -7,20 +7,38 @@ import argparse
 import json
 import math
 import os
-from pathlib import Path
 import signal
 import subprocess
 import threading
 import time
 import urllib.parse
 import urllib.request
-
+from pathlib import Path
 
 UE_FIELDS = (
-    "imsi", "ue_ip", "ran_ue_id", "slice_id", "sst", "sd", "ul_teid",
-    "dl_teid", "source", "last_seen", "seid", "pdu_session_id",
-    "gnb_id", "gnb_n3_ip", "ngap_scope", "session_key", "smf_seid", "smf_pfcp_ip",
-    "upf_seid", "upf_pfcp_ip", "ul_tunnel_key", "dl_tunnel_key", "upf_n3_ip",
+    "imsi",
+    "ue_ip",
+    "ran_ue_id",
+    "slice_id",
+    "sst",
+    "sd",
+    "ul_teid",
+    "dl_teid",
+    "source",
+    "last_seen",
+    "seid",
+    "pdu_session_id",
+    "gnb_id",
+    "gnb_n3_ip",
+    "ngap_scope",
+    "session_key",
+    "smf_seid",
+    "smf_pfcp_ip",
+    "upf_seid",
+    "upf_pfcp_ip",
+    "ul_tunnel_key",
+    "dl_tunnel_key",
+    "upf_n3_ip",
 )
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 
@@ -33,8 +51,7 @@ def inventory_record(payload: dict, limit: int) -> dict:
         raise ValueError("Inventory contains a non-object UE row")
     reported_count = payload.get("count", len(rows))
     reported_limit = payload.get("limit", limit)
-    if (type(reported_count) is not int or reported_count < 0
-            or type(reported_limit) is not int or reported_limit < 1):
+    if type(reported_count) is not int or reported_count < 0 or type(reported_limit) is not int or reported_limit < 1:
         raise ValueError("Invalid inventory count or limit")
     selected_rows = [{key: row[key] for key in UE_FIELDS if key in row} for row in rows[:limit]]
     json.dumps(selected_rows, allow_nan=False)
@@ -73,7 +90,9 @@ def fetch_inventory(args, kube_args: list[str]) -> dict:
     )
     result = subprocess.run(
         ["kubectl", *kube_args, f"--request-timeout={args.timeout_seconds}s", "get", "--raw", path],
-        capture_output=True, text=True, timeout=args.timeout_seconds + 2,
+        capture_output=True,
+        text=True,
+        timeout=args.timeout_seconds + 2,
     )
     if result.returncode:
         raise RuntimeError(result.stderr.strip()[:1000] or "kubectl service proxy failed")
@@ -84,17 +103,28 @@ def sample(args, fetch, stop: threading.Event, ready: threading.Event | None = N
     output = Path(args.out_dir)
     output.mkdir(parents=True, exist_ok=True)
     history = output / "history.jsonl"
-    summary = {"run_id": args.run_id, "started_at": time.time(), "samples": 0, "errors": 0,
-               "possibly_truncated_samples": 0, "interval_seconds": args.interval_seconds,
-               "max_seconds": args.max_seconds, "history_type": "sampled_inventory"}
+    summary = {
+        "run_id": args.run_id,
+        "started_at": time.time(),
+        "samples": 0,
+        "errors": 0,
+        "possibly_truncated_samples": 0,
+        "interval_seconds": args.interval_seconds,
+        "max_seconds": args.max_seconds,
+        "history_type": "sampled_inventory",
+    }
     deadline = time.monotonic() + args.max_seconds
     with history.open("x", encoding="utf-8") as stream:
         while True:
             start = time.monotonic()
             final = stop.is_set() or Path(args.stop_file).exists()
             expired = start >= deadline
-            record = {"run_id": args.run_id, "sequence": summary["samples"],
-                      "request_started_at": time.time(), "final": final or expired}
+            record = {
+                "run_id": args.run_id,
+                "sequence": summary["samples"],
+                "request_started_at": time.time(),
+                "final": final or expired,
+            }
             try:
                 record.update(inventory_record(fetch(), args.limit))
                 summary["possibly_truncated_samples"] += int(record["possible_truncation"])
@@ -138,10 +168,14 @@ def main() -> int:
     parser.add_argument("--max-seconds", type=int, default=7200)
     parser.add_argument("--limit", type=int, default=5000)
     args = parser.parse_args()
-    if (not math.isfinite(args.interval_seconds) or args.interval_seconds < 0.1
-            or args.interval_seconds > 3600 or args.timeout_seconds > 60
-            or not 1 <= args.service_port <= 65535
-            or min(args.timeout_seconds, args.max_seconds, args.limit) < 1):
+    if (
+        not math.isfinite(args.interval_seconds)
+        or args.interval_seconds < 0.1
+        or args.interval_seconds > 3600
+        or args.timeout_seconds > 60
+        or not 1 <= args.service_port <= 65535
+        or min(args.timeout_seconds, args.max_seconds, args.limit) < 1
+    ):
         parser.error("Positive timeout, duration and limit, and interval >= 0.1 are required")
     stop = threading.Event()
     for signum in (signal.SIGINT, signal.SIGTERM):

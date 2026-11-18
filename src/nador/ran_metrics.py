@@ -2,7 +2,6 @@
 
 from ifran.utils.k8s import build_k8s_safe
 
-
 OCUDU_LAYERS = {
     "gnb": ("app_usage", "e1ap", "pdcp", "sched", "rlc", "mac", "executor", "du_low", "ru"),
     "cu": ("app_usage",),
@@ -60,15 +59,17 @@ def ocudu_sources(model) -> list[dict]:
         if remote.get("bind_addr", "127.0.0.1") in {"127.0.0.1", "localhost", "::1"}:
             raise ValueError(f"{name}: OCUDU metrics must bind to the pod network, not loopback")
         target = next((t for t in model.monitoring.targets if t.category == "ran" and t.component == name), None)
-        sources.append({
-            "component": name,
-            "kind": str(component.type),
-            "namespace": component.namespace,
-            "selector": (target.selector if target else None) or {"app": build_k8s_safe(f"ocudu-{name}")},
-            "source_service": build_k8s_safe(f"ocudu-source-{name}"),
-            "exporter": build_k8s_safe(f"ocudu-metrics-{name}"),
-            "port": remote.get("port", 8001),
-        })
+        sources.append(
+            {
+                "component": name,
+                "kind": str(component.type),
+                "namespace": component.namespace,
+                "selector": (target.selector if target else None) or {"app": build_k8s_safe(f"ocudu-{name}")},
+                "source_service": build_k8s_safe(f"ocudu-source-{name}"),
+                "exporter": build_k8s_safe(f"ocudu-metrics-{name}"),
+                "port": remote.get("port", 8001),
+            }
+        )
     if str(model.ran.implementation) == "ocudu" and not sources:
         raise ValueError("ran_kpis requires at least one deployed OCUDU RAN component")
     return sources

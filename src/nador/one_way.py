@@ -19,7 +19,7 @@ class UpfTransitSettings(StrictBaseModel):
 
 class OneWaySettings(StrictBaseModel):
     image: str | None = None
-    sample: int = Field(default=16, ge=1, le=0xffffffff)
+    sample: int = Field(default=16, ge=1, le=0xFFFFFFFF)
     test_port: int = Field(default=0, ge=0, le=65535)
     n3: N3Settings = Field(default_factory=N3Settings)
     upf_transit: UpfTransitSettings = Field(default_factory=UpfTransitSettings)
