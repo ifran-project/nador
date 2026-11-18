@@ -17,7 +17,7 @@ from .timeline import safe_name
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_QUERIES_FILE = Path(__file__).resolve().parents[1] / "assets" / "default_queries.json"
+DEFAULT_QUERIES_FILE = Path(__file__).resolve().parents[1] / "assets" / "queries.json"
 
 COMMON_LABELS = [
     "__name__",
@@ -61,7 +61,7 @@ def http_json(url: str, params: dict[str, object] | None = None, timeout: int = 
 
 
 def load_queries(path: str | Path | None) -> list[dict[str, str]]:
-    """Read named PromQL queries from a JSON file (default: assets/default_queries.json)."""
+    """Read named PromQL queries from a JSON file (default: assets/queries.json)."""
     data = json.loads(Path(path or DEFAULT_QUERIES_FILE).read_text(encoding="utf-8"))
     queries = []
     for item in data:

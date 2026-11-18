@@ -12,11 +12,12 @@ Mounted into the controller pod by the `monitoring-controller` chart.
 
 ### `settings.json`
 
-One object. It merges the one-way settings with one request per probe family:
+One object. It merges the one-way probe settings with one request per probe family
+(the names are the controller's and do not follow the profile's metric names):
 
 | Key | Type | Meaning |
 | --- | --- | --- |
-| `image`, `sample`, `test_port`, `n3`, `upf_transit` | from `one_way:` | One-way probe image and settings (`OneWaySettings`). |
+| `image`, `sample`, `test_port`, `n3`, `upf_transit` | from `metrics.n3_one_way`, `metrics.upf_transit`, `tuning.one_way_sample` | One-way probe image and settings. |
 | `one_way_targets` | list of targets, optional | Present when one-way probes need explicit anchors (several gNBs/UPFs, or no gNB). |
 | `rtt` | request | RTT probes. Also has `imsis`, `slices` and, with packet pairing, `pairer_image`. |
 | `throughput` | request | N3 throughput probes on UPFs. |

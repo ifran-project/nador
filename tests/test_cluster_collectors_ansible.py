@@ -1,4 +1,4 @@
-"""Run ObservabilityRun's Ansible role for real, against this machine.
+"""Run the cluster collectors' Ansible role for real, against this machine.
 
 Ansible connects locally and a fake kubectl answers the UE inventory and
 cluster queries, so the snapshot, sampler start/stop, fetch and cleanup
@@ -15,7 +15,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from nador.artifacts import ObservabilityRun
+from nador.artifacts import ExperimentRun
 
 FAKE_KUBECTL = """#!/usr/bin/env python3
 import json, sys
@@ -24,16 +24,6 @@ if "--raw" in sys.argv:
 else:
     print(json.dumps({"items": []}))
 """
-EXTENDED_FLAGS = (
-    "scheduler_wait",
-    "kernel_drops",
-    "network_queues",
-    "socket_counters",
-    "split_signaling",
-    "quality",
-    "attributed_drops",
-    "tcp_flows",
-)
 
 pytestmark = pytest.mark.skipif(
     shutil.which("ansible-playbook", path=str(Path(sys.executable).parent) + os.pathsep + os.environ["PATH"]) is None,
@@ -66,10 +56,9 @@ def local_monitoring(runner_path: Path) -> SimpleNamespace:
             k8s=SimpleNamespace(master_node="local"),
             ansible=SimpleNamespace(runner_path=str(runner_path), roles_paths=[]),
         ),
+        # No Prometheus or Loki here: the run records that collection as incomplete.
         monitoring=SimpleNamespace(
-            kubeconfig="/dev/null",
-            namespace="monitoring",
-            extended=SimpleNamespace(**dict.fromkeys(EXTENDED_FLAGS, False)),
+            kubeconfig="/dev/null", namespace="monitoring", needs_session_stack=True, metrics=SimpleNamespace(logs=None)
         ),
     )
     return SimpleNamespace(deployment_model=model)
@@ -84,7 +73,7 @@ def test_remote_context_collection(tmp_path, monkeypatch):
     monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{Path(sys.executable).parent}{os.pathsep}{os.environ['PATH']}")
 
     async def experiment():
-        run = ObservabilityRun(
+        run = ExperimentRun(
             tmp_path / "run", monitoring=local_monitoring(tmp_path / "runner"), interval_seconds=0.5, timezone="UTC"
         )
         async with run:

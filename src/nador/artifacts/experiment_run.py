@@ -1,8 +1,10 @@
-"""ExperimentRun: record when each part of a workload ran, then collect evidence for those windows.
+"""ExperimentRun: record when each part of a workload ran, and save everything observed meanwhile.
 
 A run writes timeline events for the whole campaign and for each ``section``. Collectors
 (see ``collectors.py``) add evidence around it: they may ``start`` before the workload,
-``stop`` after it, and ``collect`` data for the run's time range. A collector failure is recorded in
+``stop`` after it, and ``collect`` data for the run's time range. With a monitoring manager
+a run saves metrics, logs (when ``metrics.logs`` is on), the UE context (when the UE mapper
+is deployed) and setup snapshots. A collector failure is recorded in
 ``experiment_metadata.json`` and never hides an exception raised by the workload.
 """
 
@@ -18,7 +20,8 @@ from typing import TYPE_CHECKING, Any, Self
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-from .collectors import Collector, PrometheusExport
+from .cluster_collectors import ClusterHosts, SetupSnapshot, UEContext
+from .collectors import Collector, LokiExport, PrometheusExport, RunOptions
 from .timeline import finalize_timeline
 
 if TYPE_CHECKING:
@@ -52,11 +55,12 @@ async def _complete(coroutine: Coroutine[Any, Any, Any]) -> Any:
 
 
 class ExperimentRun:
-    """Record a workload as timed sections and collect monitoring evidence for it.
+    """Record a workload as timed sections and save the monitoring evidence for it.
 
-    Pass a monitoring manager (Prometheus is reached through an SSH tunnel) or a directly
-    reachable ``prometheus_url`` to export metrics; pass neither to record the timeline only.
-    Extra ``collectors`` run alongside. The workload and its cleanup belong to the caller.
+    Pass the monitoring manager to save everything it deployed (Prometheus and Loki are
+    reached through SSH tunnels), or a directly reachable ``prometheus_url`` for metrics
+    only; pass neither to record the timeline only. Keyword ``options`` are ``RunOptions``
+    fields. Extra ``collectors`` run alongside. The workload and its cleanup belong to the caller.
     """
 
     def __init__(
@@ -70,6 +74,7 @@ class ExperimentRun:
         timezone: str = "UTC",
         monitoring: "MonitoringManagement | None" = None,
         collectors: Iterable[Collector] = (),
+        **options: Any,
     ) -> None:
         if monitoring is not None and prometheus_url is not None:
             raise ValueError("Supply monitoring or prometheus_url, not both")
@@ -80,14 +85,38 @@ class ExperimentRun:
         self.timezone = timezone
         self.zone = ZoneInfo(timezone)
         self.run_id = uuid4().hex
-        self.collectors = list(collectors)
-        if monitoring is not None or prometheus_url is not None:
-            self.collectors.append(PrometheusExport(url=prometheus_url, queries_file=queries_file, step=step))
+        self.options = RunOptions(**options)
+        self.collectors = [*collectors, *self._default_collectors(prometheus_url, step)]
         self.started = 0.0
         self.metadata: dict[str, Any] = {}
         self._sections: set[str] = set()
         self._entered = False
         self._closed = False
+
+    def _default_collectors(self, prometheus_url: str | None, step: str) -> list[Collector]:
+        options, monitoring = self.options, self.monitoring
+        hosts = ClusterHosts(monitoring, options.namespace) if monitoring is not None else None
+        if options.setup_hosts and (hosts is None or set(options.setup_hosts) - hosts.model.nodes.keys()):
+            raise ValueError("setup_hosts must refer to nodes in the supplied monitoring manager")
+        profile = monitoring.deployment_model.monitoring if monitoring is not None else None
+        collectors: list[Collector] = []
+        if options.collect_setup and hosts is not None:
+            collectors.append(SetupSnapshot(hosts, options.setup_hosts))
+        mapper_deployed = profile is not None and profile.needs_session_stack
+        if options.collect_ue_context and (options.mapper_url or mapper_deployed):
+            collectors.append(UEContext(options, hosts))
+        if monitoring is not None or prometheus_url is not None:
+            collectors.append(PrometheusExport(url=prometheus_url, queries_file=self.queries_file, step=step))
+        if options.loki_url or (profile is not None and profile.metrics.logs):
+            collectors.append(
+                LokiExport(
+                    url=options.loki_url,
+                    selector=options.loki_selector,
+                    limit=options.loki_limit,
+                    max_queries=options.loki_max_queries,
+                )
+            )
+        return collectors
 
     # --- recording ---------------------------------------------------------------------------------------------------
 

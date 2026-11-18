@@ -24,30 +24,36 @@ ONE_WAY = "ghcr.io/ifran-project/nador-n3-oneway:sha-75a58721962c2e237babeb0b953
 CASES["quickstart/dedicated-probes"] = (QUICKSTART, DEDICATED)
 CASES["variants/split-signaling"] = (
     SPLIT,
-    {"extended": DEDICATED["extended"] | {"split_signaling": True, "kernel_drops": True, "quality": True}},
+    {"metrics": DEDICATED["metrics"] | {"split_signaling": True, "kernel_drops": True, "measurement_quality": True}},
 )
 CASES["variants/one-way-packet-pairing"] = (
     QUICKSTART,
     {
-        "packet_pairing": True,
-        "rtt_imsis": ["001010000000001"],
-        "rtt_slices": ["01:ffffff"],
-        "one_way": {"image": ONE_WAY, "n3": {"enabled": True, "log_samples": True}, "upf_transit": {"enabled": False}},
+        "metrics": {
+            "rtt": {"packet_pairing": True, "imsis": ["001010000000001"], "slices": ["01:ffffff"]},
+            "n3_one_way": {"log_samples": True},
+        },
+        "images": {"one_way_probe": ONE_WAY},
+    },
+)
+RFSIM = EXAMPLES / "monitoring" / "rfsim" / "oai-rfsim" / "monitoring.yaml"
+CASES["variants/session-metrics"] = (
+    RFSIM,
+    {
+        "operation_timeout_seconds": 600,
+        "metrics": dict.fromkeys(("user_plane_paths", "ngap", "pfcp", "ue_mapper_coverage", "node_metrics"), True),
     },
 )
 CASES["variants/multi-upf-controller"] = (
     MULTI_UPF,
     {
-        "probe_controller_image": CONTROLLER,
-        "observability": {
-            "ngap": True,
-            "pfcp": True,
-            "mapper_coverage": True,
-            "user_plane_paths": True,
-            "node_metrics": True,
-            "mapper_image": "ghcr.io/ifran-project/ue_mapper_api:v1",
+        "metrics": dict.fromkeys(("ngap", "pfcp", "ue_mapper_coverage", "user_plane_paths", "node_metrics"), True)
+        | {"n3_one_way": True},
+        "images": {
+            "controller": CONTROLLER,
+            "one_way_probe": ONE_WAY,
+            "ue_mapper": "ghcr.io/ifran-project/ue_mapper_api:v1",
         },
-        "one_way": {"image": ONE_WAY, "n3": {"enabled": True, "log_samples": False}, "upf_transit": {"enabled": False}},
     },
 )
 

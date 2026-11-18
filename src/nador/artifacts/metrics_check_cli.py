@@ -118,7 +118,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--loki-selector", default='{namespace=~".+"}')
     parser.add_argument(
         "--queries-json",
-        default=str(Path(__file__).resolve().parents[1] / "assets/observability_queries.json"),
+        default=str(Path(__file__).resolve().parents[1] / "assets/queries.json"),
     )
     parser.add_argument(
         "--expectations-json",

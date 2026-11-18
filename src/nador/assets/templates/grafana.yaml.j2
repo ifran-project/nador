@@ -21,7 +21,7 @@ datasources:
         type: prometheus
         uid: monitoring-prometheus
         url: http://monitoring-prometheus-prometheus.{{ monitoring.namespace }}.svc:9090
-{% if monitoring.loki %}
+{% if monitoring.metrics.logs %}
       - access: proxy
         editable: true
         isDefault: false

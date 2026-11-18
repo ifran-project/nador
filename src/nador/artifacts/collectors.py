@@ -1,13 +1,17 @@
 """Collectors: evidence gathered around an ExperimentRun.
 
-``Collector`` is the interface. ``PrometheusExport`` and ``LokiExport`` export the
-run's time range; ``observability_run`` adds collectors that act on the cluster hosts.
+``Collector`` is the interface and ``RunOptions`` tunes the built-in collectors.
+``PrometheusExport`` and ``LokiExport`` export the run's time range;
+``cluster_collectors`` adds the ones that act on the cluster hosts.
 """
 
 import asyncio
 from contextlib import AsyncExitStack
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
+from urllib.parse import urlsplit
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from nador.probes import enabled_probes
 
@@ -18,7 +22,44 @@ from .ssh_tunnel import loki_connection, prometheus_connection
 if TYPE_CHECKING:
     from .experiment_run import ExperimentRun
 
-EXTENDED_QUERY = {"name": "nador_extended_raw", "query": '{__name__=~"nador_.*"}'}
+# Every series the host probes export, added to the export when one of them runs.
+HOST_PROBE_QUERY = {"name": "host_probes_raw", "query": '{__name__=~"nador_.*"}'}
+
+
+class RunOptions(BaseModel):
+    """How the built-in collectors of an ExperimentRun reach their data and how hard they poll."""
+
+    model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
+
+    collect_setup: bool = True
+    collect_ue_context: bool = True
+    setup_hosts: list[Annotated[str, Field(min_length=1)]] | None = None
+    mapper_url: str | None = None
+    interval_seconds: float = Field(default=2, ge=0.1, le=3600, allow_inf_nan=False)
+    timeout_seconds: int = Field(default=5, ge=1, le=60)
+    max_seconds: int = Field(default=7200, ge=1)
+    limit: int = Field(default=5000, ge=1)
+    namespace: str | None = None
+    service: str = "ue-mapper-api"
+    service_port: int = Field(default=8080, ge=1, le=65535)
+    loki_url: str | None = None
+    loki_selector: str = '{namespace=~".+"}'
+    loki_limit: int = Field(default=5000, ge=1, le=100_000)
+    loki_max_queries: int = Field(default=1024, ge=1, le=100_000)
+
+    @field_validator("mapper_url")
+    @classmethod
+    def _check_mapper_url(cls, url: str | None) -> str | None:
+        if url:
+            parsed = urlsplit(url)
+            if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.query or parsed.fragment:
+                raise ValueError("mapper_url must be an HTTP(S) base URL without query or fragment")
+        return url
+
+    def sampler_args(self) -> list[str]:
+        """Command-line options shared by the local and remote UE samplers."""
+        fields = ("interval_seconds", "timeout_seconds", "max_seconds", "limit", "service", "service_port")
+        return [arg for field in fields for arg in ("--" + field.replace("_", "-"), str(getattr(self, field)))]
 
 
 class Collector:
@@ -58,22 +99,12 @@ class PrometheusExport(Collector):
         self.step = step
 
     def _queries(self, run: "ExperimentRun") -> list[dict[str, str]]:
-        """The configured queries, plus raw extended-probe metrics when those probes are enabled."""
+        """The configured queries, plus every host-probe series when a host probe runs."""
         queries = load_queries(self.queries_file)
-        if run.monitoring is None:
-            return queries
-        settings = run.monitoring.deployment_model.monitoring.extended
-        if not enabled_probes(settings):
-            return queries
-        existing = next((item for item in queries if item["name"] == EXTENDED_QUERY["name"]), None)
-        if existing is not None and existing["query"] != EXTENDED_QUERY["query"]:
-            raise ValueError("nador_extended_raw query name is reserved for extended evidence")
-        if existing is None:
-            queries.append(dict(EXTENDED_QUERY))
-        run.write_json("extended_export_queries.json", queries)
-        run.write_json(
-            "extended_collector_config.json", settings.model_dump(mode="json", exclude={"packet_identity_secret"})
-        )
+        if run.monitoring is not None and HOST_PROBE_QUERY["name"] not in {query["name"] for query in queries}:
+            config = run.monitoring.deployment_model.monitoring.host_probe_config()
+            if enabled_probes(config):
+                queries.append(dict(HOST_PROBE_QUERY))
         return queries
 
     async def collect(self, run: "ExperimentRun", start: float, end: float) -> None:

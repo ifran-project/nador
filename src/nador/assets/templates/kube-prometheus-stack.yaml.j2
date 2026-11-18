@@ -102,7 +102,7 @@ prometheus:
           - __meta_kubernetes_pod_name
           target_label: pod
         scrape_interval: '{{ monitoring.prometheus_scrape_interval }}'
-{% if monitoring.throughput %}
+{% if monitoring.metrics.throughput %}
       - job_name: throughput-probes
         kubernetes_sd_configs:
         - namespaces:
@@ -161,7 +161,7 @@ prometheus:
           - __meta_kubernetes_pod_name
           target_label: pod
         scrape_interval: '{{ monitoring.prometheus_scrape_interval }}'
-{% if monitoring.observability.node_metrics %}
+{% if monitoring.metrics.node_metrics %}
 nodeExporter:
   enabled: true
 prometheus-node-exporter:

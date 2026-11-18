@@ -17,7 +17,7 @@ def configure_ran_kpis(ran, config) -> None:
     Existing OAI parser configuration is left unchanged. This only updates the
     supplied manager's configuration; it does not contact or restart a cluster.
     """
-    if not config.ran_kpis:
+    if not config.metrics.ran_kpis:
         return
     for name, component in ran.deployment_model.ran.components.items():
         if str(component.implementation) != "ocudu":
@@ -31,7 +31,7 @@ def configure_ran_kpis(ran, config) -> None:
             layers.setdefault(f"enable_{layer}", True)
         metrics.update(enable_json=True, layers=layers)
         remote = dict(data.get("remote_control") or {})
-        remote.update(enabled=True, bind_addr="0.0.0.0", port=config.ocudu_metrics_port)
+        remote.update(enabled=True, bind_addr="0.0.0.0", port=config.metrics.ran_kpis.ocudu_port)
         data.update(metrics=metrics, remote_control=remote)
         if component.is_installed:
             if data != original:
@@ -43,7 +43,7 @@ def configure_ran_kpis(ran, config) -> None:
 
 def ocudu_sources(model) -> list[dict]:
     """Resolve every OCUDU radio component, not just packet-capture targets."""
-    if not model.monitoring.ran_kpis:
+    if not model.monitoring.metrics.ran_kpis:
         return []
     sources = []
     for name, component in model.ran.components.items():

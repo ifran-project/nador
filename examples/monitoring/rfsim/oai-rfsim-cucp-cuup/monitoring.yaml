@@ -2,63 +2,57 @@
 namespace: monitoring
 node_name: node4
 kubeconfig: /etc/kubernetes/admin.conf
-latency: true
-packet_pairing: false
-loki: true
-core_kpis: false
-# CU has no MAC/L1 statistics; its parser is experimental.
-ran_kpis: false
-targets:
-  - category: core
-    component: amf
-    role: amf
-    container: amf
-    interface: eth0
-    metrics_port: 9090
-  - category: core
-    component: smf
-    role: smf
-    container: smf
-    interface: eth0
-    metrics_port: 9090
-  - category: core
-    component: upf
-    role: upf
-    container: upf
-    interface: eth0
-    metrics_port: 9090
-  - category: ran
-    component: cuup
-    role: gnb
-    container: cuup
-    interface: eth0
-    metrics_port: 9090
-  - category: ran
-    component: cucp
-    container: cucp
-    metrics_port: 9090
-  - category: ran
-    component: du
-    metrics_port: 9090
-throughput: true
-observability:
+metrics:
+  rtt: true
+  throughput: true
+  n3_one_way: false
+  upf_transit: false
+  user_plane_paths: false
   ngap: false
   pfcp: false
-  mapper_coverage: false
-  user_plane_paths: false
+  ue_mapper_coverage: false
+  core_kpis: false
+  # CU has no MAC/L1 statistics; its parser is experimental.
+  ran_kpis: false
+  logs: true
   node_metrics: false
-extended:
   scheduler_wait: false
   kernel_drops: false
+  attributed_drops: false
   network_queues: false
   socket_counters: false
-  split_signaling: false
-  quality: false
-  attributed_drops: false
   tcp_flows: false
-one_way:
-  n3:
-    enabled: false
-    log_samples: false
-  upf_transit:
-    enabled: false
+  split_signaling: false
+  measurement_quality: false
+targets:
+- category: core
+  component: amf
+  role: amf
+  container: amf
+  interface: eth0
+  metrics_port: 9090
+- category: core
+  component: smf
+  role: smf
+  container: smf
+  interface: eth0
+  metrics_port: 9090
+- category: core
+  component: upf
+  role: upf
+  container: upf
+  interface: eth0
+  metrics_port: 9090
+- category: ran
+  component: cuup
+  role: gnb
+  container: cuup
+  interface: eth0
+  metrics_port: 9090
+- category: ran
+  component: cucp
+  container: cucp
+  metrics_port: 9090
+- category: ran
+  component: du
+  metrics_port: 9090

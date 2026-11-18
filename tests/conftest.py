@@ -5,8 +5,9 @@ from types import SimpleNamespace
 
 import pytest
 import yaml
+from ifran.utils.utils import deep_merge
 
-from nador.config import MonitoringDeployment, load_profile, validate_deployment
+from nador.config import MonitoringDeployment, ProfileLoader, complete_component_images, validate_deployment
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES = ROOT / "examples"
@@ -72,9 +73,8 @@ def load_example(path: Path, overlay: dict | None = None) -> MonitoringDeploymen
     """Read an example profile with the same strict loader users get."""
     if overlay is None:
         return MonitoringDeployment.from_yaml_file(path)
-    data = load_profile(path)
-    data.update(overlay)
-    return validate_deployment(data, explicit=True)
+    data = deep_merge(yaml.load(path.read_text(), Loader=ProfileLoader), overlay)  # noqa: S506
+    return validate_deployment(complete_component_images(data), explicit=True)
 
 
 @pytest.fixture

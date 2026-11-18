@@ -41,7 +41,7 @@ UE_FIELDS = (
     "upf_n3_ip",
 )
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
-# Same bounds as ObservabilityOptions; repeated because this file runs standalone on hosts.
+# Same bounds as RunOptions; repeated because this file runs standalone on hosts.
 MIN_INTERVAL_SECONDS, MAX_INTERVAL_SECONDS = 0.1, 3600
 MAX_TIMEOUT_SECONDS = 60
 MAX_PORT = 65535

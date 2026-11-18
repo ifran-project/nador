@@ -13,13 +13,11 @@ from ifran.utils.utils import deep_merge
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from nador.config import (
-    DEFAULT_IMAGES,
     DeployedMonitoringComponent,
     MonitoringDeployment,
     MonitoringModel,
     ResolvedTarget,
     component_image_defaults,
-    split_image,
 )
 from nador.probes import (
     NOT_ENABLED_WHILE_PAUSED,
@@ -45,10 +43,12 @@ VALUES_TEMPLATES = Environment(  # noqa: S701 - renders YAML, not HTML; values g
 )
 
 
-def _probe_states(model):
-    if not model.monitoring.probe_controller_image:
+def _probe_states(model: MonitoringModel) -> dict[str, bool]:
+    """Running (True) or paused (False) state of each probe release the controller manages."""
+    monitoring = model.monitoring
+    if not monitoring.uses_controller:
         return {}
-    states = controlled_probes(model.monitoring.extended)
+    states = controlled_probes(monitoring.host_probe_config(), list(monitoring.host_probe_images()))
     kinds = {str(nf.type) for nf in model.ran.components.values()}
     if not (("du" in kinds and kinds.intersection({"cu", "cu_cp", "cu_up"})) or {"cu_cp", "cu_up"} <= kinds):
         if states.get(SPLIT_SIGNALING):
@@ -86,10 +86,10 @@ def resolve_targets(model: MonitoringModel) -> list[ResolvedTarget]:
     return result
 
 
-def _extended_chart_context(
+def _host_probe_chart_context(
     model: MonitoringModel, targets: list[ResolvedTarget], probe_name: str, probe_states: dict[str, bool]
 ) -> dict:
-    settings = model.monitoring.extended
+    monitoring = model.monitoring
     extended_targets = [
         target.values() | {"kind": str(getattr(model, target.category).components[target.component].type)}
         for target in targets
@@ -108,13 +108,14 @@ def _extended_chart_context(
                         "selector": {"app": build_k8s_safe(f"{nf.implementation}-{name}")},
                     }
                 )
-    selected = settings.probe_targets.get(probe_name)
+    config = monitoring.host_probe_config()
+    selected = config["probe_targets"].get(probe_name)
     if selected:
         available = {f"{t['category']}/{t['component']}" for t in extended_targets}
         if set(selected) - available:
             raise ValueError(f"Unresolved probe targets for {probe_name}: {sorted(set(selected) - available)}")
         extended_targets = [t for t in extended_targets if f"{t['category']}/{t['component']}" in selected]
-    extended_config = probe_values(settings, probe_name)
+    extended_config = probe_values(config, probe_name)
     if probe_name in probe_states:
         extended_config["paused"] = not probe_states[probe_name]
         if not probe_states[probe_name]:
@@ -123,7 +124,7 @@ def _extended_chart_context(
     return {
         "extended_targets": extended_targets,
         "extended_config": extended_config,
-        "probe_image": settings.probe_images.get(probe_name),
+        "probe_image": monitoring.host_probe_images().get(probe_name),
     }
 
 
@@ -135,49 +136,65 @@ def _controller_values(
     Single-anchor deployments describe their gNB/UPF through probeControlTargets (targets.json);
     multi-anchor deployments pass explicit per-request target lists instead.
     """
+    metrics = monitoring.metrics
     anchors = [target.values() for target in targets if target.role in ("gnb", "upf")]
     upfs = [target for target in anchors if target["role"] == "upf"]
     by_role = {target["role"]: target for target in anchors}
-    controller_image = monitoring.probe_controller_image
+    controller_image = monitoring.image("controller") if monitoring.uses_controller else None
     has_session_context = {"amf", "smf"} <= {target.role for target in targets}
     scoped_probes_allowed = controller_image is not None and has_session_context
-    observation = monitoring.observability
 
-    one_way = monitoring.one_way.model_dump(mode="json")
-    if monitoring.one_way.image and monitoring.separate_one_way_targets:
+    upf_transit = metrics.upf_transit
+    one_way: dict = {
+        "image": monitoring.image("one_way_probe") if monitoring.one_way_probes else None,
+        "sample": monitoring.tuning.one_way_sample,
+        "test_port": upf_transit.test_port if upf_transit else 0,
+        "n3": {
+            "enabled": metrics.running("n3_one_way"),
+            "log_samples": bool(metrics.n3_one_way and metrics.n3_one_way.log_samples),
+        },
+        "upf_transit": {
+            "enabled": metrics.running("upf_transit"),
+            "peer": str(upf_transit.peer) if upf_transit else None,
+        },
+    }
+    if monitoring.one_way_probes and monitoring.separate_one_way_targets:
         one_way["one_way_targets"] = anchors
 
-    rtt = {
-        "enabled": monitoring.latency,
+    rtt = metrics.rtt
+    rtt_request: dict = {
+        "enabled": metrics.running("rtt"),
         "allowed": scoped_probes_allowed and bool(anchors),
-        "image": monitoring.images.probe,
-        "imsis": monitoring.rtt_imsis,
-        "slices": monitoring.rtt_slices,
+        "image": monitoring.image("rtt_probe"),
+        "imsis": rtt.imsis if rtt else [],
+        "slices": rtt.slices if rtt else [],
     }
-    if monitoring.packet_pairing:
-        pairer = DEFAULT_IMAGES["components"]["packet-pairer"]
-        rtt["pairer_image"] = f"{pairer['repository']}:{pairer['image_tag']}"
+    if rtt and rtt.packet_pairing:
+        rtt_request["pairer_image"] = monitoring.image("packet_pairer")
+    throughput_image = monitoring.image("throughput_probe") if metrics.throughput else None
     throughput = {
-        "enabled": monitoring.throughput,
-        "allowed": scoped_probes_allowed and bool(upfs) and monitoring.external_throughput_image is not None,
-        "image": monitoring.external_throughput_image,
+        "enabled": metrics.running("throughput"),
+        "allowed": scoped_probes_allowed and bool(upfs) and throughput_image is not None,
+        "image": throughput_image,
     }
+    paths_metric = metrics.user_plane_paths
+    path_image = monitoring.image("path_probe") if paths_metric else None
     paths = {
-        "enabled": observation.user_plane_paths,
-        "allowed": bool(anchors) and monitoring.external_path_image is not None,
-        "image": monitoring.external_path_image,
-        "port": observation.path_port,
-        "interval": observation.path_interval_seconds,
+        "enabled": metrics.running("user_plane_paths"),
+        "allowed": bool(anchors) and path_image is not None,
+        "image": path_image,
+        "port": paths_metric.port if paths_metric else 9403,
+        "interval": paths_metric.interval_seconds if paths_metric else 5,
     }
     if monitoring.multi_anchor and controller_image:
-        rtt["targets"] = paths["targets"] = anchors
+        rtt_request["targets"] = paths["targets"] = anchors
         throughput["targets"] = upfs
 
     return {
         "targetNamespaces": sorted({target.namespace for target in targets}),
         "operationTimeoutSeconds": monitoring.operation_timeout_seconds,
         "probeControllerImage": controller_image,
-        "cleanupImage": controller_image or DEFAULT_IMAGES["external_probes"]["controller"],
+        "cleanupImage": monitoring.image("controller"),
         "probeControlTargets": {} if monitoring.multi_anchor else by_role,
         "extendedProbeStates": probe_states,
         # Workloads the controller may pause and resume; RBAC is generated from this list.
@@ -187,7 +204,7 @@ def _controller_values(
         "probeApiTlsSecret": monitoring.probe_api_tls_secret,
         "probeApiTokenSecret": monitoring.probe_api_token_secret,
         "probeControl": one_way,
-        "rttRequest": rtt,
+        "rttRequest": rtt_request,
         "throughputRequest": throughput,
         "pathRequest": paths,
     }
@@ -215,7 +232,7 @@ def _render_chart_values(
     context = {}
     if chart == "extended-probes":
         probe_name = probe_kind(component.release_name or "")
-        context = _extended_chart_context(model, targets, probe_name, probe_states)
+        context = _host_probe_chart_context(model, targets, probe_name, probe_states)
     elif chart == "ocudu-metrics":
         context["ocudu_sources"] = ocudu_sources(model)
     elif chart == "kube-prometheus-stack":
@@ -238,18 +255,19 @@ def _enabled_components(model: MonitoringModel) -> set[str]:
     monitoring = model.monitoring
     core = str(model.core.implementation)
     ran = str(model.ran.implementation)
-    if monitoring.core_kpis and core != "open5gs":
+    metrics = monitoring.metrics
+    if metrics.core_kpis and core != "open5gs":
         raise ValueError("Core KPI calculator requires Open5GS")
-    if monitoring.ran_kpis and ran not in {"oai", "ocudu"}:
+    if metrics.ran_kpis and ran not in {"oai", "ocudu"}:
         raise ValueError("RAN KPIs support OAI and OCUDU")
     enabled = {"integration", "prometheus", "grafana"}
     if monitoring.needs_session_stack:
         enabled.update(("redis", "ue-mapper-api", "monitoring-controller"))
-    if monitoring.loki:
+    if metrics.logs:
         enabled.update(("loki", "promtail"))
-    if monitoring.core_kpis:
+    if metrics.core_kpis:
         enabled.add("kpi-calculator-open5gs")
-    if monitoring.ran_kpis:
+    if metrics.ran_kpis:
         enabled.add("ocudu-metrics" if ran == "ocudu" else "kpi-calculator-oai")
     return enabled
 
@@ -261,7 +279,7 @@ def resolve_components(model: MonitoringModel, targets: list[ResolvedTarget]) ->
     enabled = _enabled_components(model)
     definitions = {name: data for name, data in catalog["components"].items() if name in enabled}
     probe_states = _probe_states(model)
-    kinds = probe_states if monitoring.probe_controller_image else enabled_probes(monitoring.extended)
+    kinds = probe_states if monitoring.uses_controller else enabled_probes(monitoring.host_probe_config())
     for kind in kinds:
         definitions[release_name(kind)] = {
             "chart_ref": "extended-probes",
@@ -274,7 +292,7 @@ def resolve_components(model: MonitoringModel, targets: list[ResolvedTarget]) ->
             | catalog["defaults"]
             | definition
         )
-        image = component_image_defaults(name, monitoring.probe_controller_image)
+        image = component_image_defaults(name, monitoring.images)
         if image:
             data["image"] = image.copy()
         if name in monitoring.components:
@@ -282,14 +300,6 @@ def resolve_components(model: MonitoringModel, targets: list[ResolvedTarget]) ->
                 data, monitoring.components[name].model_dump(mode="json", exclude_unset=True, exclude_none=True)
             )
         component = DeployedMonitoringComponent.model_validate(data)
-        if (
-            name == "ue-mapper-api"
-            and monitoring.observability.mapper_coverage
-            and (image := monitoring.observability.mapper_image)
-        ):
-            if component.image is None:
-                raise ValueError("ue-mapper-api has no image to override")
-            component.image.repository, component.image.image_tag = split_image(image)
         component.namespace = monitoring.namespace
         component.chart_values = _render_chart_values(component, model, targets, probe_states)
         if probe_kind(name) and component.chart_values.get("settings", {}).get("paused"):

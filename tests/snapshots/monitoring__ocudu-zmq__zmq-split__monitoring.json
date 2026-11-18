@@ -146,19 +146,10 @@
         "latencyEnabled": true,
         "lokiEnabled": true,
         "observability": {
-          "amf_image": null,
-          "mapper_coverage": false,
-          "mapper_image": null,
           "ngap": false,
           "ngap_port": 9102,
-          "node_metrics": false,
-          "path_interval_seconds": 5,
-          "path_port": 9403,
-          "pending_timeout_seconds": 30,
           "pfcp": false,
-          "pfcp_port": 9104,
-          "smf_image": null,
-          "user_plane_paths": false
+          "pfcp_port": 9104
         },
         "targets": [
           {

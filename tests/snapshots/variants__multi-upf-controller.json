@@ -137,19 +137,10 @@
         "latencyEnabled": false,
         "lokiEnabled": false,
         "observability": {
-          "amf_image": null,
-          "mapper_coverage": true,
-          "mapper_image": "ghcr.io/ifran-project/ue_mapper_api:v1",
           "ngap": true,
           "ngap_port": 9102,
-          "node_metrics": true,
-          "path_interval_seconds": 5,
-          "path_port": 9403,
-          "pending_timeout_seconds": 30,
           "pfcp": true,
-          "pfcp_port": 9104,
-          "smf_image": null,
-          "user_plane_paths": true
+          "pfcp_port": 9104
         },
         "targets": [
           {

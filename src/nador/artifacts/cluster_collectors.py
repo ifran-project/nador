@@ -1,75 +1,38 @@
-"""ObservabilityRun: an ExperimentRun that also records the setup and the UE context.
+"""Collectors that act on the cluster hosts through the ``experiment/context`` Ansible role.
 
-Two collectors act on the cluster hosts through the ``experiment/context`` Ansible role:
-``SetupSnapshot`` (host and cluster state before and after the workload) and
-``UEContext`` (the UE mapper's inventory, sampled while the workload runs). With a
-``mapper_url`` the sampler runs on this machine instead.
+``SetupSnapshot`` records host and cluster state before and after the workload, and
+``UEContext`` samples the UE mapper's inventory while it runs. With a ``mapper_url``
+the sampler runs on this machine instead.
 """
+
+from __future__ import annotations
 
 import asyncio
 import json
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any
-from urllib.parse import urlsplit
+from typing import TYPE_CHECKING, Any
 
 from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_role
-from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from nador.planner import ASSETS
 
-from .collectors import Collector, LokiExport
-from .experiment_run import ExperimentRun
+from .collectors import Collector, RunOptions
 
 if TYPE_CHECKING:
     from nador.deployment import MonitoringManagement
+
+    from .experiment_run import ExperimentRun
 
 HERE = Path(__file__).resolve().parent
 SNAPSHOT_SCRIPT = HERE / "setup_snapshot.py"
 SAMPLER_SCRIPT = HERE / "ue_sampler.py"
 
 
-class ObservabilityOptions(BaseModel):
-    """What ObservabilityRun collects and how hard it may poll."""
-
-    model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
-
-    mapper_url: str | None = None
-    collect_setup: bool = True
-    collect_ue_context: bool = True
-    setup_hosts: list[Annotated[str, Field(min_length=1)]] | None = None
-    interval_seconds: float = Field(default=2, ge=0.1, le=3600, allow_inf_nan=False)
-    timeout_seconds: int = Field(default=5, ge=1, le=60)
-    max_seconds: int = Field(default=7200, ge=1)
-    limit: int = Field(default=5000, ge=1)
-    namespace: str | None = None
-    service: str = "ue-mapper-api"
-    service_port: int = Field(default=8080, ge=1, le=65535)
-    loki_url: str | None = None
-    collect_loki: bool = False
-    loki_selector: str = '{namespace=~".+"}'
-    loki_limit: int = Field(default=5000, ge=1, le=100_000)
-    loki_max_queries: int = Field(default=1024, ge=1, le=100_000)
-
-    @field_validator("mapper_url")
-    @classmethod
-    def _check_mapper_url(cls, url: str | None) -> str | None:
-        if url:
-            parsed = urlsplit(url)
-            if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.query or parsed.fragment:
-                raise ValueError("mapper_url must be an HTTP(S) base URL without query or fragment")
-        return url
-
-    def sampler_args(self) -> list[str]:
-        """Command-line options shared by the local and remote UE samplers."""
-        fields = ("interval_seconds", "timeout_seconds", "max_seconds", "limit", "service", "service_port")
-        return [arg for field in fields for arg in ("--" + field.replace("_", "-"), str(getattr(self, field)))]
-
-
 class ClusterHosts:
     """Runs the experiment/context Ansible role on the hosts of a deployment."""
 
-    def __init__(self, monitoring: "MonitoringManagement", namespace: str | None) -> None:
+    def __init__(self, monitoring: MonitoringManagement, namespace: str | None) -> None:
         model = monitoring.deployment_model
         control = model.params.k8s.master_node
         if not control or control not in model.nodes:
@@ -97,7 +60,7 @@ class ClusterHosts:
             become=True,
             inputs={"context_action": action, **inputs},
             output_keys=outputs,
-            runner_path=str(Path(self.model.params.ansible.runner_path) / "ml-artifacts" / run.run_id / action),
+            runner_path=str(Path(self.model.params.ansible.runner_path) / "experiments" / run.run_id / action),
             roles_paths=[str(ASSETS / "roles"), *self.model.params.ansible.roles_paths],
             quiet=True,
         )
@@ -160,7 +123,7 @@ class UEContext(Collector):
 
     label = "ue_context"
 
-    def __init__(self, options: ObservabilityOptions, hosts: ClusterHosts | None) -> None:
+    def __init__(self, options: RunOptions, hosts: ClusterHosts | None) -> None:
         self.options = options
         self.hosts = hosts
         self.process: asyncio.subprocess.Process | None = None
@@ -265,38 +228,3 @@ class UEContext(Collector):
 async def _stderr(process: asyncio.subprocess.Process) -> str:
     error = (await process.stderr.read(4000)).decode(errors="replace").strip() if process.stderr else ""
     return error or f"UE sampler exited with code {process.returncode}"
-
-
-class ObservabilityRun(ExperimentRun):
-    """An ExperimentRun that also snapshots the setup, samples UE context and can export Loki logs.
-
-    Keyword arguments are ObservabilityOptions fields or ExperimentRun arguments. A failed
-    collection fails a successful workload, but never replaces a workload exception.
-    """
-
-    def __init__(
-        self, directory: str | Path, *, monitoring: "MonitoringManagement | None" = None, **kwargs: Any
-    ) -> None:
-        options = ObservabilityOptions(
-            **{key: kwargs.pop(key) for key in list(kwargs) if key in ObservabilityOptions.model_fields}
-        )
-        hosts = ClusterHosts(monitoring, options.namespace) if monitoring is not None else None
-        if options.setup_hosts and (hosts is None or set(options.setup_hosts) - hosts.model.nodes.keys()):
-            raise ValueError("setup_hosts must refer to nodes in the supplied monitoring manager")
-        collectors = list(kwargs.pop("collectors", ()))
-        if options.collect_setup and hosts is not None:
-            collectors.append(SetupSnapshot(hosts, options.setup_hosts))
-        if options.collect_ue_context and (options.mapper_url or hosts is not None):
-            collectors.append(UEContext(options, hosts))
-        kwargs.setdefault("queries_file", ASSETS / "observability_queries.json")
-        super().__init__(directory, monitoring=monitoring, collectors=collectors, **kwargs)
-        if options.collect_loki or options.loki_url:
-            self.collectors.append(
-                LokiExport(
-                    url=options.loki_url,
-                    selector=options.loki_selector,
-                    limit=options.loki_limit,
-                    max_queries=options.loki_max_queries,
-                )
-            )
-        self.settings = options

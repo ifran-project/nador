@@ -5,18 +5,17 @@ import json
 
 import pytest
 
-from nador.artifacts import Collector, ExperimentRun, LokiExport, ObservabilityOptions, ObservabilityRun
+from nador.artifacts import Collector, ExperimentRun, LokiExport, RunOptions
 
 
-def test_observability_defaults(tmp_path):
-    run = ObservabilityRun(tmp_path / "run", name="x")
+def test_run_defaults(tmp_path):
+    run = ExperimentRun(tmp_path / "run", name="x")
     assert run.name == "x"
-    assert run.settings.sampler_args() == [
+    assert run.options.sampler_args() == [
         *("--interval-seconds", "2", "--timeout-seconds", "5", "--max-seconds", "7200"),
         *("--limit", "5000", "--service", "ue-mapper-api", "--service-port", "8080"),
     ]
-    assert run.queries_file.name == "observability_queries.json"
-    assert run.collectors == []  # no monitoring manager, mapper URL or Loki URL: nothing to collect
+    assert run.collectors == []  # no monitoring manager, Prometheus, mapper or Loki URL: timeline only
 
 
 @pytest.mark.parametrize(
@@ -32,21 +31,17 @@ def test_observability_defaults(tmp_path):
         {"loki_limit": 100_001},
         {"setup_hosts": [""]},
         {"setup_hosts": ["node1"]},  # needs a monitoring manager that knows node1
+        {"colect_loki": True},  # misspelled option
     ],
 )
-def test_observability_rejects_bad_options(tmp_path, kwargs):
+def test_bad_options_are_rejected(tmp_path, kwargs):
     with pytest.raises(ValueError):  # noqa: PT011 - pydantic and custom messages vary
-        ObservabilityRun(tmp_path / "run", **kwargs)
+        ExperimentRun(tmp_path / "run", **kwargs)
 
 
-def test_unknown_arguments_are_rejected(tmp_path):
-    with pytest.raises(TypeError):
-        ObservabilityRun(tmp_path / "run", colect_loki=True)
-
-
-def test_loki_url_enables_loki_export():
-    assert ObservabilityOptions(loki_url="http://loki:3100").loki_url
-    run = ObservabilityRun("unused", loki_url="http://loki:3100")
+def test_loki_url_enables_log_export():
+    assert RunOptions(loki_url="http://loki:3100").loki_url
+    run = ExperimentRun("unused", loki_url="http://loki:3100")
     assert [type(collector) for collector in run.collectors] == [LokiExport]
 
 
@@ -180,7 +175,7 @@ def test_local_ue_sampler_runs_as_a_subprocess(tmp_path):
 
         async def experiment():
             url = f"http://127.0.0.1:{server.server_port}"
-            async with ObservabilityRun(tmp_path / "run", mapper_url=url, interval_seconds=0.2, timezone="UTC"):
+            async with ExperimentRun(tmp_path / "run", mapper_url=url, interval_seconds=0.2, timezone="UTC"):
                 await asyncio.sleep(0.6)
 
         asyncio.run(experiment())

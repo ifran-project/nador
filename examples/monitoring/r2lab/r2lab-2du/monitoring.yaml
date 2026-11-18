@@ -3,11 +3,27 @@
 # Override a target interface here if you attach N2/N3/N4 to a different pod interface.
 namespace: monitoring
 node_name: sopnode-f3
-latency: true
-packet_pairing: false
-loki: true
-core_kpis: false
-ran_kpis: false
+metrics:
+  rtt: true
+  throughput: true
+  n3_one_way: false
+  upf_transit: false
+  user_plane_paths: false
+  ngap: false
+  pfcp: false
+  ue_mapper_coverage: false
+  core_kpis: false
+  ran_kpis: false
+  logs: true
+  node_metrics: false
+  scheduler_wait: false
+  kernel_drops: false
+  attributed_drops: false
+  network_queues: false
+  socket_counters: false
+  tcp_flows: false
+  split_signaling: false
+  measurement_quality: false
 targets:
 - category: core
   component: amf
@@ -41,25 +57,3 @@ targets:
 - category: ran
   component: du02
   metrics_port: 9090
-throughput: true
-observability:
-  ngap: false
-  pfcp: false
-  mapper_coverage: false
-  user_plane_paths: false
-  node_metrics: false
-extended:
-  scheduler_wait: false
-  kernel_drops: false
-  network_queues: false
-  socket_counters: false
-  split_signaling: false
-  quality: false
-  attributed_drops: false
-  tcp_flows: false
-one_way:
-  n3:
-    enabled: false
-    log_samples: false
-  upf_transit:
-    enabled: false

@@ -1,8 +1,9 @@
-"""The monitoring profile: its schema, its validation rules and how it is read from YAML.
+"""The monitoring profile: which metrics to collect, where, and how it is read from YAML.
 
-A profile (``monitoring.yaml``) becomes a ``MonitoringDeployment``. Sections of the
-profile have their own settings models below (``observability``, ``extended``,
-``one_way``); ``read_deployment`` is the strict YAML entry point.
+A profile (``monitoring.yaml``) becomes a ``MonitoringDeployment``. Every metric is a key
+under ``metrics:``: ``true`` turns it on, ``false`` leaves it out, and a mapping turns it
+on with options. Probes the controller can start later take ``{on_demand: true}``.
+Container images default to ``assets/images.json``; ``images:`` overrides them.
 """
 
 import json
@@ -16,9 +17,19 @@ from ifran.models.deployment import DeploymentModel
 from ifran.models.k8s import ContainerImage
 from ifran.utils.utils import deep_merge
 from metamodel_3gpp.models.base import StrictBaseModel
-from pydantic import AfterValidator, Field, ValidationError, field_validator, model_validator
+from pydantic import AfterValidator, BeforeValidator, Field, ValidationError, field_validator, model_validator
 
-from nador.probes import PROBES, enabled_probes
+from nador.probes import HOST_PROBES, image_key, kind_of
+
+DEFAULT_IMAGES: dict[str, str] = json.loads((Path(__file__).parent / "assets" / "images.json").read_text())["images"]
+DURATION = r"^([0-9]+(ms|s|m|h|d|w|y))+$"  # Prometheus duration, e.g. 15s, 5d or 1h30m
+# Helm releases whose image comes from images.json, by image key.
+COMPONENT_IMAGES = {
+    "monitoring-controller": "controller",
+    "ue-mapper-api": "ue_mapper",
+    "kpi-calculator-oai": "kpi_calculator_oai",
+}
+
 
 # --- Image references ----------------------------------------------------------------------------------------------
 
@@ -47,48 +58,96 @@ def split_image(reference: str) -> tuple[str, str]:
     return repository, tag + at + digest
 
 
-# --- observability: protocol, path and infrastructure collectors ---------------------------------------------------
+# --- Metrics -------------------------------------------------------------------------------------------------------
 
 
-class ObservabilitySettings(StrictBaseModel):
-    """Opt-in collectors with optional image overrides."""
-
-    ngap: bool = False
-    pfcp: bool = False
-    mapper_coverage: bool = False
-    user_plane_paths: bool = False
-    node_metrics: bool = False
-    amf_image: str | None = None
-    smf_image: str | None = None
-    mapper_image: str | None = None
-    ngap_port: int = Field(default=9102, ge=1, le=65535)
-    pfcp_port: int = Field(default=9104, ge=1, le=65535)
-    path_port: int = Field(default=9403, ge=1, le=65535)
-    pending_timeout_seconds: float = Field(default=30, gt=0, le=3600)
-    path_interval_seconds: float = Field(default=5, ge=0.1, le=3600)
-
-    @property
-    def active(self) -> bool:
-        """Whether any collector that needs the session stack is enabled."""
-        return self.ngap or self.pfcp or self.mapper_coverage or self.user_plane_paths
-
-    @model_validator(mode="after")
-    def require_collector_images(self) -> Self:
-        """Reject blank image overrides and exporter port clashes."""
-        for field in ("amf_image", "smf_image", "mapper_image"):
-            image = getattr(self, field)
-            if image is not None and not image.strip():
-                raise ValueError(f"{field} must be a non-empty image or null to inherit the default")
-        if self.mapper_coverage and self.mapper_image:
-            repository, tag = split_image(self.mapper_image)
-            if not repository or not tag or "@" in self.mapper_image:
-                raise ValueError("mapper_image must use an explicit repository:tag")
-        if self.path_port in range(9100, 9200) or self.path_port in range(9300, 9400):
-            raise ValueError("path_port overlaps the latency/throughput exporter ranges; use 9403 or another range")
-        return self
+class Metric(StrictBaseModel):
+    """A metric that is on. Subclasses add its options."""
 
 
-# --- extended: dedicated research probes ---------------------------------------------------------------------------
+class OnDemand(Metric):
+    """A probe the controller manages: ``on_demand`` deploys it stopped, ready to start later."""
+
+    on_demand: bool = False
+
+
+class Rtt(OnDemand):
+    """Round-trip latency per UE and slice, measured by eBPF probes on gNBs and UPFs."""
+
+    packet_pairing: bool = False
+    imsis: list[str] = Field(default_factory=list)
+    slices: list[str] = Field(default_factory=list)
+
+    @field_validator("imsis")
+    @classmethod
+    def _check_imsis(cls, values: list[str]) -> list[str]:
+        if any(not re.fullmatch(r"[0-9]{5,16}", value) for value in values):
+            raise ValueError("rtt imsis must contain quoted IMSIs")
+        return values
+
+    @field_validator("slices")
+    @classmethod
+    def _check_slices(cls, values: list[str]) -> list[str]:
+        if any(not re.fullmatch(r"[0-9a-f]{2}:[0-9a-f]{6}", value) for value in values):
+            raise ValueError("rtt slices must use labels such as 01:ffffff")
+        return values
+
+
+class N3OneWay(OnDemand):
+    """One-way latency between gNB and UPF on N3."""
+
+    log_samples: bool = False
+
+
+class UpfTransit(OnDemand):
+    """One-way transit latency through the UPF towards a test peer."""
+
+    peer: IPv4Address
+    test_port: int = Field(ge=1, le=65535)
+
+
+class UserPlanePaths(OnDemand):
+    """Per-path packet counters on gNBs and UPFs."""
+
+    port: int = Field(default=9403, ge=1, le=65535)
+    interval_seconds: float = Field(default=5, ge=0.1, le=3600)
+
+    @field_validator("port")
+    @classmethod
+    def _check_port(cls, port: int) -> int:
+        if port in range(9100, 9200) or port in range(9300, 9400):
+            raise ValueError("user_plane_paths port overlaps the latency/throughput exporter ranges")
+        return port
+
+
+class Ngap(Metric):
+    """NGAP session-setup metrics exported by the AMF sniffer."""
+
+    port: int = Field(default=9102, ge=1, le=65535)
+
+
+class Pfcp(Metric):
+    """PFCP session-establishment metrics exported by the SMF sniffer."""
+
+    port: int = Field(default=9104, ge=1, le=65535)
+
+
+class RanKpis(Metric):
+    """RAN KPIs: OAI's parser, or OCUDU's native JSON metrics on ``ocudu_port``."""
+
+    ocudu_port: int = Field(default=8001, ge=1, le=65535)
+
+
+class HostProbe(OnDemand):
+    """A probe that runs on the nodes. ``targets`` limits it to some components (``ran/gnb``)."""
+
+    targets: list[str] = Field(default_factory=list)
+
+
+class TcpFlows(HostProbe):
+    """Per-flow TCP evidence; packet identities are keyed by an existing Kubernetes Secret."""
+
+    identity_secret: str = Field(pattern=r"^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$", max_length=253)
 
 
 class QualityQuery(StrictBaseModel):
@@ -100,102 +159,87 @@ class QualityQuery(StrictBaseModel):
     max_age_seconds: float = Field(default=30, gt=0, le=86400)
 
 
-class ExtendedSettings(StrictBaseModel):
-    """Experimental collectors with no inferred deployment or image selection."""
+class MeasurementQuality(HostProbe):
+    """Freshness and availability checks over Prometheus queries."""
 
-    scheduler_wait: bool = False
-    kernel_drops: bool = False
-    network_queues: bool = False
-    socket_counters: bool = False
-    split_signaling: bool = False
-    quality: bool = False
-    attributed_drops: bool = False
-    tcp_flows: bool = False
-    packet_identity_secret: str | None = Field(
-        default=None, pattern=r"^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$", max_length=253
-    )
+    queries: list[QualityQuery] = Field(default_factory=list, max_length=64)
+
+    @field_validator("queries")
+    @classmethod
+    def _unique(cls, queries: list[QualityQuery]) -> list[QualityQuery]:
+        if len({query.name for query in queries}) != len(queries):
+            raise ValueError("measurement_quality query names must be unique")
+        return queries
+
+
+def _on_off(value: Any) -> Any:
+    """``true`` turns a metric on with default options, ``false`` or ``null`` leaves it off."""
+    if value is True:
+        return {}
+    return None if value is False else value
+
+
+Switch = BeforeValidator(_on_off)
+
+
+class Metrics(StrictBaseModel):
+    """Every metric NADOR can collect. Each is ``None`` when off."""
+
+    rtt: Annotated[Rtt | None, Switch] = None
+    throughput: Annotated[OnDemand | None, Switch] = None
+    n3_one_way: Annotated[N3OneWay | None, Switch] = None
+    upf_transit: Annotated[UpfTransit | None, Switch] = None
+    user_plane_paths: Annotated[UserPlanePaths | None, Switch] = None
+    ngap: Annotated[Ngap | None, Switch] = None
+    pfcp: Annotated[Pfcp | None, Switch] = None
+    ue_mapper_coverage: Annotated[Metric | None, Switch] = None
+    core_kpis: Annotated[Metric | None, Switch] = None
+    ran_kpis: Annotated[RanKpis | None, Switch] = None
+    logs: Annotated[Metric | None, Switch] = None
+    node_metrics: Annotated[Metric | None, Switch] = None
+    scheduler_wait: Annotated[HostProbe | None, Switch] = None
+    kernel_drops: Annotated[HostProbe | None, Switch] = None
+    attributed_drops: Annotated[HostProbe | None, Switch] = None
+    network_queues: Annotated[HostProbe | None, Switch] = None
+    socket_counters: Annotated[HostProbe | None, Switch] = None
+    tcp_flows: Annotated[TcpFlows | None, Switch] = None
+    split_signaling: Annotated[HostProbe | None, Switch] = None
+    measurement_quality: Annotated[MeasurementQuality | None, Switch] = None
+
+    def get(self, name: str) -> Metric | None:
+        """The metric's options, or None when it is off."""
+        return getattr(self, name)
+
+    def available(self, name: str) -> bool:
+        """Deployed, running or on demand."""
+        return self.get(name) is not None
+
+    def running(self, name: str) -> bool:
+        """Deployed and started."""
+        metric = self.get(name)
+        return metric is not None and not getattr(metric, "on_demand", False)
+
+
+class Tuning(StrictBaseModel):
+    """Advanced knobs shared by several probes; the defaults suit most deployments."""
+
+    probe_interval_seconds: float = Field(default=5, ge=1, le=300)
+    probe_timeout_seconds: float = Field(default=2, ge=0.1, le=10)
+    probe_capture_limit: int = Field(default=8, ge=1, le=32)
     packet_run_id: str = Field(default="experiment", min_length=1, max_length=128)
     packet_state_limit: int = Field(default=4096, ge=16, le=16384)
     packet_ttl_seconds: float = Field(default=30, ge=1, le=300)
-    quality_queries: list[QualityQuery] = Field(default_factory=list, max_length=64)
-    probe_images: dict[str, TaggedImage] = Field(default_factory=dict)
-    probe_targets: dict[str, list[str]] = Field(default_factory=dict)
-    interval_seconds: float = Field(default=5, ge=1, le=300)
-    timeout_seconds: float = Field(default=2, ge=0.1, le=10)
-    capture_limit: int = Field(default=8, ge=1, le=32)
+    sniffer_pending_timeout_seconds: float = Field(default=30, gt=0, le=3600)
+    one_way_sample: int = Field(default=16, ge=1, le=0xFFFFFFFF)
 
     @model_validator(mode="after")
-    def validate_settings(self):
-        """Require pinned images and consistent settings for enabled probes."""
-        unknown = self.probe_images.keys() - PROBES.keys()
-        if unknown:
-            raise ValueError(f"Unknown probe images: {sorted(unknown)}")
-        missing = set(enabled_probes(self)) - self.probe_images.keys()
-        if missing:
-            raise ValueError(f"extended.probe_images requires an image for: {', '.join(sorted(missing))}")
-        if self.probe_targets.keys() - self.probe_images.keys() or any(
-            not items for items in self.probe_targets.values()
-        ):
-            raise ValueError("probe_targets requires a corresponding probe image and a nonempty target list")
-        names = [query.name for query in self.quality_queries]
-        if len(set(names)) != len(names):
-            raise ValueError("Extended quality query names must be unique")
-        if self.timeout_seconds > self.interval_seconds:
-            raise ValueError("Probe timeout must not exceed the polling interval")
-        if self.tcp_flows and not self.packet_identity_secret:
-            raise ValueError("TCP flow evidence requires an existing Kubernetes Secret with key 'key'")
+    def _timeout_fits_interval(self) -> Self:
+        if self.probe_timeout_seconds > self.probe_interval_seconds:
+            raise ValueError("probe_timeout_seconds must not exceed probe_interval_seconds")
         return self
 
 
-# --- one_way: controller-managed one-way latency -------------------------------------------------------------------
-
-
-class N3Settings(StrictBaseModel):
-    """One-way latency between gNB and UPF on N3."""
-
-    enabled: bool = False
-    log_samples: bool = False
-
-
-class UpfTransitSettings(StrictBaseModel):
-    """One-way transit latency through the UPF towards a test peer."""
-
-    enabled: bool = False
-    peer: IPv4Address | None = None
-
-
-class OneWaySettings(StrictBaseModel):
-    """Controller-managed one-way probes and their shared settings."""
-
-    image: TaggedImage | None = None
-    sample: int = Field(default=16, ge=1, le=0xFFFFFFFF)
-    test_port: int = Field(default=0, ge=0, le=65535)
-    n3: N3Settings = Field(default_factory=N3Settings)
-    upf_transit: UpfTransitSettings = Field(default_factory=UpfTransitSettings)
-
-    @model_validator(mode="after")
-    def check_requirements(self) -> Self:
-        """Enabled probes need an image; UPF transit needs a peer and port."""
-        if (self.n3.enabled or self.upf_transit.enabled) and not self.image:
-            raise ValueError("Enabled one-way probes require one_way.image")
-        if self.upf_transit.enabled and (not self.upf_transit.peer or not self.test_port):
-            raise ValueError("UPF transit requires upf_transit.peer and test_port")
-        return self
-
-
-# --- The profile ---------------------------------------------------------------------------------------------------
-
-DEFAULT_IMAGES = json.loads((Path(__file__).parent / "assets" / "images.json").read_text())
-DURATION = r"^([0-9]+(ms|s|m|h|d|w|y))+$"  # Prometheus duration, e.g. 15s, 5d or 1h30m
-
-
-def component_image_defaults(name: str, controller_image: str | None = None) -> dict | None:
-    """Derive controller chart defaults from the same image used for probes and cleanup."""
-    if name == "monitoring-controller":
-        reference = controller_image or DEFAULT_IMAGES["external_probes"]["controller"]
-        repository, tag = split_image(reference)
-        return {"repository": repository, "image_tag": tag, "image_pull_policy": "IfNotPresent"}
-    return DEFAULT_IMAGES["components"].get(name)
+# --- Targets and Helm components -----------------------------------------------------------------------------------
 
 
 class DeployedMonitoringComponent(StrictBaseModel):
@@ -256,40 +300,25 @@ class ResolvedTarget(MonitoringTarget):
         return self.model_dump(mode="json")
 
 
-class MonitoringImages(StrictBaseModel):
-    """Container versions for the RTT probe and session sniffers."""
+# --- The profile ---------------------------------------------------------------------------------------------------
 
-    probe: str = DEFAULT_IMAGES["probes"]["probe"]
-    amf_sniffer: str = DEFAULT_IMAGES["probes"]["amf_sniffer"]
-    smf_sniffer: str = DEFAULT_IMAGES["probes"]["smf_sniffer"]
+CONTROLLER_METRICS = ("rtt", "throughput", "n3_one_way", "upf_transit", "user_plane_paths")
+SESSION_METRICS = ("ngap", "pfcp", "ue_mapper_coverage", "user_plane_paths")
 
 
 class MonitoringDeployment(StrictBaseModel):
-    """Monitoring configuration and component deployment information."""
+    """A monitoring profile: the metrics to collect, the network functions to watch, and where to deploy."""
 
     namespace: str = Field(default="monitoring", pattern=r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", max_length=63)
     node_name: str | None = None  # actual Kubernetes node name for scheduling
     kubeconfig: str = "/etc/kubernetes/admin.conf"  # on the Kubernetes master
-    loki: bool = True
-    latency: bool = False
-    throughput: bool = True
-    packet_pairing: bool = False
-    core_kpis: bool = False
-    ran_kpis: bool = False
-    ocudu_metrics_port: int = Field(default=8001, ge=1, le=65535)
-    observability: ObservabilitySettings = Field(default_factory=ObservabilitySettings)
-    extended: ExtendedSettings = Field(default_factory=ExtendedSettings)
-    one_way: OneWaySettings = Field(default_factory=OneWaySettings)
-    probe_controller_image: TaggedImage | None = None
+    metrics: Metrics = Field(default_factory=Metrics)
+    targets: list[MonitoringTarget] = Field(default_factory=list)
+    images: dict[str, TaggedImage] = Field(default_factory=dict)
+    tuning: Tuning = Field(default_factory=Tuning)
+    components: dict[str, DeployedMonitoringComponent] = Field(default_factory=dict)
     probe_api_tls_secret: str | None = None
     probe_api_token_secret: str | None = None
-    external_throughput_image: TaggedImage | None = None
-    external_path_image: TaggedImage | None = None
-    rtt_imsis: list[str] = Field(default_factory=list)
-    rtt_slices: list[str] = Field(default_factory=list)
-    targets: list[MonitoringTarget] = Field(default_factory=list)
-    images: MonitoringImages = Field(default_factory=MonitoringImages)
-    components: dict[str, DeployedMonitoringComponent] = Field(default_factory=dict)
     prometheus_scrape_interval: str = Field(default="1s", pattern=DURATION)
     prometheus_retention_period: str = Field(default="5d", pattern=DURATION)
     operation_timeout_seconds: int = Field(default=300, ge=1)
@@ -301,6 +330,10 @@ class MonitoringDeployment(StrictBaseModel):
     def from_yaml_file(cls, path: str | Path) -> Self:
         """Read and check a full monitoring profile before any cluster work."""
         return read_deployment(path, cls)
+
+    def image(self, key: str) -> str:
+        """The image for a key of images.json, after profile overrides."""
+        return self.images.get(key) or DEFAULT_IMAGES[key]
 
     @property
     def roles(self) -> set[str | None]:
@@ -318,97 +351,127 @@ class MonitoringDeployment(StrictBaseModel):
         return self.multi_anchor or "gnb" not in self.roles
 
     @property
+    def one_way_probes(self) -> bool:
+        """Whether any one-way probe is deployed."""
+        return self.metrics.available("n3_one_way") or self.metrics.available("upf_transit")
+
+    @property
+    def uses_controller(self) -> bool:
+        """Whether the probe controller is deployed."""
+        on_demand = any(getattr(self.metrics.get(name), "on_demand", False) for name in Metrics.model_fields)
+        return on_demand or any(self.metrics.available(name) for name in CONTROLLER_METRICS)
+
+    @property
     def needs_session_stack(self) -> bool:
         """Whether to deploy session services and start the AMF/SMF sniffers."""
-        return bool(self.probe_controller_image or self.observability.active)
+        return self.uses_controller or any(self.metrics.running(name) for name in SESSION_METRICS)
 
-    @field_validator("rtt_imsis")
-    @classmethod
-    def _check_imsis(cls, values: list[str]) -> list[str]:
-        if any(not re.fullmatch(r"[0-9]{5,16}", value) for value in values):
-            raise ValueError("rtt_imsis must contain quoted IMSIs")
-        return values
+    def host_probe_config(self) -> dict[str, Any]:
+        """Settings sent to every dedicated probe, in the shape the probe images read."""
+        metrics, tuning = self.metrics, self.tuning
+        flags = {flag: metrics.running(metric) for metric, flag in HOST_PROBES.items()}
+        targets: dict[str, list[str]] = {}
+        for metric in HOST_PROBES:
+            probe = metrics.get(metric)
+            if isinstance(probe, HostProbe) and probe.targets:
+                kind = kind_of(metric)
+                targets[kind] = sorted({*targets.get(kind, []), *probe.targets})
+        quality = metrics.measurement_quality
+        return flags | {
+            "packet_identity_secret": metrics.tcp_flows.identity_secret if metrics.tcp_flows else None,
+            "packet_run_id": tuning.packet_run_id,
+            "packet_state_limit": tuning.packet_state_limit,
+            "packet_ttl_seconds": float(tuning.packet_ttl_seconds),
+            "quality_queries": [query.model_dump(mode="json") for query in quality.queries] if quality else [],
+            "probe_targets": targets,
+            "interval_seconds": float(tuning.probe_interval_seconds),
+            "timeout_seconds": float(tuning.probe_timeout_seconds),
+            "capture_limit": tuning.probe_capture_limit,
+        }
 
-    @field_validator("rtt_slices")
+    def host_probe_images(self) -> dict[str, str]:
+        """Image of every deployed host probe, by probe kind."""
+        kinds = {kind_of(metric) for metric in HOST_PROBES if self.metrics.available(metric)}
+        return {kind: self.image(image_key(kind)) for kind in sorted(kinds)}
+
+    @field_validator("images")
     @classmethod
-    def _check_slices(cls, values: list[str]) -> list[str]:
-        if any(not re.fullmatch(r"[0-9a-f]{2}:[0-9a-f]{6}", value) for value in values):
-            raise ValueError("rtt_slices must use labels such as 01:ffffff")
-        return values
+    def _known_images(cls, images: dict[str, str]) -> dict[str, str]:
+        if unknown := images.keys() - DEFAULT_IMAGES.keys():
+            raise ValueError(f"Unknown images {sorted(unknown)}; known: {sorted(DEFAULT_IMAGES)}")
+        for key in ("ue_mapper", "kpi_calculator_oai"):
+            if key in images and not split_image(images[key])[1].partition("@")[0]:
+                raise ValueError(f"images.{key} must use an explicit repository:tag")
+        return images
 
     @model_validator(mode="after")
     def validate_profile(self) -> Self:
-        """Fill default probe images, then check that the enabled features fit the targets."""
-        self._apply_default_images()
+        """Check that the enabled metrics fit the targets."""
         self._check_targets()
-        self._check_probes()
-        self._check_observability()
+        self._check_controller()
+        self._check_roles()
         self._check_ports()
         return self
-
-    def _apply_default_images(self) -> None:
-        multi_target_paths = self.multi_anchor and self.observability.user_plane_paths
-        separate_one_way = self.one_way.image and self.separate_one_way_targets
-        if not self.probe_controller_image and (multi_target_paths or separate_one_way):
-            raise ValueError("Set probe_controller_image to a build that supports the requested multi-anchor probes")
-        defaults = DEFAULT_IMAGES["external_probes"]
-        wants_controller = self.latency or self.throughput or self.one_way.image or self.observability.user_plane_paths
-        if wants_controller and not self.probe_controller_image:
-            self.probe_controller_image = defaults["controller"]
-        if self.throughput and self.external_throughput_image is None:
-            self.external_throughput_image = defaults["throughput"]
-        if self.observability.user_plane_paths and self.external_path_image is None:
-            self.external_path_image = defaults["user_plane_paths"]
 
     def _check_targets(self) -> None:
         keys = [(t.category, t.component) for t in self.targets]
         if len(keys) != len(set(keys)):
             raise ValueError("Only one monitoring target per component is supported")
 
-    def _check_probes(self) -> None:
-        roles = self.roles
-        if self.packet_pairing and (not self.latency or not {"gnb", "upf"} <= roles):
-            raise ValueError("Packet pairing requires latency and both gNB and UPF targets")
+    def _check_controller(self) -> None:
+        metrics = self.metrics
+        multi_anchor_paths = self.multi_anchor and metrics.available("user_plane_paths")
+        anchored_one_way = self.one_way_probes and self.separate_one_way_targets
+        if "controller" not in self.images and (multi_anchor_paths or anchored_one_way):
+            raise ValueError("Set images.controller to a build that supports the requested multi-anchor probes")
         api_secrets = (self.probe_api_tls_secret, self.probe_api_token_secret)
-        if any(api_secrets) and not (self.probe_controller_image and all(api_secrets)):
-            raise ValueError("Public probe API requires probe_controller_image and both API secrets")
-        if self.latency or self.rtt_imsis or self.rtt_slices:
-            if not self.probe_controller_image:
-                raise ValueError("External RTT requires probe_controller_image")
-            if not {"amf", "smf"} <= roles or roles.isdisjoint({"gnb", "upf"}):
-                raise ValueError("External RTT requires AMF/SMF and a gNB or UPF target")
-        # An empty target list is allowed here so defaults can be built; plan() requires targets.
-        if self.throughput and self.targets and not {"amf", "smf", "upf"} <= roles:
-            raise ValueError("Throughput requires AMF, SMF and UPF packet targets")
-        if self.one_way.image and not {"amf", "smf", "upf"} <= roles:
-            raise ValueError("One-way monitoring requires UPF, AMF and SMF targets for slice mapping")
-        if self.one_way.n3.enabled and "gnb" not in roles:
-            raise ValueError("N3 one-way monitoring requires at least one gNB and one UPF target")
+        if any(api_secrets) and not (self.uses_controller and all(api_secrets)):
+            raise ValueError("Public probe API requires a controller-managed metric and both API secrets")
 
-    def _check_observability(self) -> None:
-        observation, roles = self.observability, self.roles
-        if (observation.ngap or observation.mapper_coverage) and "amf" not in roles:
-            raise ValueError("NGAP/mapper coverage requires an AMF target")
-        if (observation.pfcp or observation.mapper_coverage) and "smf" not in roles:
-            raise ValueError("PFCP/mapper coverage requires an SMF target")
-        if observation.user_plane_paths and not roles.intersection({"gnb", "upf"}):
-            raise ValueError("Path monitoring requires a gnb/upf target")
+    def _check_roles(self) -> None:
+        """Each metric needs the network functions it measures among the targets."""
+        metrics, roles = self.metrics, self.roles
+        if metrics.rtt and metrics.rtt.packet_pairing and (metrics.rtt.on_demand or not {"gnb", "upf"} <= roles):
+            raise ValueError("Packet pairing requires a running rtt metric and both gNB and UPF targets")
+        if metrics.rtt and (not {"amf", "smf"} <= roles or roles.isdisjoint({"gnb", "upf"})):
+            raise ValueError("rtt requires AMF/SMF and a gNB or UPF target")
+        # An empty target list is allowed here so defaults can be built; plan() requires targets.
+        if metrics.throughput and self.targets and not {"amf", "smf", "upf"} <= roles:
+            raise ValueError("throughput requires AMF, SMF and UPF packet targets")
+        if self.one_way_probes and not {"amf", "smf", "upf"} <= roles:
+            raise ValueError("One-way metrics require UPF, AMF and SMF targets for slice mapping")
+        if metrics.n3_one_way and "gnb" not in roles:
+            raise ValueError("n3_one_way requires at least one gNB and one UPF target")
+        if (metrics.ngap or metrics.ue_mapper_coverage) and "amf" not in roles:
+            raise ValueError("ngap/ue_mapper_coverage require an AMF target")
+        if (metrics.pfcp or metrics.ue_mapper_coverage) and "smf" not in roles:
+            raise ValueError("pfcp/ue_mapper_coverage require an SMF target")
+        if metrics.user_plane_paths and not roles.intersection({"gnb", "upf"}):
+            raise ValueError("user_plane_paths requires a gnb/upf target")
 
     def _check_ports(self) -> None:
-        observation = self.observability
-        if observation.active:
-            ports = {
-                "amf": observation.ngap_port,
-                "smf": observation.pfcp_port,
-                "gnb": observation.path_port,
-                "upf": observation.path_port,
-            }
-            for target in self.targets:
-                if target.role and target.metrics_port == ports[target.role]:
-                    raise ValueError(f"{target.component}: observability and NF metric ports conflict")
+        metrics = self.metrics
+        ports = {
+            "amf": metrics.ngap.port if metrics.ngap else None,
+            "smf": metrics.pfcp.port if metrics.pfcp else None,
+            "gnb": metrics.user_plane_paths.port if metrics.user_plane_paths else None,
+            "upf": metrics.user_plane_paths.port if metrics.user_plane_paths else None,
+        }
+        for target in self.targets:
+            if target.role and target.metrics_port is not None and target.metrics_port == ports[target.role]:
+                raise ValueError(f"{target.component}: a NADOR metric port conflicts with the NF metrics port")
         node_ports = (self.prometheus_node_port, self.grafana_node_port, self.loki_node_port)
         if len(set(node_ports)) != len(node_ports):
             raise ValueError("Monitoring NodePorts must be distinct")
+
+
+def component_image_defaults(name: str, images: dict[str, str] | None = None) -> dict | None:
+    """ContainerImage fields for a Helm release whose image comes from images.json or images: overrides."""
+    key = COMPONENT_IMAGES.get(name)
+    if key is None:
+        return None
+    repository, tag = split_image((images or {}).get(key) or DEFAULT_IMAGES[key])
+    return {"repository": repository, "image_tag": tag, "image_pull_policy": "IfNotPresent"}
 
 
 class MonitoringModel(DeploymentModel):
@@ -428,15 +491,11 @@ class ProfileLoader(yaml.SafeLoader):
         mapping = super().construct_mapping(node, deep=deep)
         keys = [self.construct_object(key, deep=deep) for key, _ in node.value]
         if len(keys) != len(mapping):
-            raise yaml.constructor.ConstructorError(
-                None,
-                None,
-                "duplicate monitoring option",
-                node.start_mark,
-            )
+            raise yaml.constructor.ConstructorError(None, None, "duplicate monitoring option", node.start_mark)
         return mapping
 
 
+# Only the literal words true/false are booleans: "yes", "on" or "no" stay strings and fail validation.
 ProfileLoader.yaml_implicit_resolvers = {
     ch: [(tag, pattern) for tag, pattern in entries if tag != "tag:yaml.org,2002:bool"]
     for ch, entries in yaml.SafeLoader.yaml_implicit_resolvers.items()
@@ -444,28 +503,21 @@ ProfileLoader.yaml_implicit_resolvers = {
 ProfileLoader.add_implicit_resolver("tag:yaml.org,2002:bool", re.compile("^(true|false)$"), list("tf"))
 
 
-def switches(defaults=None, prefix=()):
-    """Yield explicit switch paths, including switches introduced by new model fields."""
-    if defaults is None:
-        defaults = MonitoringDeployment().model_dump(mode="json", exclude={"components", "images", "targets"})
-    for key, value in defaults.items():
-        path = (*prefix, key)
-        if type(value) is bool:
-            yield path
-        elif isinstance(value, dict):
-            yield from switches(value, path)
-
-
-def load_profile(path):
-    """Read a profile and fill partial component image overrides."""
+def load_profile(path: Path) -> dict:
+    """Read a profile with the strict loader and complete partial component image overrides."""
     data = yaml.load(path.read_text(), Loader=ProfileLoader)  # noqa: S506 - ProfileLoader is a SafeLoader
     if not isinstance(data, dict):
         raise ValueError("expected a YAML mapping")
+    return complete_component_images(data)
+
+
+def complete_component_images(data: dict) -> dict:
+    """Fill the repository and tag of ``components.<name>.image`` overrides that only set other fields."""
     components = data.get("components")
     if isinstance(components, dict):
         for name, override in components.items():
             image = override.get("image") if isinstance(override, dict) else None
-            if isinstance(image, dict) and (default_image := component_image_defaults(name)):
+            if isinstance(image, dict) and (default_image := component_image_defaults(name, data.get("images"))):
                 override["image"] = deep_merge(default_image.copy(), image)
     return data
 
@@ -477,15 +529,13 @@ def validate_deployment[M: MonitoringDeployment](
     source: str = "Monitoring configuration",
     explicit: bool = False,
 ) -> M:
-    """Validate deployment values and report field errors without displaying input values."""
+    """Validate a profile. ``explicit`` also requires every metric to be listed under metrics:."""
     errors = []
     if explicit:
-        for keys in switches():
-            value = data
-            for key in keys:
-                value = value.get(key) if isinstance(value, dict) else None
-            if type(value) is not bool:
-                errors.append(f"{'.'.join(keys)}: write an explicit true or false")
+        listed = data.get("metrics")
+        listed = listed if isinstance(listed, dict) else {}
+        missing = [name for name in Metrics.model_fields if name not in listed]
+        errors += [f"metrics.{name}: write true, false or its options" for name in missing]
     try:
         config = model.model_validate(data)
     except ValidationError as exc:

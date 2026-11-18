@@ -15,7 +15,6 @@ from nador.config import (
     DeployedMonitoringComponent,
     MonitoringDeployment,
     MonitoringModel,
-    OneWaySettings,
     ResolvedTarget,
     validate_deployment,
 )
@@ -29,6 +28,24 @@ class Plan:
     control_node: str
     targets: list[ResolvedTarget]
     components: dict[str, DeployedMonitoringComponent]
+
+
+def _sniffer_settings(monitoring: MonitoringDeployment) -> dict:
+    """What the AMF/SMF sniffers run and export, for the inject_sniffers role."""
+    metrics = monitoring.metrics
+    return {
+        "amf": {
+            "image": monitoring.image("amf_sniffer"),
+            "metrics_enabled": metrics.running("ngap"),
+            "metrics_port": metrics.ngap.port if metrics.ngap else 9102,
+        },
+        "smf": {
+            "image": monitoring.image("smf_sniffer"),
+            "metrics_enabled": metrics.running("pfcp"),
+            "metrics_port": metrics.pfcp.port if metrics.pfcp else 9104,
+        },
+        "pending_timeout_seconds": monitoring.tuning.sniffer_pending_timeout_seconds,
+    }
 
 
 class MonitoringManagement(HelmManagement):
@@ -55,7 +72,7 @@ class MonitoringManagement(HelmManagement):
     def plan(self) -> Plan:
         """Resolve targets and chart values without contacting deployment hosts."""
         monitoring = validate_deployment(self.deployment_model.monitoring.model_dump(mode="python"))
-        if monitoring.throughput and not monitoring.targets:
+        if monitoring.metrics.throughput and not monitoring.targets:
             raise ValueError("Throughput requires AMF, SMF and UPF packet targets")
         node_name, _ = self._get_deployment_node(None)
         model = self.deployment_model.model_copy(update={"monitoring": monitoring})
@@ -108,7 +125,7 @@ class MonitoringManagement(HelmManagement):
 
     async def _run_tasks(
         self,
-        action: Literal["prepare", "inject_sniffers", "set_one_way"],
+        action: Literal["prepare", "inject_sniffers", "patch_controller_settings"],
         *,
         targets: list[ResolvedTarget] | None = None,
         settings: dict | None = None,
@@ -127,7 +144,8 @@ class MonitoringManagement(HelmManagement):
                 "monitoring_control_node": node_name,
                 "monitoring_config": monitoring.model_dump(mode="json", exclude={"components"}),
                 "monitoring_targets": [target.values() for target in targets or []],
-                "one_way_settings": settings,
+                "sniffers": _sniffer_settings(monitoring),
+                "controller_settings": settings,
             },
             extra_params={"name": "Monitoring"},
             runner_path=str(Path(self.deployment_model.params.ansible.runner_path) / "monitoring"),
@@ -135,34 +153,39 @@ class MonitoringManagement(HelmManagement):
             quiet=quiet,
         )
 
-    async def set_one_way(
+    async def set_running(
         self,
         *,
-        n3: bool | None = None,
+        n3_one_way: bool | None = None,
         upf_transit: bool | None = None,
-        log_samples: bool | None = None,
+        n3_log_samples: bool | None = None,
         quiet: bool = False,
     ) -> None:
-        """Set the running controller's desired state without reinstalling the stack."""
-        monitoring = self.deployment_model.monitoring
-        data = monitoring.one_way.model_dump(mode="json")
-        if not data["image"]:
-            raise ValueError("Configure one_way.image before deploying monitoring")
-        changes = {}
-        for name, values in (
-            ("n3", {"enabled": n3, "log_samples": log_samples}),
-            ("upf_transit", {"enabled": upf_transit}),
-        ):
-            patch = {key: value for key, value in values.items() if value is not None}
-            if patch:
-                changes[name] = patch
-                data[name].update(patch)
-        if changes:
-            if data["n3"]["enabled"] and not any(t.role == "gnb" for t in monitoring.targets):
-                raise ValueError("N3 one-way monitoring requires a gNB target")
-            planned = OneWaySettings.model_validate(data)
-            await self._run_tasks("set_one_way", settings=changes, quiet=quiet)
-            monitoring.one_way = planned
+        """Start or stop deployed one-way metrics on the running controller, without reinstalling."""
+        metrics = self.deployment_model.monitoring.metrics
+        requested = {"n3_one_way": ("n3", n3_one_way), "upf_transit": ("upf_transit", upf_transit)}
+        changes: dict[str, dict] = {}
+        for name, (_key, running) in requested.items():
+            if running is not None:
+                changes.setdefault(name, {})["enabled"] = running
+        if n3_log_samples is not None:
+            changes.setdefault("n3_one_way", {})["log_samples"] = n3_log_samples
+        for name in changes:
+            if not metrics.available(name):
+                raise ValueError(f"Deploy with metrics.{name} (on_demand: true starts it stopped)")
+        if not changes:
+            return
+        await self._run_tasks(
+            "patch_controller_settings",
+            settings={requested[name][0]: patch for name, patch in changes.items()},
+            quiet=quiet,
+        )
+        for name, patch in changes.items():
+            update = {"log_samples": patch["log_samples"]} if "log_samples" in patch else {}
+            if "enabled" in patch:
+                update["on_demand"] = not patch["enabled"]
+            if (metric := metrics.get(name)) is not None:
+                setattr(metrics, name, metric.model_copy(update=update))
 
     async def deploy(self, *, quiet: bool = False) -> None:
         """Deploy monitoring and wait for its components and sniffers."""
