@@ -298,13 +298,13 @@
       "advanced_config": {},
       "chart_ref": "/tmp/monitoring-charts/monitoring-controller",
       "chart_values": {
-        "cleanupImage": "ghcr.io/ifran-project/nador-controller:sha-75a58721962c2e237babeb0b95354bec22296616@sha256:c7485a39290e7fbb5cfac160d7e1c2f38aa94b30a07d7ecc1a1912e9b482a91d",
+        "cleanupImage": "ghcr.io/ifran-project/nador-controller:sha-68530af707b7016dab8dcad88799c44b2fc8de2b@sha256:7202a5b9855ce0e9a69c17443f65ab1cbdc07471299926467033aa4b595b8cfb",
         "hostProbeStates": {},
         "hostProbeWorkloads": [],
         "image": {
           "pullPolicy": "IfNotPresent",
           "repository": "ghcr.io/ifran-project/nador-controller",
-          "tag": "sha-75a58721962c2e237babeb0b95354bec22296616@sha256:c7485a39290e7fbb5cfac160d7e1c2f38aa94b30a07d7ecc1a1912e9b482a91d"
+          "tag": "sha-68530af707b7016dab8dcad88799c44b2fc8de2b@sha256:7202a5b9855ce0e9a69c17443f65ab1cbdc07471299926467033aa4b595b8cfb"
         },
         "nodeSelector": {
           "monitoring.blueprint/node": "monitoring"
@@ -398,11 +398,11 @@
           }
         },
         "probeControlTargets": {},
-        "probeControllerImage": "ghcr.io/ifran-project/nador-controller:sha-75a58721962c2e237babeb0b95354bec22296616@sha256:c7485a39290e7fbb5cfac160d7e1c2f38aa94b30a07d7ecc1a1912e9b482a91d",
+        "probeControllerImage": "ghcr.io/ifran-project/nador-controller:sha-68530af707b7016dab8dcad88799c44b2fc8de2b@sha256:7202a5b9855ce0e9a69c17443f65ab1cbdc07471299926467033aa4b595b8cfb",
         "rttRequest": {
           "allowed": true,
           "enabled": false,
-          "image": "ghcr.io/ifran-project/ebpf-latency-probe:sha-75a58721962c2e237babeb0b95354bec22296616@sha256:a76fa39a6c78f24db2ef3b04b273dcf51406b812275f3aec5d80b8a2a48d7d79",
+          "image": "ghcr.io/ifran-project/ebpf-latency-probe:sha-68530af707b7016dab8dcad88799c44b2fc8de2b@sha256:f68c3905c4b98744cc6fb2c6fc631ffdaac7d97b39e51e2c24412c4a0efc0905",
           "imsis": [],
           "slices": [],
           "targets": [
@@ -478,7 +478,7 @@
         "throughputRequest": {
           "allowed": true,
           "enabled": true,
-          "image": "ghcr.io/ifran-project/nador-throughput-probe:sha-75a58721962c2e237babeb0b95354bec22296616@sha256:e31b63162f39bdb8e6a64846e7d804cbd2f7c67df560748fde327097bf7cec95",
+          "image": "ghcr.io/ifran-project/nador-throughput-probe:sha-68530af707b7016dab8dcad88799c44b2fc8de2b@sha256:8e170dd37af2eef6ccb6e3ad6b83e7ab77e517b51ddb0e8efa2addfcff6e2cd3",
           "targets": [
             {
               "category": "core",
@@ -542,7 +542,7 @@
       "image": {
         "image_pull_policy": "IfNotPresent",
         "image_pull_secrets": null,
-        "image_tag": "sha-75a58721962c2e237babeb0b95354bec22296616@sha256:c7485a39290e7fbb5cfac160d7e1c2f38aa94b30a07d7ecc1a1912e9b482a91d",
+        "image_tag": "sha-68530af707b7016dab8dcad88799c44b2fc8de2b@sha256:7202a5b9855ce0e9a69c17443f65ab1cbdc07471299926467033aa4b595b8cfb",
         "repository": "ghcr.io/ifran-project/nador-controller"
       },
       "is_installed": false,
@@ -1083,7 +1083,7 @@
         "image": {
           "pullPolicy": "Always",
           "repository": "ghcr.io/ifran-project/ue_mapper_api",
-          "tag": "sha-75a58721962c2e237babeb0b95354bec22296616@sha256:a3ef0ee7705a0f2abbd0f29682cecaf4c018feeb4ddc176cd305753579ec82fb"
+          "tag": "sha-68530af707b7016dab8dcad88799c44b2fc8de2b@sha256:6e0f789601f8709bc1cf39b3a8b94ab8dc4d52224fa00104b8b4920a9750486e"
         },
         "nodeSelector": {
           "monitoring.blueprint/node": "monitoring"
@@ -1106,7 +1106,7 @@
       "image": {
         "image_pull_policy": "Always",
         "image_pull_secrets": null,
-        "image_tag": "sha-75a58721962c2e237babeb0b95354bec22296616@sha256:a3ef0ee7705a0f2abbd0f29682cecaf4c018feeb4ddc176cd305753579ec82fb",
+        "image_tag": "sha-68530af707b7016dab8dcad88799c44b2fc8de2b@sha256:6e0f789601f8709bc1cf39b3a8b94ab8dc4d52224fa00104b8b4920a9750486e",
         "repository": "ghcr.io/ifran-project/ue_mapper_api"
       },
       "is_installed": false,

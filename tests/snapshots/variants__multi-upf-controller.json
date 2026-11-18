@@ -313,7 +313,7 @@
         "pathRequest": {
           "allowed": true,
           "enabled": true,
-          "image": "ghcr.io/ifran-project/nador-user-plane-path:sha-75a58721962c2e237babeb0b95354bec22296616@sha256:cdba8d135bcb50fa973b01425838fcbea9d978c9ff7de520f15844ae21e8f3a5",
+          "image": "ghcr.io/ifran-project/nador-user-plane-path:sha-68530af707b7016dab8dcad88799c44b2fc8de2b@sha256:431ade9a96f9c4c7099948cf9d56572bc58aa83053888ad9dbd29165dd8a3dd9",
           "interval": 5,
           "port": 9403,
           "targets": [
@@ -467,7 +467,7 @@
         "rttRequest": {
           "allowed": true,
           "enabled": false,
-          "image": "ghcr.io/ifran-project/ebpf-latency-probe:sha-75a58721962c2e237babeb0b95354bec22296616@sha256:a76fa39a6c78f24db2ef3b04b273dcf51406b812275f3aec5d80b8a2a48d7d79",
+          "image": "ghcr.io/ifran-project/ebpf-latency-probe:sha-68530af707b7016dab8dcad88799c44b2fc8de2b@sha256:f68c3905c4b98744cc6fb2c6fc631ffdaac7d97b39e51e2c24412c4a0efc0905",
           "imsis": [],
           "slices": [],
           "targets": [
@@ -543,7 +543,7 @@
         "throughputRequest": {
           "allowed": true,
           "enabled": true,
-          "image": "ghcr.io/ifran-project/nador-throughput-probe:sha-75a58721962c2e237babeb0b95354bec22296616@sha256:e31b63162f39bdb8e6a64846e7d804cbd2f7c67df560748fde327097bf7cec95",
+          "image": "ghcr.io/ifran-project/nador-throughput-probe:sha-68530af707b7016dab8dcad88799c44b2fc8de2b@sha256:8e170dd37af2eef6ccb6e3ad6b83e7ab77e517b51ddb0e8efa2addfcff6e2cd3",
           "targets": [
             {
               "category": "core",
