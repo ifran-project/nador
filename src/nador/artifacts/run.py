@@ -72,6 +72,7 @@ class ExperimentRun:
             f.write(json.dumps(event) + "\n")
 
     async def __aenter__(self) -> Self:
+        """Create the run directory and record the campaign start."""
         if self.entered:
             raise RuntimeError("ExperimentRun cannot be entered twice")
         self.directory.mkdir(parents=True, exist_ok=False)
@@ -181,6 +182,7 @@ class ExperimentRun:
     async def __aexit__(
         self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None
     ) -> bool:
+        """Record the outcome and collect artifacts, even when the workload failed."""
         self.closed = True
         self._event("campaign", "end", self.name, status="failed" if exc else "completed")
         self.metadata["status"] = "failed" if exc else "completed"

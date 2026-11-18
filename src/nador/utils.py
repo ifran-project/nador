@@ -27,8 +27,8 @@ from nador.ran_metrics import ocudu_sources
 
 ASSETS = Path(__file__).resolve().parent / "assets"
 CHARTS = ASSETS / "charts"
-REMOTE_CHARTS = "/tmp/monitoring-charts"
-VALUES_TEMPLATES = Environment(
+REMOTE_CHARTS = "/tmp/monitoring-charts"  # noqa: S108 - written as root on the control node by the prepare role
+VALUES_TEMPLATES = Environment(  # noqa: S701 - renders YAML, not HTML; values go through tojson
     loader=FileSystemLoader(ASSETS / "templates"),
     undefined=StrictUndefined,
     trim_blocks=True,

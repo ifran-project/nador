@@ -161,7 +161,9 @@ def test_one_way_and_extended_images_must_be_pinned():
         ExtendedSettings(probe_images={"cpu": "ghcr.io/x/cpu"})
 
 
-@pytest.mark.parametrize(("value", "ok"), [("1s", True), ("15s", True), ("1h30m", True), ("5d", True), ("5 d", False), ("x", False)])
+@pytest.mark.parametrize(
+    ("value", "ok"), [("1s", True), ("15s", True), ("1h30m", True), ("5d", True), ("5 d", False), ("x", False)]
+)
 def test_prometheus_durations(quickstart, value, ok):
     quickstart.pop("components")
     profile = quickstart | {"prometheus_scrape_interval": value}

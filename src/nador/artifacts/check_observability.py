@@ -12,6 +12,9 @@ from pathlib import Path
 
 from .prometheus_range_export import http_json, load_queries, query_range
 
+MIN_LOOKBACK_SECONDS = 120  # rate() windows need several scrapes
+STEP = "15s"
+
 
 def load_expectations(path: str) -> list[dict]:
     """Load required readiness conditions without folding them into artifacts."""
@@ -38,6 +41,7 @@ def load_expectations(path: str) -> list[dict]:
 
 
 def summarize_query(payload: dict) -> dict:
+    """Classify a range-query result as available, empty, partial or non-finite."""
     if payload.get("status") != "success":
         return {"status": "error", "error": payload.get("error", str(payload))}
     if payload.get("data", {}).get("resultType") != "matrix":
@@ -65,6 +69,7 @@ def summarize_query(payload: dict) -> dict:
 
 
 def check_targets(prometheus_url: str) -> dict:
+    """Report the health of every active Prometheus scrape target."""
     payload = http_json(f"{prometheus_url.rstrip('/')}/api/v1/targets", {"state": "active"})
     if payload.get("status") != "success":
         raise ValueError(payload.get("error", "Could not read scrape targets"))
@@ -85,6 +90,7 @@ def check_targets(prometheus_url: str) -> dict:
 
 
 def check_loki(loki_url: str, selector: str, start: float, end: float) -> dict:
+    """Check that Loki ingests logs for a selector without copying log lines."""
     payload = http_json(
         f"{loki_url.rstrip('/')}/loki/api/v1/query_range",
         {
@@ -105,7 +111,7 @@ def check_loki(loki_url: str, selector: str, start: float, end: float) -> dict:
     return {"status": "available" if count else "empty", "selector": selector}
 
 
-def main() -> int:
+def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prometheus-url", required=True)
     parser.add_argument("--loki-url")
@@ -116,15 +122,39 @@ def main() -> int:
     )
     parser.add_argument(
         "--expectations-json",
-        help=(
-            "Optional JSON list of required readiness queries. Each condition must return at least one finite sample."
-        ),
+        help="Optional JSON list of required readiness queries. Each must return at least one finite sample.",
     )
     parser.add_argument("--lookback-seconds", type=int, default=300)
     parser.add_argument("--out", required=True)
+    return parser
+
+
+def _check_queries(prometheus_url: str, queries: list[dict], start: float, end: float, label: str) -> list[dict]:
+    items = []
+    for query in queries:
+        try:
+            status = summarize_query(query_range(prometheus_url, query["query"], start, end, STEP))
+        except (OSError, ValueError, TimeoutError) as exc:
+            status = {"status": "error", "error": str(exc)}
+        item = {**query, **status}
+        items.append(item)
+        print(f"{label}{item['status']:12} {item['name']} ({item.get('series', 0)} series)", flush=True)
+    return items
+
+
+def _guarded(check, *args) -> dict:
+    try:
+        return check(*args)
+    except (OSError, ValueError, TimeoutError) as exc:
+        return {"status": "error", "error": str(exc)}
+
+
+def main() -> int:
+    """Check query availability, required expectations and Loki; exit 2 when unhealthy."""
+    parser = _parser()
     args = parser.parse_args()
-    if args.lookback_seconds < 120:
-        parser.error("--lookback-seconds must be at least 120 for rate queries")
+    if args.lookback_seconds < MIN_LOOKBACK_SECONDS:
+        parser.error(f"--lookback-seconds must be at least {MIN_LOOKBACK_SECONDS} for rate queries")
     queries = load_queries(args.queries_json)
     try:
         expectations = load_expectations(args.expectations_json) if args.expectations_json else []
@@ -132,42 +162,20 @@ def main() -> int:
         parser.error(f"Could not load readiness expectations: {exc}")
     end = time.time()
     start = end - args.lookback_seconds
-    report = {"start": start, "end": end, "queries": [], "expectations": []}
-    errors = False
-    try:
-        report["scrape_targets"] = check_targets(args.prometheus_url)
-    except (OSError, ValueError, TimeoutError) as exc:
-        report["scrape_targets"] = {"status": "error", "error": str(exc)}
-        errors = True
-    for query in queries:
-        try:
-            status = summarize_query(query_range(args.prometheus_url, query["query"], start, end, "15s"))
-        except (OSError, ValueError, TimeoutError) as exc:
-            status = {"status": "error", "error": str(exc)}
-        item = {**query, **status}
-        report["queries"].append(item)
-        errors |= item["status"] == "error"
-        print(f"{item['status']:12} {item['name']} ({item.get('series', 0)} series)", flush=True)
-    for expectation in expectations:
-        try:
-            status = summarize_query(query_range(args.prometheus_url, expectation["query"], start, end, "15s"))
-        except (OSError, ValueError, TimeoutError) as exc:
-            status = {"status": "error", "error": str(exc)}
-        item = {**expectation, **status}
-        report["expectations"].append(item)
-        errors |= item["status"] != "available"
-        print(f"required {item['status']:12} {item['name']} ({item.get('series', 0)} series)", flush=True)
+    report = {"start": start, "end": end}
+    report["scrape_targets"] = _guarded(check_targets, args.prometheus_url)
+    report["queries"] = _check_queries(args.prometheus_url, queries, start, end, "")
+    report["expectations"] = _check_queries(args.prometheus_url, expectations, start, end, "required ")
+    errors = report["scrape_targets"]["status"] == "error"
+    errors |= any(item["status"] == "error" for item in report["queries"])
+    errors |= any(item["status"] != "available" for item in report["expectations"])
     if args.loki_url:
-        try:
-            report["loki"] = check_loki(args.loki_url, args.loki_selector, start, end)
-        except (OSError, ValueError, TimeoutError) as exc:
-            report["loki"] = {"status": "error", "error": str(exc)}
+        report["loki"] = _guarded(check_loki, args.loki_url, args.loki_selector, start, end)
         errors |= report["loki"]["status"] == "error"
         print(f"Loki: {report['loki']['status']}")
     report["counts"] = dict(Counter(item["status"] for item in report["queries"]))
     report["expectation_counts"] = dict(Counter(item["status"] for item in report["expectations"]))
-    targets = report["scrape_targets"].get("targets", [])
-    unhealthy = [item for item in targets if item["health"] != "up"]
+    unhealthy = [item for item in report["scrape_targets"].get("targets", []) if item["health"] != "up"]
     report["unhealthy_targets"] = unhealthy
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)

@@ -4,12 +4,13 @@ import os
 import time
 
 import kubernetes
+from kubernetes.stream import stream
+
+NOT_FOUND = 404
 
 
 def stop_sniffers(api, pod, namespace, owner):
     """Signal only processes carrying the monitoring owner's explicit marker."""
-    from kubernetes.stream import stream
-
     command = """import os, pathlib, signal
 marker = ('MONITORING_SNIFFER_OWNER=' + os.environ['MONITORING_SNIFFER_OWNER']).encode()
 for path in pathlib.Path('/proc').glob('[0-9]*/environ'):
@@ -61,7 +62,7 @@ def stop_controller(api, namespace, name="monitoring-controller"):
     try:
         apps.patch_namespaced_deployment(name, namespace, {"spec": {"replicas": 0}})
     except kubernetes.client.exceptions.ApiException as exc:
-        if exc.status != 404:
+        if exc.status != NOT_FOUND:
             raise
     deadline = time.monotonic() + int(os.environ["CLEANUP_TIMEOUT_SECONDS"])
     while api.list_namespaced_pod(namespace, label_selector=f"app={name}").items:

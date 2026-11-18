@@ -4,11 +4,17 @@ from __future__ import annotations
 
 import csv
 import json
+import logging
 import re
 from collections import defaultdict
 from datetime import datetime
-from pathlib import Path
+from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 WINDOW_FIELDS = [
     "window_id",
@@ -48,16 +54,18 @@ WINDOW_FIELDS = [
 
 
 def safe_name(value: str) -> str:
+    """Turn a label into a file-system-safe name."""
     value = re.sub(r"[^A-Za-z0-9_.=-]+", "_", value.strip())
     return value.strip("_") or "window"
 
 
 def load_events(path: Path) -> list[dict]:
+    """Read timeline events; malformed lines become parse_error events."""
     events = []
     if not path.exists():
         return events
-    for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
-        line = line.strip()
+    for line_no, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        line = raw.strip()
         if not line:
             continue
         try:
@@ -79,6 +87,7 @@ def load_events(path: Path) -> list[dict]:
 
 
 def event_key(event: dict) -> tuple:
+    """Key that pairs a start event with its end event."""
     level = event.get("level", "")
     return (
         level,
@@ -92,13 +101,15 @@ def event_key(event: dict) -> tuple:
 
 
 def to_int(value, default: int = 0) -> int:
+    """Parse an integer (accepting floats), falling back to a default."""
     try:
         return int(float(value))
     except (TypeError, ValueError):
         return default
 
 
-def to_local(epoch: int, tz_name: str) -> str:
+def to_local(epoch: float, tz_name: str) -> str:
+    """Format an epoch in a time zone, falling back to UTC."""
     try:
         tz = ZoneInfo(tz_name)
     except Exception:  # noqa: BLE001
@@ -107,6 +118,7 @@ def to_local(epoch: int, tz_name: str) -> str:
 
 
 def duration_text(seconds: int) -> str:
+    """Format seconds as 1h02m03s, 2m03s or 3s."""
     seconds = max(0, int(seconds))
     minutes, sec = divmod(seconds, 60)
     hours, minutes = divmod(minutes, 60)
@@ -118,11 +130,13 @@ def duration_text(seconds: int) -> str:
 
 
 def json_field(event: dict, field: str, default):
+    """Read an event field, replacing null with a default."""
     value = event.get(field, default)
     return value if value is not None else default
 
 
 def make_window(start: dict, end: dict, tz_name: str) -> dict:
+    """Build a timeline window from a start event and its end event."""
     start_epoch = float(start.get("epoch", 0))
     end_epoch = float(end.get("epoch", start_epoch))
     level = start.get("level", "")
@@ -130,10 +144,7 @@ def make_window(start: dict, end: dict, tz_name: str) -> dict:
     step = start.get("step", "")
     direction = start.get("direction", "")
     name = start.get("name", "")
-    parts = [level]
-    for item in [scenario, step, direction, name]:
-        if item:
-            parts.append(str(item))
+    parts = [level, *(str(item) for item in (scenario, step, direction, name) if item)]
     window_id = safe_name("__".join(parts))
     return {
         "window_id": window_id,
@@ -173,6 +184,7 @@ def make_window(start: dict, end: dict, tz_name: str) -> dict:
 
 
 def pair_windows(events: list[dict], tz_name: str) -> tuple[list[dict], list[dict], list[dict]]:
+    """Pair start and end events into windows; also return unmatched events."""
     starts: dict[tuple, list[dict]] = defaultdict(list)
     windows = []
     unmatched_ends = []
@@ -195,6 +207,7 @@ def pair_windows(events: list[dict], tz_name: str) -> tuple[list[dict], list[dic
 
 
 def expand_iperf_tasks(windows: list[dict]) -> list[dict]:
+    """Expand direction windows into one iperf or ping task per UE."""
     tasks = []
     for window in windows:
         if window.get("level") != "direction":
@@ -230,12 +243,14 @@ def expand_iperf_tasks(windows: list[dict]) -> list[dict]:
 
 
 def csv_value(value):
+    """Serialize lists and dicts as JSON for CSV cells."""
     if isinstance(value, (list, dict)):
         return json.dumps(value, sort_keys=True)
     return value
 
 
 def write_csv(path: Path, rows: list[dict]) -> None:
+    """Write windows with the fixed WINDOW_FIELDS columns."""
     with path.open("w", newline="", encoding="utf-8") as fp:
         writer = csv.DictWriter(fp, fieldnames=WINDOW_FIELDS)
         writer.writeheader()
@@ -243,63 +258,50 @@ def write_csv(path: Path, rows: list[dict]) -> None:
             writer.writerow({field: csv_value(row.get(field, "")) for field in WINDOW_FIELDS})
 
 
+def _span(window: dict) -> str:
+    return f"{window['start_local']} -> {window['end_local']} ({duration_text(window['duration_s'])})"
+
+
+def _section_line(section: dict) -> str:
+    title = f" - {section['scenario_title']}" if section.get("scenario_title") else ""
+    details = [f"runner={section['runner_type']}"] if section.get("runner_type") else []
+    details += [
+        f"{flag.removesuffix('_enabled')}={section.get(flag)}"
+        for flag in ("prometheus_enabled", "pcap_enabled")
+        if section.get(flag) != ""
+    ]
+    detail_text = f" [{' '.join(details)}]" if details else ""
+    return f"- section {section['name']}{title}{detail_text}: {_span(section)}"
+
+
+def _task_line(task: dict) -> str:
+    if task.get("level") == "ping_task":
+        return f"  - {task['step']} {task['ue']} ICMP ping count={task.get('ping_count', '')}: {_span(task)}"
+    return f"  - {task['step']} {task['ue']} {task['direction']} -P{task['parallel_streams']}: {_span(task)}"
+
+
 def recap_lines(run_id: str, tz_name: str, windows: list[dict], iperf_tasks: list[dict]) -> list[str]:
+    """Human-readable recap of the campaign, sections and scenarios."""
     lines = [f"Timeline recap for {run_id} ({tz_name})"]
     campaign = next((w for w in windows if w["level"] == "campaign"), None)
     traffic = next((w for w in windows if w["level"] == "traffic_campaign"), None)
     if campaign:
-        lines.append(
-            f"Campaign: {campaign['start_local']} -> {campaign['end_local']} ({duration_text(campaign['duration_s'])})"
-        )
+        lines.append(f"Campaign: {_span(campaign)}")
     if traffic:
-        lines.append(
-            f"Traffic: {traffic['start_local']} -> {traffic['end_local']} ({duration_text(traffic['duration_s'])})"
-        )
-
+        lines.append(f"Traffic: {_span(traffic)}")
     sections = [w for w in windows if w["level"] == "section"]
     if sections:
         lines.append("Sections:")
-        for section in sections:
-            title = f" - {section['scenario_title']}" if section.get("scenario_title") else ""
-            details = []
-            if section.get("runner_type"):
-                details.append(f"runner={section.get('runner_type')}")
-            if section.get("prometheus_enabled") != "":
-                details.append(f"prometheus={section.get('prometheus_enabled')}")
-            if section.get("pcap_enabled") != "":
-                details.append(f"pcap={section.get('pcap_enabled')}")
-            detail_text = f" [{' '.join(details)}]" if details else ""
-            lines.append(
-                f"- section {section['name']}{title}{detail_text}: "
-                f"{section['start_local']} -> {section['end_local']} "
-                f"({duration_text(section['duration_s'])})"
-            )
-
-    scenarios = [w for w in windows if w["level"] == "scenario"]
-    for scenario in scenarios:
+        lines.extend(_section_line(section) for section in sections)
+    for scenario in (w for w in windows if w["level"] == "scenario"):
         title = f" - {scenario['scenario_title']}" if scenario.get("scenario_title") else ""
-        lines.append(
-            f"- {scenario['scenario']}{title}: {scenario['start_local']} -> "
-            f"{scenario['end_local']} ({duration_text(scenario['duration_s'])})"
-        )
-        scenario_tasks = [t for t in iperf_tasks if t.get("scenario") == scenario.get("scenario")]
-        for task in scenario_tasks:
-            if task.get("level") == "ping_task":
-                lines.append(
-                    f"  - {task['step']} {task['ue']} ICMP ping count={task.get('ping_count', '')}: "
-                    f"{task['start_local']} -> {task['end_local']} "
-                    f"({duration_text(task['duration_s'])})"
-                )
-            else:
-                lines.append(
-                    f"  - {task['step']} {task['ue']} {task['direction']} -P{task['parallel_streams']}: "
-                    f"{task['start_local']} -> {task['end_local']} "
-                    f"({duration_text(task['duration_s'])})"
-                )
+        lines.append(f"- {scenario['scenario']}{title}: {_span(scenario)}")
+        lines.extend(_task_line(t) for t in iperf_tasks if t.get("scenario") == scenario.get("scenario"))
     return lines
 
 
 def write_markdown(path: Path, lines: list[str], summary_json: dict) -> None:
+    """Write the recap and a guide to the output files as Markdown."""
     content = ["# Experiment Timeline", ""]
     content.extend(lines)
     content.extend(
@@ -307,13 +309,11 @@ def write_markdown(path: Path, lines: list[str], summary_json: dict) -> None:
             "",
             "## Output Files",
             "",
-            "- `timeline_summary.csv`: paired scenario, step, direction, iperf-task, and ping-task windows.",
+            "- `timeline_summary.csv`: paired campaign, section and task windows.",
             "- `timeline_summary.json`: same data for scripts.",
             "- `timeline_recap.txt`: terminal-friendly recap.",
-            "- `by_window/campaign/*/prometheus_timeseries.csv(.gz)`: full campaign metric slices when Prometheus export exists.",
-            "- `by_window/section/*/prometheus_timeseries.csv(.gz)`: per-section metric slices for generic experiments.",
-            "- `by_window/scenario/*/prometheus_timeseries.csv(.gz)`: per-scenario metric slices when Prometheus export exists.",
-            "- `by_window/task/*/prometheus_timeseries.csv(.gz)`: per-step/direction metric slices when Prometheus export exists.",
+            "- `by_window/campaign/*/`: full-campaign Prometheus samples, when exported.",
+            "- `by_window/section/*/`: per-section Prometheus samples, when exported.",
             "",
             f"Unmatched starts: {len(summary_json.get('unmatched_starts', []))}",
             f"Unmatched ends: {len(summary_json.get('unmatched_ends', []))}",
@@ -348,6 +348,6 @@ def finalize_timeline(events_file: Path, out_dir: Path, *, run_id: str, timezone
     lines = recap_lines(run_id, timezone, windows, iperf_tasks)
     (out_dir / "timeline_recap.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
     write_markdown(out_dir / "timeline_summary.md", lines, summary)
-    print("\n".join(lines))
+    logger.info("%s", "\n".join(lines))
     if unmatched_starts or unmatched_ends:
-        print(f"warning: unmatched starts={len(unmatched_starts)} unmatched ends={len(unmatched_ends)}")
+        logger.warning("Unmatched timeline events: %d starts, %d ends", len(unmatched_starts), len(unmatched_ends))

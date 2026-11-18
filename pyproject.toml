@@ -100,7 +100,20 @@ ignore = [
 
     "D212",
     "S104",
+    "TRY004", # ValueError is the right error for malformed files and API payloads
+    "ASYNC240", # local path calls are negligible next to the SSH/Ansible work around them
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# Command-line entry points: printing is their output.
+"src/nador/controller_cli.py" = ["T201"]
+"src/nador/artifacts/check_observability.py" = ["T201"]
+# Scripts copied to and run on hosts; they call fixed system tools.
+"src/nador/artifacts/collect_setup.py" = ["T201", "S603", "S607"]
+"src/nador/artifacts/ue_context.py" = ["T201", "S603", "S607"]
+# Files mounted into containers by the Helm charts, not package modules.
+"src/nador/assets/charts/*/files/*.py" = ["INP001", "T201"]
+"tests/*" = ["D", "S101", "PLR2004", "PLC0415", "INP001", "ARG"]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]
@@ -117,6 +130,7 @@ exclude = [
     "dist",
     "build",
     "exclude",
+    "src/nador/assets",  # scripts mounted into containers with their own dependencies
 ]
 pythonVersion = "3.12"
 typeCheckingMode = "basic"

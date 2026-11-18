@@ -2,6 +2,7 @@
 """Print a bounded, read-only host or Kubernetes setup snapshot as JSON."""
 
 import argparse
+import contextlib
 import hashlib
 import json
 import os
@@ -12,15 +13,14 @@ from pathlib import Path
 
 
 def command(argv, timeout=15):
+    """Run a read-only command and return its timed status, parsed JSON output or error."""
     started = time.time()
     try:
-        result = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+        result = subprocess.run(argv, check=False, capture_output=True, text=True, timeout=timeout)
         data = result.stdout
         if result.returncode == 0:
-            try:
+            with contextlib.suppress(ValueError):
                 data = json.loads(data)
-            except ValueError:
-                pass
         return {
             "status": "ok" if result.returncode == 0 else "error",
             "started_at": started,
@@ -34,6 +34,7 @@ def command(argv, timeout=15):
 
 
 def pod_summary(pod):
+    """Keep the scheduling, image, network and configuration facts of a pod."""
     spec, status = pod.get("spec", {}), pod.get("status", {})
     meta = pod.get("metadata", {})
     return {
@@ -70,6 +71,7 @@ def pod_summary(pod):
 
 
 def cluster_snapshot(kubeconfig):
+    """Snapshot nodes, pods, services and ConfigMap fingerprints with kubectl."""
     base = ["kubectl", "--request-timeout=15s"]
     if kubeconfig != "auto":
         base += ["--kubeconfig", kubeconfig]
@@ -127,14 +129,15 @@ def cluster_snapshot(kubeconfig):
 
 
 def main(argv=None):
+    """Print a host or cluster snapshot as one JSON document."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mode", choices=("host", "cluster"), required=True)
     parser.add_argument("--kubeconfig", default="auto")
     args = parser.parse_args(argv)
     started = time.time()
     if args.mode == "host":
-        data = {"hostname": platform.node(), "kernel": platform.release(), "architecture": platform.machine()}
-        for name, argv in {
+        data: dict = {"hostname": platform.node(), "kernel": platform.release(), "architecture": platform.machine()}
+        for name, tool in {
             "cpu": ["lscpu", "-J"],
             "memory": ["free", "-b"],
             "interfaces": ["ip", "-j", "address"],
@@ -142,7 +145,7 @@ def main(argv=None):
             "clock": ["timedatectl", "show"],
             "os": ["cat", "/etc/os-release"],
         }.items():
-            data[name] = command(argv)
+            data[name] = command(tool)
     else:
         data = cluster_snapshot(args.kubeconfig)
     print(json.dumps({"started_at": started, "finished_at": time.time(), "mode": args.mode, "data": data}))

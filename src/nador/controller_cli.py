@@ -13,12 +13,11 @@ import urllib.request
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     """Never forward the controller bearer token to another URL."""
 
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        return None
+    def redirect_request(self, *_args: object) -> None:
+        """Refuse every redirect."""
 
 
-def main():
-    """List, start, or stop probes."""
+def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", default=os.getenv("NADOR_CONTROLLER_URL", "http://127.0.0.1:8787"))
     actions = parser.add_subparsers(dest="action", required=True)
@@ -30,20 +29,40 @@ def main():
     start.add_argument("--all", action="store_true", help="Clear both existing UE filters")
     start.add_argument("--log-samples", action=argparse.BooleanOptionalAction, default=None)
     actions.add_parser("stop").add_argument("probe")
-    args = parser.parse_args()
-    url = urllib.parse.urlsplit(args.url)
+    return parser
+
+
+def _is_safe_endpoint(url: urllib.parse.SplitResult) -> bool:
+    """HTTPS anywhere, plain HTTP only on loopback, and no credentials, query or fragment."""
+    if not url.hostname or url.username or url.password or url.query or url.fragment:
+        return False
     try:
         loopback = ipaddress.ip_address(url.hostname).is_loopback
     except ValueError:
         loopback = url.hostname == "localhost"
-    if (
-        not url.hostname
-        or url.username
-        or url.password
-        or url.query
-        or url.fragment
-        or (url.scheme != "https" and not (url.scheme == "http" and loopback))
-    ):
+    return url.scheme == "https" or (url.scheme == "http" and loopback)
+
+
+def _payload(args: argparse.Namespace, parser: argparse.ArgumentParser) -> dict:
+    payload = {"enabled": args.action == "start"}
+    if args.action == "start":
+        if args.all and (args.imsi or args.slice):
+            parser.error("--all cannot be combined with --imsi or --slice")
+        if args.imsi is not None or args.all:
+            payload["imsis"] = args.imsi or []
+        if args.slice is not None or args.all:
+            payload["slices"] = args.slice or []
+        if args.log_samples is not None:
+            payload["log_samples"] = args.log_samples
+    return payload
+
+
+def main() -> int:
+    """List, start, or stop probes."""
+    parser = _parser()
+    args = parser.parse_args()
+    url = urllib.parse.urlsplit(args.url)
+    if not _is_safe_endpoint(url):
         parser.error("Use HTTPS for remote controllers; HTTP is only allowed on loopback")
     token = os.getenv("NADOR_CONTROLLER_TOKEN")
     if url.scheme == "https" and not token:
@@ -53,19 +72,9 @@ def main():
     data = None
     if args.action != "list":
         endpoint += "/" + urllib.parse.quote(args.probe, safe="")
-        payload = {"enabled": args.action == "start"}
-        if args.action == "start":
-            if args.all and (args.imsi or args.slice):
-                parser.error("--all cannot be combined with --imsi or --slice")
-            if args.imsi is not None or args.all:
-                payload["imsis"] = args.imsi or []
-            if args.slice is not None or args.all:
-                payload["slices"] = args.slice or []
-            if args.log_samples is not None:
-                payload["log_samples"] = args.log_samples
-        data = json.dumps(payload).encode()
+        data = json.dumps(_payload(args, parser)).encode()
         headers["Content-Type"] = "application/json"
-    request = urllib.request.Request(endpoint, data=data, headers=headers, method="GET" if data is None else "PUT")
+    request = urllib.request.Request(endpoint, data=data, headers=headers, method="GET" if data is None else "PUT")  # noqa: S310 - scheme checked above
     try:
         with urllib.request.build_opener(NoRedirect()).open(request, timeout=10) as response:
             print(json.dumps(json.load(response), indent=2))

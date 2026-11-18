@@ -79,3 +79,23 @@ def test_failed_section_marks_run_failed(tmp_path):
     metadata = json.loads((tmp_path / "run" / "experiment_metadata.json").read_text())
     assert metadata["status"] == "failed"
     assert metadata["error"] == "workload failed"
+
+
+@pytest.mark.parametrize(
+    ("url", "safe"),
+    [
+        ("https://controller.example:8787", True),
+        ("http://127.0.0.1:8787", True),
+        ("http://localhost:8787", True),
+        ("http://controller.example:8787", False),
+        ("https://user:pw@controller.example", False),
+        ("https://controller.example/?x=1", False),
+        ("ftp://127.0.0.1", False),
+    ],
+)
+def test_controller_cli_only_sends_tokens_safely(url, safe):
+    from urllib.parse import urlsplit
+
+    from nador.controller_cli import _is_safe_endpoint
+
+    assert _is_safe_endpoint(urlsplit(url)) is safe

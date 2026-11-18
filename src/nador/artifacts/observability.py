@@ -12,10 +12,12 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Annotated, Any
 from urllib.parse import urlsplit
 
+from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_playbook
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from . import ue_context
 from .connection import loki_connection
+from .loki_export import collect_logs
 from .run import ExperimentRun
 
 if TYPE_CHECKING:
@@ -108,8 +110,6 @@ class ObservabilityRun(ExperimentRun):
         super()._collect(ended)
         if self.loki_url:
             try:
-                from .loki_export import collect_logs
-
                 summary = collect_logs(
                     self.directory / "logs",
                     url=self.loki_url,
@@ -149,9 +149,6 @@ class ObservabilityRun(ExperimentRun):
         return self._remote_config
 
     async def _run(self, tasks, *, host=None, output_keys=None):
-        # Keep Ansible (and its model dependencies) optional for direct HTTP runs.
-        from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_playbook
-
         model = self.monitoring.deployment_model
         host = host or self._control()[0]
         inventory = "[ml_context]\n" + get_ansible_inventory_line(host, model.nodes[host]) + "\n"
@@ -250,7 +247,7 @@ class ObservabilityRun(ExperimentRun):
                 raise self._thread_error
             return
         _, kubeconfig, namespace = self._control()
-        self._remote_directory = "/tmp/nador-ml-" + self.run_id
+        self._remote_directory = "/tmp/nador-ml-" + self.run_id  # noqa: S108 - random run_id, created with mode 0700
         remote = self._remote_directory
         argv = [
             "python3",
@@ -301,78 +298,76 @@ class ObservabilityRun(ExperimentRun):
             ]
         )
 
+    async def _fetch_remote_samples(self, output: Path) -> None:
+        """Stop the remote sampler, fetch whatever it recorded, then remove its directory."""
+        remote = self._remote_directory
+        wait = [
+            {"ansible.builtin.copy": {"dest": remote + "/STOP", "content": "stop\n", "mode": "0600"}},
+            {
+                "ansible.builtin.wait_for": {
+                    "path": remote + "/summary.json",
+                    "timeout": 2 * self.options["timeout_seconds"] + 15,
+                }
+            },
+        ]
+        if self._job_id:
+            wait.append(
+                {
+                    "ansible.builtin.async_status": {"jid": self._job_id},
+                    "register": "sampler_exit",
+                    "until": "sampler_exit.finished | default(false)",
+                    "retries": self.options["timeout_seconds"] + 15,
+                    "delay": 1,
+                }
+            )
+        output.mkdir(parents=True, exist_ok=True)
+        fetch = {
+            "ansible.builtin.fetch": {"src": remote + "/{{ item }}", "dest": str(output.resolve()) + "/", "flat": True},
+            "loop": ["history.jsonl", "summary.json", "ready.json"],
+        }
+        # Always try to retrieve partial evidence, even if stopping failed.
+        await self._run([{"block": wait, "always": [fetch]}])
+        cleanup = []
+        if self._job_id:
+            cleanup.append({"ansible.builtin.async_status": {"jid": self._job_id, "mode": "cleanup"}})
+        cleanup.append({"ansible.builtin.file": {"path": remote, "state": "absent"}})
+        await self._run(cleanup)
+
+    def _check_samples(self, output: Path) -> None:
+        summary = json.loads((output / "summary.json").read_text())
+        if summary.get("run_id") != self.run_id or not summary.get("samples"):
+            raise ValueError("Missing or mismatched UE context samples")
+        if summary.get("errors"):
+            self._error("ue_context", f"{summary['errors']} failed inventory polls")
+        if summary.get("stop_reason") == "max_seconds":
+            self._error("ue_context", "max_seconds reached; history may not cover the full workload")
+
+    async def _stop_local_sampler(self) -> None:
+        self._stop.set()
+        await asyncio.to_thread(self._thread.join)
+        if self._thread_error:
+            raise self._thread_error
+
     async def _stop_sampler(self):
+        if not (self._thread or self._remote_directory):
+            return
         output = self.directory / "ue_context"
         status = {"mode": "direct" if self.mapper_url else "remote", "remote_directory": self._remote_directory}
         try:
             if self._thread:
-                self._stop.set()
-                await asyncio.to_thread(self._thread.join)
-                if self._thread_error:
-                    raise self._thread_error
-            elif self._remote_directory:
-                remote = self._remote_directory
-                wait = [
-                    {"ansible.builtin.copy": {"dest": remote + "/STOP", "content": "stop\n", "mode": "0600"}},
-                    {
-                        "ansible.builtin.wait_for": {
-                            "path": remote + "/summary.json",
-                            "timeout": 2 * self.options["timeout_seconds"] + 15,
-                        }
-                    },
-                ]
-                if self._job_id:
-                    wait.append(
-                        {
-                            "ansible.builtin.async_status": {"jid": self._job_id},
-                            "register": "sampler_exit",
-                            "until": "sampler_exit.finished | default(false)",
-                            "retries": self.options["timeout_seconds"] + 15,
-                            "delay": 1,
-                        }
-                    )
-                output.mkdir(parents=True, exist_ok=True)
-                # Always try to retrieve partial evidence, even if stopping failed.
-                await self._run(
-                    [
-                        {
-                            "block": wait,
-                            "always": [
-                                {
-                                    "ansible.builtin.fetch": {
-                                        "src": remote + "/{{ item }}",
-                                        "dest": str(output.resolve()) + "/",
-                                        "flat": True,
-                                    },
-                                    "loop": ["history.jsonl", "summary.json", "ready.json"],
-                                },
-                            ],
-                        }
-                    ]
-                )
-                cleanup = []
-                if self._job_id:
-                    cleanup.append({"ansible.builtin.async_status": {"jid": self._job_id, "mode": "cleanup"}})
-                cleanup.append({"ansible.builtin.file": {"path": remote, "state": "absent"}})
-                await self._run(cleanup)
+                await self._stop_local_sampler()
             else:
-                return
-            summary = json.loads((output / "summary.json").read_text())
-            if summary.get("run_id") != self.run_id or not summary.get("samples"):
-                raise ValueError("Missing or mismatched UE context samples")
-            if summary.get("errors"):
-                self._error("ue_context", f"{summary['errors']} failed inventory polls")
-            if summary.get("stop_reason") == "max_seconds":
-                self._error("ue_context", "max_seconds reached; history may not cover the full workload")
+                await self._fetch_remote_samples(output)
+            self._check_samples(output)
             status["status"] = "completed"
         except Exception as exc:
             status.update(status="error", error=str(exc))
             self._error("ue_context stop/fetch", exc)
         finally:
-            if self._thread or self._remote_directory:
-                self._write(output / "collection_status.json", status)
+            self._write(output / "collection_status.json", status)
 
     async def __aenter__(self):
+        """Start the run, take the 'before' snapshot and start UE context sampling."""
         await super().__aenter__()
 
         async def start():
@@ -409,6 +404,8 @@ class ObservabilityRun(ExperimentRun):
         return cancelled
 
     async def __aexit__(self, exc_type, exc, tb):
+        """Stop sampling, take the 'after' snapshot, then finalize like ExperimentRun."""
+
         async def finish():
             for label, operation in [
                 ("ue_context cleanup", self._stop_sampler),

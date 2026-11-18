@@ -226,7 +226,8 @@ class MonitoringDeployment(StrictBaseModel):
             for target in self.targets:
                 if target.role and target.metrics_port == ports[target.role]:
                     raise ValueError(f"{target.component}: observability and NF metric ports conflict")
-        if len({self.prometheus_node_port, self.grafana_node_port, self.loki_node_port}) != 3:
+        node_ports = (self.prometheus_node_port, self.grafana_node_port, self.loki_node_port)
+        if len(set(node_ports)) != len(node_ports):
             raise ValueError("Monitoring NodePorts must be distinct")
 
 

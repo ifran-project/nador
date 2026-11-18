@@ -41,9 +41,14 @@ UE_FIELDS = (
     "upf_n3_ip",
 )
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
+# Same bounds as ObservabilityOptions; repeated because this file runs standalone on hosts.
+MIN_INTERVAL_SECONDS, MAX_INTERVAL_SECONDS = 0.1, 3600
+MAX_TIMEOUT_SECONDS = 60
+MAX_PORT = 65535
 
 
 def inventory_record(payload: dict, limit: int) -> dict:
+    """Validate a UE inventory response and keep the known UE fields."""
     if not isinstance(payload, dict) or not isinstance(payload.get("ues"), list):
         raise ValueError("Expected an inventory object with a ues list")
     rows = payload["ues"]
@@ -66,6 +71,7 @@ def inventory_record(payload: dict, limit: int) -> dict:
 
 
 def kubeconfig_args(requested: str) -> list[str]:
+    """Kubectl arguments for the requested or first readable kubeconfig."""
     if requested != "auto":
         return ["--kubeconfig", requested]
     if os.environ.get("KUBECONFIG"):
@@ -77,9 +83,10 @@ def kubeconfig_args(requested: str) -> list[str]:
 
 
 def fetch_inventory(args, kube_args: list[str]) -> dict:
+    """Read the UE inventory directly or through the Kubernetes service proxy."""
     if args.url:
         url = args.url.rstrip("/") + "/inventory/ues?" + urllib.parse.urlencode({"limit": args.limit})
-        with urllib.request.urlopen(url, timeout=args.timeout_seconds) as response:
+        with urllib.request.urlopen(url, timeout=args.timeout_seconds) as response:  # noqa: S310 - scheme validated by callers
             data = response.read(MAX_RESPONSE_BYTES + 1)
             if len(data) > MAX_RESPONSE_BYTES:
                 raise ValueError("Inventory response exceeds byte limit")
@@ -88,7 +95,7 @@ def fetch_inventory(args, kube_args: list[str]) -> dict:
         f"/api/v1/namespaces/{args.namespace}/services/http:{args.service}:{args.service_port}/proxy/"
         f"inventory/ues?limit={args.limit}"
     )
-    result = subprocess.run(
+    result = subprocess.run(  # noqa: PLW1510 - the return code is checked below
         ["kubectl", *kube_args, f"--request-timeout={args.timeout_seconds}s", "get", "--raw", path],
         capture_output=True,
         text=True,
@@ -100,6 +107,7 @@ def fetch_inventory(args, kube_args: list[str]) -> dict:
 
 
 def sample(args, fetch, stop: threading.Event, ready: threading.Event | None = None) -> dict:
+    """Poll the inventory until stopped, appending history and writing a summary."""
     output = Path(args.out_dir)
     output.mkdir(parents=True, exist_ok=True)
     history = output / "history.jsonl"
@@ -154,6 +162,7 @@ def sample(args, fetch, stop: threading.Event, ready: threading.Event | None = N
 
 
 def main() -> int:
+    """Sample UE inventory from the command line and print the summary."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out-dir", required=True)
     parser.add_argument("--stop-file", required=True)
@@ -170,10 +179,9 @@ def main() -> int:
     args = parser.parse_args()
     if (
         not math.isfinite(args.interval_seconds)
-        or args.interval_seconds < 0.1
-        or args.interval_seconds > 3600
-        or args.timeout_seconds > 60
-        or not 1 <= args.service_port <= 65535
+        or not MIN_INTERVAL_SECONDS <= args.interval_seconds <= MAX_INTERVAL_SECONDS
+        or args.timeout_seconds > MAX_TIMEOUT_SECONDS
+        or not 1 <= args.service_port <= MAX_PORT
         or min(args.timeout_seconds, args.max_seconds, args.limit) < 1
     ):
         parser.error("Positive timeout, duration and limit, and interval >= 0.1 are required")

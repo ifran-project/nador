@@ -14,6 +14,7 @@ class ProfileLoader(yaml.SafeLoader):
     """Reject duplicate options instead of silently choosing the last value."""
 
     def construct_mapping(self, node, deep=False):
+        """Build a mapping, rejecting duplicate keys."""
         mapping = super().construct_mapping(node, deep=deep)
         keys = [self.construct_object(key, deep=deep) for key, _ in node.value]
         if len(keys) != len(mapping):
@@ -47,7 +48,7 @@ def switches(defaults=None, prefix=()):
 
 def load_profile(path):
     """Read a profile and fill partial component image overrides."""
-    data = yaml.load(path.read_text(), Loader=ProfileLoader)
+    data = yaml.load(path.read_text(), Loader=ProfileLoader)  # noqa: S506 - ProfileLoader is a SafeLoader
     if not isinstance(data, dict):
         raise ValueError("expected a YAML mapping")
     components = data.get("components")
@@ -59,7 +60,13 @@ def load_profile(path):
     return data
 
 
-def validate_deployment(data, model=MonitoringDeployment, *, source="Monitoring configuration", explicit=False):
+def validate_deployment[M: MonitoringDeployment](
+    data: dict,
+    model: type[M] = MonitoringDeployment,
+    *,
+    source: str = "Monitoring configuration",
+    explicit: bool = False,
+) -> M:
     """Validate deployment values and report field errors without displaying input values."""
     errors = []
     if explicit:
@@ -73,12 +80,17 @@ def validate_deployment(data, model=MonitoringDeployment, *, source="Monitoring 
         config = model.model_validate(data)
     except ValidationError as exc:
         errors.extend(f"{'.'.join(map(str, error['loc'])) or 'profile'}: {error['msg']}" for error in exc.errors())
+        raise ValueError(_report(source, errors)) from None
     if errors:
-        raise ValueError(f"{source}:\n  - " + "\n  - ".join(errors))
+        raise ValueError(_report(source, errors))
     return config
 
 
-def read_deployment(path, model=MonitoringDeployment):
+def _report(source: str, errors: list[str]) -> str:
+    return f"{source}:\n  - " + "\n  - ".join(errors)
+
+
+def read_deployment[M: MonitoringDeployment](path: str | Path, model: type[M] = MonitoringDeployment) -> M:
     """Load a full monitoring profile before planning or deploying it."""
     path = Path(path)
     try:

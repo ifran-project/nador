@@ -25,10 +25,12 @@ class ObservabilitySettings(StrictBaseModel):
 
     @property
     def active(self) -> bool:
+        """Whether any collector that needs the session stack is enabled."""
         return self.ngap or self.pfcp or self.mapper_coverage or self.user_plane_paths
 
     @model_validator(mode="after")
     def require_collector_images(self) -> Self:
+        """Reject blank image overrides and exporter port clashes."""
         for field in ("amf_image", "smf_image", "mapper_image"):
             image = getattr(self, field)
             if image is not None and not image.strip():

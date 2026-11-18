@@ -44,6 +44,7 @@ class ExtendedSettings(StrictBaseModel):
 
     @model_validator(mode="after")
     def validate_settings(self):
+        """Require pinned images and consistent settings for enabled probes."""
         unknown = self.probe_images.keys() - PROBES.keys()
         if unknown:
             raise ValueError(f"Unknown probe images: {sorted(unknown)}")

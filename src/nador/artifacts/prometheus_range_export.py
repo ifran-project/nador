@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import csv
 import json
-import sys
+import logging
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_QUERIES = [
     {
@@ -155,18 +157,23 @@ COMMON_LABELS = [
 
 
 def clean_query(query: str) -> str:
+    """Collapse whitespace so queries are stored on one line."""
     return " ".join(query.strip().split())
 
 
 def http_json(url: str, params: dict[str, object] | None = None, timeout: int = 30) -> dict:
+    """GET a JSON document, with optional query parameters."""
+    if urllib.parse.urlsplit(url).scheme not in ("http", "https"):
+        raise ValueError(f"Expected an HTTP(S) URL, got {url!r}")
     if params:
         url = f"{url}?{urllib.parse.urlencode(params)}"
-    req = urllib.request.Request(url, headers={"Accept": "application/json"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    req = urllib.request.Request(url, headers={"Accept": "application/json"})  # noqa: S310 - scheme checked above
+    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
         return json.loads(resp.read().decode("utf-8"))
 
 
 def load_queries(path: str | Path | None) -> list[dict[str, str]]:
+    """Read named PromQL queries from a JSON file, or return the defaults."""
     if not path:
         return list(DEFAULT_QUERIES)
     data = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -185,6 +192,7 @@ def query_range(
     end: float,
     step: str,
 ) -> dict:
+    """Run a Prometheus range query."""
     return http_json(
         f"{prometheus_url.rstrip('/')}/api/v1/query_range",
         {
@@ -203,6 +211,7 @@ def write_rows(
     query: str,
     result: dict,
 ) -> int:
+    """Write one CSV row per sample of a range-query result; return the row count."""
     count = 0
     for series in result.get("data", {}).get("result", []):
         metric = series.get("metric", {})
@@ -254,10 +263,10 @@ def export_ranges(
                     query_summary["rows"] = write_rows(writer, name, query, payload)
             except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
                 query_summary["error"] = str(exc)
-                print(f"warning: query {name!r} failed: {exc}", file=sys.stderr)
+                logger.warning("Prometheus query %r failed: %s", name, exc)
             summary["queries"].append(query_summary)
 
     (directory / "prometheus_export_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     total_rows = sum(int(item.get("rows", 0)) for item in summary["queries"])
-    print(f"wrote {total_rows} Prometheus samples to {out_path}")
+    logger.info("Wrote %d Prometheus samples to %s", total_rows, out_path)
     return summary
