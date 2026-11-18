@@ -10,6 +10,7 @@ from ifran.utils.utils import deep_merge
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from nador.controller_values import controller_values
+from nador.images import split_image
 from nador.models import DeployedMonitoringComponent, MonitoringModel, component_image_defaults
 from nador.probe_catalog import NODE_PROBES, PROBES, controlled_probes, enabled_probes, probe_values
 from nador.ran_metrics import ocudu_sources
@@ -198,8 +199,8 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
             and monitoring.observability.mapper_coverage
             and (image := monitoring.observability.mapper_image)
         ):
-            repository, separator, tag = image.rpartition(":")
-            if not separator or not repository or not tag or "/" in tag or "@" in image:
+            repository, tag = split_image(image)
+            if not repository or not tag or "@" in image:
                 raise ValueError("mapper_image must use an explicit repository:tag")
             component.image.repository = repository
             component.image.image_tag = tag

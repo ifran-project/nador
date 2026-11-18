@@ -5,7 +5,8 @@ from typing import Literal
 from metamodel_3gpp.models.base import StrictBaseModel
 from pydantic import Field, model_validator
 
-from .probe_catalog import PROBES, enabled_probes
+from nador.images import TaggedImage
+from nador.probe_catalog import PROBES, enabled_probes
 
 
 class QualityQuery(StrictBaseModel):
@@ -35,7 +36,7 @@ class ExtendedSettings(StrictBaseModel):
     packet_state_limit: int = Field(default=4096, ge=16, le=16384)
     packet_ttl_seconds: float = Field(default=30, ge=1, le=300)
     quality_queries: list[QualityQuery] = Field(default_factory=list, max_length=64)
-    probe_images: dict[str, str] = Field(default_factory=dict)
+    probe_images: dict[str, TaggedImage] = Field(default_factory=dict)
     probe_targets: dict[str, list[str]] = Field(default_factory=dict)
     interval_seconds: float = Field(default=5, ge=1, le=300)
     timeout_seconds: float = Field(default=2, ge=0.1, le=10)
@@ -49,9 +50,6 @@ class ExtendedSettings(StrictBaseModel):
         missing = set(enabled_probes(self)) - self.probe_images.keys()
         if missing:
             raise ValueError(f"extended.probe_images requires an image for: {', '.join(sorted(missing))}")
-        for name, image in self.probe_images.items():
-            if ":" not in image.rsplit("/", 1)[-1] or any(c.isspace() for c in image):
-                raise ValueError(f"extended.probe_images.{name} requires a published image tag or digest")
         if self.probe_targets.keys() - self.probe_images.keys() or any(
             not items for items in self.probe_targets.values()
         ):

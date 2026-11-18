@@ -47,11 +47,11 @@ CASES = {
     ),
     "untagged controller": (
         lambda p: p | {"probe_controller_image": "ghcr.io/x/controller"},
-        "probe_controller_image must be a tagged image or digest",
+        "probe_controller_image\n  Value error, must be a tagged image",
     ),
     "untagged throughput": (
         lambda p: p | {"external_throughput_image": "ghcr.io/x/tp"},
-        "external_throughput_image must be a tagged image or digest",
+        "external_throughput_image\n  Value error, must be a tagged image",
     ),
     "api secrets in pairs": (
         lambda p: p | {"probe_api_tls_secret": "tls"},
@@ -131,3 +131,31 @@ def test_yes_is_not_a_boolean(tmp_path):
     path.write_text((EXAMPLES / "quickstart" / "monitoring.yaml").read_text().replace("loki: false", "loki: yes"))
     with pytest.raises(ValueError, match="loki"):
         read_deployment(path)
+
+
+@pytest.mark.parametrize(
+    ("reference", "pinned"),
+    [
+        ("ghcr.io/x/y:v1", True),
+        ("ghcr.io/x/y@sha256:abc", True),
+        ("ghcr.io/x/y:v1@sha256:abc", True),
+        ("registry:5000/x/y", False),
+        ("ghcr.io/x/y", False),
+        ("ghcr.io/x/y: v1", False),
+        ("", False),
+    ],
+)
+def test_image_pinning(reference, pinned):
+    from nador.images import is_pinned
+
+    assert is_pinned(reference) is pinned
+
+
+def test_one_way_and_extended_images_must_be_pinned():
+    from nador.extended import ExtendedSettings
+    from nador.one_way import OneWaySettings
+
+    with pytest.raises(ValueError, match="must be a tagged image"):
+        OneWaySettings(image="ghcr.io/x/one-way")
+    with pytest.raises(ValueError, match="must be a tagged image"):
+        ExtendedSettings(probe_images={"cpu": "ghcr.io/x/cpu"})
