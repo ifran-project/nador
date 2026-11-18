@@ -106,6 +106,16 @@ async with ExperimentRun("results/run1", monitoring=monitoring) as run:
         ...
 ```
 
+For throughput, `nador.traffic.Iperf` installs iperf3 on a server node and on the
+UEs that lack it, then runs tests from the UEs (containers or physical UEs):
+
+```python
+iperf = await Iperf.setup(ue, server="node4", interface="oaitun_ue1", clients=["sim_ue"])
+async with ExperimentRun("results/run2", monitoring=monitoring) as run:
+    with run.section("downlink"):
+        run.save_json("downlink.json", await iperf.run("sim_ue", "downlink", 20))
+```
+
 Other collectors can run alongside: anything with `start`, `stop` and `collect`
 steps (see `nador.artifacts.Collector`) can be passed as
 `ExperimentRun(..., collectors=[...])`. To check that the monitoring stack
