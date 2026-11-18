@@ -1,4 +1,4 @@
-"""Monitoring and experiment artifacts for the unmodified 5G orchestrator."""
+"""NADOR: monitoring and experiment artifacts for IFRAN-deployed 5G networks."""
 
 from .deployment import MonitoringManagement
 from .models import MonitoringDeployment

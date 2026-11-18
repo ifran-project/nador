@@ -197,10 +197,6 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
                 data, monitoring.components[name].model_dump(mode="json", exclude_unset=True, exclude_none=True)
             )
         component = DeployedMonitoringComponent.model_validate(data)
-        if name == "monitoring-controller" and image:
-            # Old snapshots can still store the retired image. Only its pull policy remains relevant.
-            component.image.repository = image["repository"]
-            component.image.image_tag = image["image_tag"]
         if (
             name == "ue-mapper-api"
             and monitoring.observability.mapper_coverage

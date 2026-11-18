@@ -5,7 +5,11 @@ from nador.probe_catalog import workload
 
 
 def controller_values(monitoring: MonitoringDeployment, targets: list[dict], probe_states: dict) -> dict:
-    """Keep the legacy single-role target map alongside the explicit multi-target requests."""
+    """Build controller values.
+
+    Single-anchor deployments describe their gNB/UPF through probeControlTargets (targets.json);
+    multi-anchor deployments pass explicit per-request target lists instead.
+    """
     anchors = [target for target in targets if target["role"] in ("gnb", "upf")]
     upfs = [target for target in anchors if target["role"] == "upf"]
     by_role = {target["role"]: target for target in anchors}

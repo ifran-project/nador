@@ -32,6 +32,18 @@ The notebook profiles inherit these defaults, including the AMF/SMF sniffers
 and UE mapper in ML mode. After merging an image update, reinstall Nador,
 restart the notebook kernel, and redeploy. Explicit overrides still take precedence.
 
+## Development
+
+```bash
+python -m pip install -e ".[dev]"
+ruff check src tests && ruff format --check src tests
+pytest
+```
+
+The tests plan every example profile offline and compare the rendered Helm
+values with `tests/snapshots/`. After an intended change, regenerate them with
+`NADOR_UPDATE_SNAPSHOTS=1 pytest` and review the diff.
+
 ## Monitoring
 
 Deploy monitoring after the RAN and before UE attachment, so the sniffers
@@ -50,19 +62,9 @@ NGAP, PFCP, UE-mapper, path, and infrastructure collectors. Use
 `nador.artifacts.ObservabilityRun` to export metrics, sampled UE context, and
 setup snapshots; Loki export is optional.
 
-When upgrading a deployment that used the old standalone `one-way` or bundled
-`extended-probes` releases, uninstall those releases from the monitoring
-namespace before redeploying. In custom profiles, replace bundled
-`extended.node_image`/`extended.service_image` with `extended.probe_images`
-and remove `observability.path_image`. Path probes now inherit the controller's
-external path image unless `external_path_image` is explicitly set.
-If gNB or UPF pods still carry the old injected path probes, recreate those
-pods during a maintenance window to remove the ephemeral containers.
-
 Throughput uses the external controller even when RTT is off. Use
-`external_throughput_image` for custom probe builds. For upgrades from the
-retired standalone deployment, start with clean network-function pods: an
-in-place Helm upgrade does not remove injected probes from existing pods.
+`external_throughput_image` for custom probe builds. Path probes inherit the
+controller's external path image unless `external_path_image` is set.
 The controller supports multiple targets for RTT, path counters and one-way
 latency. Set `one_way.image` to the matching one-way probe build. N3 latency
 needs gNB and UPF targets; UPF transit needs no gNB target but still needs

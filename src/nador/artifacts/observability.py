@@ -250,7 +250,7 @@ class ObservabilityRun(ExperimentRun):
                 raise self._thread_error
             return
         _, kubeconfig, namespace = self._control()
-        self._remote_directory = "/tmp/orchestrator-ml-" + self.run_id
+        self._remote_directory = "/tmp/nador-ml-" + self.run_id
         remote = self._remote_directory
         argv = [
             "python3",

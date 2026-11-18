@@ -37,16 +37,6 @@ WINDOW_FIELDS = [
     "ue_roles",
     "directions",
     "directions_by_ue",
-    "interference_node",
-    "interference_freq",
-    "interference_gain",
-    "interference_noise_bandwidth",
-    "interference_focus_ue",
-    "stress_target",
-    "stress_node",
-    "stress_workers",
-    "stress_namespace",
-    "stress_pod_regex",
     "prometheus_enabled",
     "pcap_enabled",
     "artifacts_file",
@@ -172,16 +162,6 @@ def make_window(start: dict, end: dict, tz_name: str) -> dict:
         "ue_roles": json_field(start, "ue_roles", {}),
         "directions": json_field(start, "directions", []),
         "directions_by_ue": json_field(start, "directions_by_ue", {}),
-        "interference_node": start.get("interference_node", ""),
-        "interference_freq": start.get("interference_freq", ""),
-        "interference_gain": start.get("interference_gain", ""),
-        "interference_noise_bandwidth": start.get("interference_noise_bandwidth", ""),
-        "interference_focus_ue": start.get("interference_focus_ue", start.get("interference_target_ue", "")),
-        "stress_target": start.get("stress_target", ""),
-        "stress_node": start.get("stress_node", ""),
-        "stress_workers": start.get("stress_workers", ""),
-        "stress_namespace": start.get("stress_namespace", ""),
-        "stress_pod_regex": start.get("stress_pod_regex", ""),
         "prometheus_enabled": start.get("prometheus_enabled", ""),
         "pcap_enabled": start.get("pcap_enabled", ""),
         "artifacts_file": start.get("artifacts_file", ""),
@@ -316,32 +296,6 @@ def recap_lines(run_id: str, tz_name: str, windows: list[dict], iperf_tasks: lis
                     f"{task['start_local']} -> {task['end_local']} "
                     f"({duration_text(task['duration_s'])})"
                 )
-        scenario_phases = [
-            w
-            for w in windows
-            if w.get("level") in {"interference_phase", "stress_phase"}
-            and w.get("scenario") == scenario.get("scenario")
-        ]
-        for phase in scenario_phases:
-            detail = ""
-            if phase.get("interference_node"):
-                detail = (
-                    f" node={phase.get('interference_node')} "
-                    f"freq={phase.get('interference_freq')} "
-                    f"gain={phase.get('interference_gain')} "
-                    f"bw={phase.get('interference_noise_bandwidth')}"
-                )
-            elif phase.get("stress_target"):
-                detail = (
-                    f" target={phase.get('stress_target')} "
-                    f"node={phase.get('stress_node')} "
-                    f"workers={phase.get('stress_workers')}"
-                )
-            lines.append(
-                f"  - phase {phase['name']}{detail}: "
-                f"{phase['start_local']} -> {phase['end_local']} "
-                f"({duration_text(phase['duration_s'])})"
-            )
     return lines
 
 
@@ -360,8 +314,6 @@ def write_markdown(path: Path, lines: list[str], summary_json: dict) -> None:
             "- `by_window/section/*/prometheus_timeseries.csv(.gz)`: per-section metric slices for generic experiments.",
             "- `by_window/scenario/*/prometheus_timeseries.csv(.gz)`: per-scenario metric slices when Prometheus export exists.",
             "- `by_window/task/*/prometheus_timeseries.csv(.gz)`: per-step/direction metric slices when Prometheus export exists.",
-            "- `by_window/interference_phase/*/prometheus_timeseries.csv(.gz)`: clean/noise/recovery slices for interference scenarios.",
-            "- `by_window/stress_phase/*/prometheus_timeseries.csv(.gz)`: clean/stress/recovery slices for stress scenarios.",
             "",
             f"Unmatched starts: {len(summary_json.get('unmatched_starts', []))}",
             f"Unmatched ends: {len(summary_json.get('unmatched_ends', []))}",
