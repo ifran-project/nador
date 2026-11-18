@@ -16,7 +16,7 @@ from nador.observability import ObservabilitySettings
 from nador.one_way import OneWaySettings
 
 DEFAULT_IMAGES = json.loads((Path(__file__).parent / "assets" / "images.json").read_text())
-DURATION = r"^[0-9]+(ms|s|m|h|d|w|y)$"  # Prometheus duration, e.g. 15s or 5d
+DURATION = r"^([0-9]+(ms|s|m|h|d|w|y))+$"  # Prometheus duration, e.g. 15s, 5d or 1h30m
 
 
 def component_image_defaults(name: str, controller_image: str | None = None) -> dict | None:

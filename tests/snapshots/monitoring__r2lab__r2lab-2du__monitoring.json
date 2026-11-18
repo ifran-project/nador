@@ -412,6 +412,7 @@
       "chart_values": {
         "cleanupImage": "ghcr.io/ifran-project/nador-controller:sha-75a58721962c2e237babeb0b95354bec22296616",
         "extendedProbeStates": {},
+        "extendedProbeWorkloads": [],
         "image": {
           "pullPolicy": "Always",
           "repository": "ghcr.io/ifran-project/nador-controller",

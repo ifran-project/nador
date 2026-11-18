@@ -377,6 +377,32 @@
           "split-signaling": true,
           "tcp": false
         },
+        "extendedProbeWorkloads": [
+          {
+            "name": "probe-cpu-extended-node",
+            "resource": "daemonsets"
+          },
+          {
+            "name": "probe-drops-extended-node",
+            "resource": "daemonsets"
+          },
+          {
+            "name": "probe-measurement-quality-extended-service",
+            "resource": "deployments"
+          },
+          {
+            "name": "probe-queueing-extended-node",
+            "resource": "daemonsets"
+          },
+          {
+            "name": "probe-split-signaling-extended-node",
+            "resource": "daemonsets"
+          },
+          {
+            "name": "probe-tcp-extended-node",
+            "resource": "daemonsets"
+          }
+        ],
         "image": {
           "pullPolicy": "Always",
           "repository": "ghcr.io/ifran-project/nador-controller",

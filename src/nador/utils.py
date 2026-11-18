@@ -12,7 +12,17 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from nador.controller_values import controller_values
 from nador.images import split_image
 from nador.models import DeployedMonitoringComponent, MonitoringModel, component_image_defaults
-from nador.probe_catalog import NODE_PROBES, PROBES, controlled_probes, enabled_probes, probe_values
+from nador.probe_catalog import (
+    NOT_ENABLED_WHILE_PAUSED,
+    PROBES,
+    SPLIT_SIGNALING,
+    controlled_probes,
+    enabled_probes,
+    probe_kind,
+    probe_values,
+    release_name,
+    workload,
+)
 from nador.ran_metrics import ocudu_sources
 
 ASSETS = Path(__file__).resolve().parent / "assets"
@@ -32,9 +42,9 @@ def _probe_states(model):
     states = controlled_probes(model.monitoring.extended)
     kinds = {str(nf.type) for nf in model.ran.components.values()}
     if not (("du" in kinds and kinds.intersection({"cu", "cu_cp", "cu_up"})) or {"cu_cp", "cu_up"} <= kinds):
-        if states.get("split-signaling"):
+        if states.get(SPLIT_SIGNALING):
             raise ValueError("split_signaling requires a modeled F1 or E1 split")
-        states.pop("split-signaling", None)
+        states.pop(SPLIT_SIGNALING, None)
     return states
 
 
@@ -96,9 +106,8 @@ def _extended_chart_context(model, targets, probe_name, probe_states):
     if probe_name in probe_states:
         extended_config["paused"] = not probe_states[probe_name]
         if not probe_states[probe_name]:
-            for flag in PROBES[probe_name]:
-                if flag not in ("tcp_flows", "attributed_drops"):
-                    extended_config[flag] = True
+            for flag in set(PROBES[probe_name]) - NOT_ENABLED_WHILE_PAUSED:
+                extended_config[flag] = True
     return {
         "extended_targets": extended_targets,
         "extended_config": extended_config,
@@ -120,7 +129,7 @@ def _render_chart_values(
         node_selector = {"kubernetes.io/hostname": component.node_name}
     context = {}
     if chart == "extended-probes":
-        probe_name = (component.release_name or "").removeprefix("probe-")
+        probe_name = probe_kind(component.release_name or "")
         context = _extended_chart_context(model, targets, probe_name, probe_states)
     elif chart == "ocudu-metrics":
         context["ocudu_sources"] = ocudu_sources(model)
@@ -169,11 +178,9 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
     probe_states = _probe_states(model)
     kinds = probe_states if monitoring.probe_controller_image else enabled_probes(monitoring.extended)
     for kind in kinds:
-        name = f"probe-{kind}"
-        workload = "node" if kind in NODE_PROBES else "service"
-        definitions[name] = {
+        definitions[release_name(kind)] = {
             "chart_ref": "extended-probes",
-            "pod_selector": [f"app={name}-extended-{workload}"],
+            "pod_selector": [f"app={workload(kind)[1]}"],
         }
     components = {}
     for name, definition in definitions.items():
@@ -206,7 +213,7 @@ def resolve_components(model: MonitoringModel, targets: list[dict]) -> dict[str,
             component.image.image_tag = tag
         component.namespace = monitoring.namespace
         component.chart_values = _render_chart_values(component, model, targets, probe_states)
-        if name.startswith("probe-") and component.chart_values.get("settings", {}).get("paused"):
+        if probe_kind(name) and component.chart_values.get("settings", {}).get("paused"):
             component.pod_selector = []
         if not component.chart_version:
             component.chart_ref = f"{REMOTE_CHARTS}/{Path(component.chart_ref).name}"

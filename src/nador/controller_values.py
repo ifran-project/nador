@@ -1,6 +1,7 @@
 """Build the Helm values for the monitoring controller."""
 
-from .models import DEFAULT_IMAGES, MonitoringDeployment
+from nador.models import DEFAULT_IMAGES, MonitoringDeployment
+from nador.probe_catalog import workload
 
 
 def controller_values(monitoring: MonitoringDeployment, targets: list[dict], probe_states: dict) -> dict:
@@ -50,6 +51,10 @@ def controller_values(monitoring: MonitoringDeployment, targets: list[dict], pro
         "cleanupImage": controller_image or DEFAULT_IMAGES["external_probes"]["controller"],
         "probeControlTargets": {} if monitoring.multi_anchor else by_role,
         "extendedProbeStates": probe_states,
+        # Workloads the controller may pause and resume; RBAC is generated from this list.
+        "extendedProbeWorkloads": [
+            dict(zip(("resource", "name"), workload(kind), strict=True)) for kind in sorted(probe_states)
+        ],
         "probeApiTlsSecret": monitoring.probe_api_tls_secret,
         "probeApiTokenSecret": monitoring.probe_api_token_secret,
         "probeControl": one_way,

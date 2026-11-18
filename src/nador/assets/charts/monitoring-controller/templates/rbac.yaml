@@ -38,14 +38,12 @@ rules:
     resourceNames: [nador-one-way]
     verbs: [get, patch]
   {{- if $.Values.extendedProbeStates }}
+  {{- range $.Values.extendedProbeWorkloads }}
   - apiGroups: [apps]
-    resources: [daemonsets]
-    resourceNames: [probe-cpu-extended-node, probe-drops-extended-node, probe-queueing-extended-node, probe-tcp-extended-node, probe-split-signaling-extended-node]
+    resources: [{{ .resource }}]
+    resourceNames: [{{ .name }}]
     verbs: [get, patch]
-  - apiGroups: [apps]
-    resources: [deployments]
-    resourceNames: [probe-measurement-quality-extended-service]
-    verbs: [get, patch]
+  {{- end }}
   {{- end }}
   {{- end }}
 ---
