@@ -139,9 +139,15 @@ class ObservabilityRun(ExperimentRun):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
+    @property
+    def _model(self):
+        if self.monitoring is None:
+            raise ValueError("Remote collection requires a monitoring manager")
+        return self.monitoring.deployment_model
+
     def _control(self):
         if self._remote_config is None:
-            model = self.monitoring.deployment_model
+            model = self._model
             cfg = model.monitoring
             name = model.params.k8s.master_node
             if not name or name not in model.nodes:
@@ -151,9 +157,9 @@ class ObservabilityRun(ExperimentRun):
 
     async def _run(self, action: str, inputs: dict, *, host: str | None = None, output_keys=None):
         """Run one action of the experiment/context Ansible role on a cluster host."""
-        model = self.monitoring.deployment_model
+        model = self._model
         host = host or self._control()[0]
-        return await run_ansible_role(
+        result = await run_ansible_role(
             role="experiment/context",
             hosts=host,
             inventory=get_ansible_inventory_line(host, model.nodes[host]),
@@ -164,6 +170,7 @@ class ObservabilityRun(ExperimentRun):
             roles_paths=[str(ASSETS / "roles"), *model.params.ansible.roles_paths],
             quiet=True,
         )
+        return result or {}
 
     async def _snapshot(self, phase):
         if not self.monitoring or not self.settings.collect_setup:
@@ -287,7 +294,8 @@ class ObservabilityRun(ExperimentRun):
 
     async def _stop_local_sampler(self) -> None:
         self._stop.set()
-        await asyncio.to_thread(self._thread.join)
+        if self._thread is not None:
+            await asyncio.to_thread(self._thread.join)
         if self._thread_error:
             raise self._thread_error
 

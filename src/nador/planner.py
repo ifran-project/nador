@@ -66,19 +66,20 @@ def resolve_targets(model: MonitoringModel) -> list[ResolvedTarget]:
             raise ValueError(f"Unknown {target.category} component {target.component!r}")
         component = components[target.component]
         namespace = getattr(component, "namespace", None)
-        if not namespace:
+        implementation = getattr(component, "implementation", None)
+        if not namespace or implementation is None:
             raise ValueError(f"{target.component}: namespace is unresolved; pass the latest deployed manager")
         if target.role:
             expected = {"amf": {"amf"}, "smf": {"smf"}, "upf": {"upf"}, "gnb": {"gnb", "cu", "cu_up"}}
             if component.type not in expected[target.role]:
                 raise ValueError(f"{target.component}: {component.type} cannot be a {target.role} packet target")
-        selector = target.selector or {"app": build_k8s_safe(f"{component.implementation}-{target.component}")}
+        selector = target.selector or {"app": build_k8s_safe(f"{implementation}-{target.component}")}
         result.append(
             ResolvedTarget(
                 **target.model_dump(exclude={"selector"}),
                 selector=selector,
                 namespace=namespace,
-                implementation=str(component.implementation),
+                implementation=str(implementation),
                 label_selectors=[f"{key}={value}" for key, value in selector.items()],
             )
         )
@@ -192,6 +193,13 @@ def _controller_values(
     }
 
 
+def _chart_name(component: DeployedMonitoringComponent) -> str:
+    """Chart directory or repository chart name, without its repository or path prefix."""
+    if not component.chart_ref:
+        raise ValueError(f"{component.release_name}: chart_ref is not set")
+    return component.chart_ref.rsplit("/", 1)[-1]
+
+
 def _render_chart_values(
     component: DeployedMonitoringComponent,
     model: MonitoringModel,
@@ -199,7 +207,7 @@ def _render_chart_values(
     probe_states: dict[str, bool],
 ) -> dict:
     """Render chart configuration before applying explicit user overrides."""
-    chart = component.chart_ref.rsplit("/", 1)[-1]
+    chart = _chart_name(component)
     defaults = ASSETS / "defaults" / f"{chart}.yaml" if component.chart_version else CHARTS / chart / "values.yaml"
     node_selector = component.node_selector
     if component.node_name:
@@ -279,12 +287,14 @@ def resolve_components(model: MonitoringModel, targets: list[ResolvedTarget]) ->
             and monitoring.observability.mapper_coverage
             and (image := monitoring.observability.mapper_image)
         ):
+            if component.image is None:
+                raise ValueError("ue-mapper-api has no image to override")
             component.image.repository, component.image.image_tag = split_image(image)
         component.namespace = monitoring.namespace
         component.chart_values = _render_chart_values(component, model, targets, probe_states)
         if probe_kind(name) and component.chart_values.get("settings", {}).get("paused"):
             component.pod_selector = []
         if not component.chart_version:
-            component.chart_ref = f"{REMOTE_CHARTS}/{Path(component.chart_ref).name}"
+            component.chart_ref = f"{REMOTE_CHARTS}/{_chart_name(component)}"
         components[name] = component
     return components

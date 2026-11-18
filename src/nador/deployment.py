@@ -229,5 +229,7 @@ async def _run_component_action(
     if action in ("install", "uninstall"):
         component.is_installed = action == "install"
     elif output_key:
+        if result is None:
+            raise RuntimeError(f"{component_name}: {action} returned no output")
         return result[output_key]
     return None

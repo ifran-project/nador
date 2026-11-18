@@ -24,6 +24,8 @@ def _ssh_forward_command(monitoring: MonitoringManagement, local_port: int, node
     """Build an ssh command forwarding local_port to node_port on the Kubernetes control node."""
     model = monitoring.deployment_model
     name = model.params.k8s.master_node
+    if not name or name not in model.nodes:
+        raise ValueError("The deployment model has no Kubernetes control node to tunnel through")
     ssh = model.nodes[name].ssh_info
     host = ssh.hostname or name
     command = ["ssh", "-N", "-T", "-S", "none"]

@@ -37,6 +37,7 @@ restart the notebook kernel, and redeploy. Explicit overrides still take precede
 ```bash
 python -m pip install -e ".[dev]"
 ruff check src tests && ruff format --check src tests
+pyright
 pytest
 ```
 

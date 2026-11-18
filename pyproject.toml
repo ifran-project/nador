@@ -27,7 +27,7 @@ requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.9.4"]
+dev = ["pyright>=1.1.390", "pytest>=8", "ruff>=0.9.4"]
 notebooks = ["ipykernel>=6,<8"]
 
 [tool.pytest.ini_options]
