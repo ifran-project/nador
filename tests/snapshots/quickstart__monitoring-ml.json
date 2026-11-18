@@ -347,13 +347,13 @@
       "advanced_config": {},
       "chart_ref": "/tmp/monitoring-charts/monitoring-controller",
       "chart_values": {
-        "cleanupImage": "ghcr.io/ifran-project/nador-controller:sha-75a58721962c2e237babeb0b95354bec22296616",
+        "cleanupImage": "ghcr.io/ifran-project/nador-controller:sha-75a58721962c2e237babeb0b95354bec22296616@sha256:c7485a39290e7fbb5cfac160d7e1c2f38aa94b30a07d7ecc1a1912e9b482a91d",
         "extendedProbeStates": {},
         "extendedProbeWorkloads": [],
         "image": {
-          "pullPolicy": "Always",
+          "pullPolicy": "IfNotPresent",
           "repository": "ghcr.io/ifran-project/nador-controller",
-          "tag": "sha-75a58721962c2e237babeb0b95354bec22296616"
+          "tag": "sha-75a58721962c2e237babeb0b95354bec22296616@sha256:c7485a39290e7fbb5cfac160d7e1c2f38aa94b30a07d7ecc1a1912e9b482a91d"
         },
         "nodeSelector": {
           "monitoring.blueprint/node": "monitoring"
@@ -362,7 +362,7 @@
         "pathRequest": {
           "allowed": true,
           "enabled": true,
-          "image": "ghcr.io/ifran-project/nador-user-plane-path:sha-75a58721962c2e237babeb0b95354bec22296616",
+          "image": "ghcr.io/ifran-project/nador-user-plane-path:sha-75a58721962c2e237babeb0b95354bec22296616@sha256:cdba8d135bcb50fa973b01425838fcbea9d978c9ff7de520f15844ae21e8f3a5",
           "interval": 5,
           "port": 9403
         },
@@ -425,11 +425,11 @@
             }
           }
         },
-        "probeControllerImage": "ghcr.io/ifran-project/nador-controller:sha-75a58721962c2e237babeb0b95354bec22296616",
+        "probeControllerImage": "ghcr.io/ifran-project/nador-controller:sha-75a58721962c2e237babeb0b95354bec22296616@sha256:c7485a39290e7fbb5cfac160d7e1c2f38aa94b30a07d7ecc1a1912e9b482a91d",
         "rttRequest": {
           "allowed": true,
           "enabled": true,
-          "image": "ghcr.io/ifran-project/ebpf-latency-probe:sha-75a58721962c2e237babeb0b95354bec22296616",
+          "image": "ghcr.io/ifran-project/ebpf-latency-probe:sha-75a58721962c2e237babeb0b95354bec22296616@sha256:a76fa39a6c78f24db2ef3b04b273dcf51406b812275f3aec5d80b8a2a48d7d79",
           "imsis": [],
           "slices": []
         },
@@ -440,7 +440,7 @@
         "throughputRequest": {
           "allowed": true,
           "enabled": true,
-          "image": "ghcr.io/ifran-project/nador-throughput-probe:sha-75a58721962c2e237babeb0b95354bec22296616"
+          "image": "ghcr.io/ifran-project/nador-throughput-probe:sha-75a58721962c2e237babeb0b95354bec22296616@sha256:e31b63162f39bdb8e6a64846e7d804cbd2f7c67df560748fde327097bf7cec95"
         },
         "tolerations": [
           {
@@ -458,9 +458,9 @@
       },
       "chart_version": null,
       "image": {
-        "image_pull_policy": "Always",
+        "image_pull_policy": "IfNotPresent",
         "image_pull_secrets": null,
-        "image_tag": "sha-75a58721962c2e237babeb0b95354bec22296616",
+        "image_tag": "sha-75a58721962c2e237babeb0b95354bec22296616@sha256:c7485a39290e7fbb5cfac160d7e1c2f38aa94b30a07d7ecc1a1912e9b482a91d",
         "repository": "ghcr.io/ifran-project/nador-controller"
       },
       "is_installed": false,
@@ -1083,7 +1083,7 @@
         "image": {
           "pullPolicy": "IfNotPresent",
           "repository": "ghcr.io/ifran-project/ue_mapper_api",
-          "tag": "sha-75a58721962c2e237babeb0b95354bec22296616"
+          "tag": "sha-75a58721962c2e237babeb0b95354bec22296616@sha256:a3ef0ee7705a0f2abbd0f29682cecaf4c018feeb4ddc176cd305753579ec82fb"
         },
         "nodeSelector": {
           "monitoring.blueprint/node": "monitoring"
@@ -1106,7 +1106,7 @@
       "image": {
         "image_pull_policy": "IfNotPresent",
         "image_pull_secrets": null,
-        "image_tag": "sha-75a58721962c2e237babeb0b95354bec22296616",
+        "image_tag": "sha-75a58721962c2e237babeb0b95354bec22296616@sha256:a3ef0ee7705a0f2abbd0f29682cecaf4c018feeb4ddc176cd305753579ec82fb",
         "repository": "ghcr.io/ifran-project/ue_mapper_api"
       },
       "is_installed": false,

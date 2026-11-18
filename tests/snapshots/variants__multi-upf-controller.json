@@ -311,7 +311,7 @@
         "extendedProbeStates": {},
         "extendedProbeWorkloads": [],
         "image": {
-          "pullPolicy": "Always",
+          "pullPolicy": "IfNotPresent",
           "repository": "ghcr.io/ifran-project/nador-controller",
           "tag": "sha-75a58721962c2e237babeb0b95354bec22296616"
         },
@@ -322,7 +322,7 @@
         "pathRequest": {
           "allowed": true,
           "enabled": true,
-          "image": "ghcr.io/ifran-project/nador-user-plane-path:sha-75a58721962c2e237babeb0b95354bec22296616",
+          "image": "ghcr.io/ifran-project/nador-user-plane-path:sha-75a58721962c2e237babeb0b95354bec22296616@sha256:cdba8d135bcb50fa973b01425838fcbea9d978c9ff7de520f15844ae21e8f3a5",
           "interval": 5,
           "port": 9403,
           "targets": [
@@ -476,7 +476,7 @@
         "rttRequest": {
           "allowed": true,
           "enabled": false,
-          "image": "ghcr.io/ifran-project/ebpf-latency-probe:sha-75a58721962c2e237babeb0b95354bec22296616",
+          "image": "ghcr.io/ifran-project/ebpf-latency-probe:sha-75a58721962c2e237babeb0b95354bec22296616@sha256:a76fa39a6c78f24db2ef3b04b273dcf51406b812275f3aec5d80b8a2a48d7d79",
           "imsis": [],
           "slices": [],
           "targets": [
@@ -552,7 +552,7 @@
         "throughputRequest": {
           "allowed": true,
           "enabled": true,
-          "image": "ghcr.io/ifran-project/nador-throughput-probe:sha-75a58721962c2e237babeb0b95354bec22296616",
+          "image": "ghcr.io/ifran-project/nador-throughput-probe:sha-75a58721962c2e237babeb0b95354bec22296616@sha256:e31b63162f39bdb8e6a64846e7d804cbd2f7c67df560748fde327097bf7cec95",
           "targets": [
             {
               "category": "core",
@@ -614,7 +614,7 @@
       },
       "chart_version": null,
       "image": {
-        "image_pull_policy": "Always",
+        "image_pull_policy": "IfNotPresent",
         "image_pull_secrets": null,
         "image_tag": "sha-75a58721962c2e237babeb0b95354bec22296616",
         "repository": "ghcr.io/ifran-project/nador-controller"

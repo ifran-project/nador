@@ -159,3 +159,34 @@ def test_one_way_and_extended_images_must_be_pinned():
         OneWaySettings(image="ghcr.io/x/one-way")
     with pytest.raises(ValueError, match="must be a tagged image"):
         ExtendedSettings(probe_images={"cpu": "ghcr.io/x/cpu"})
+
+
+@pytest.mark.parametrize(("value", "ok"), [("1s", True), ("15s", True), ("1h30m", True), ("5d", True), ("5 d", False), ("x", False)])
+def test_prometheus_durations(quickstart, value, ok):
+    quickstart.pop("components")
+    profile = quickstart | {"prometheus_scrape_interval": value}
+    if ok:
+        MonitoringDeployment.model_validate(profile)
+    else:
+        with pytest.raises(ValueError, match="prometheus_scrape_interval"):
+            MonitoringDeployment.model_validate(profile)
+
+
+def test_rtt_placement_is_no_longer_accepted(quickstart):
+    quickstart.pop("components")
+    with pytest.raises(ValueError, match="rtt_placement"):
+        MonitoringDeployment.model_validate(quickstart | {"rtt_placement": "external"})
+
+
+def test_default_images_are_pinned_to_their_recorded_builds():
+    from nador.models import DEFAULT_IMAGES
+
+    builds = DEFAULT_IMAGES["builds"]
+    digests = {build["digest"] for build in builds.values()}
+    references = [*DEFAULT_IMAGES["probes"].values(), *DEFAULT_IMAGES["external_probes"].values()]
+    references += [f"{c['repository']}:{c['image_tag']}" for c in DEFAULT_IMAGES["components"].values()]
+    for reference in references:
+        tag, _, digest = reference.rpartition("@")
+        assert digest in digests, reference
+        commit = next(b["source_commit"] for b in builds.values() if b["digest"] == digest)
+        assert tag.endswith(f":sha-{commit}"), reference

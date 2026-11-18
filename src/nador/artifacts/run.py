@@ -37,7 +37,7 @@ class ExperimentRun:
         prometheus_url: str | None = None,
         queries_file: str | Path | None = None,
         step: str = "1s",
-        timezone: str = "Europe/Paris",
+        timezone: str = "UTC",
         monitoring: MonitoringManagement | None = None,
     ) -> None:
         if monitoring is not None and prometheus_url is not None:

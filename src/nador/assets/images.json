@@ -1,29 +1,29 @@
 {
   "probes": {
-    "probe": "ghcr.io/ifran-project/ebpf-latency-probe:sha-75a58721962c2e237babeb0b95354bec22296616",
-    "amf_sniffer": "ghcr.io/ifran-project/amf-sniffer:sha-75a58721962c2e237babeb0b95354bec22296616",
-    "smf_sniffer": "ghcr.io/ifran-project/smf-sniffer:sha-75a58721962c2e237babeb0b95354bec22296616"
+    "probe": "ghcr.io/ifran-project/ebpf-latency-probe:sha-75a58721962c2e237babeb0b95354bec22296616@sha256:a76fa39a6c78f24db2ef3b04b273dcf51406b812275f3aec5d80b8a2a48d7d79",
+    "amf_sniffer": "ghcr.io/ifran-project/amf-sniffer:sha-75a58721962c2e237babeb0b95354bec22296616@sha256:6aac4884f5242193cc18a0b536aed111c8fce676e2940319132512e32cc07287",
+    "smf_sniffer": "ghcr.io/ifran-project/smf-sniffer:sha-75a58721962c2e237babeb0b95354bec22296616@sha256:f4db8992792916402a1b701f8cdc8ba716dcf22566ce2dea9f944d3bb555578d"
   },
   "external_probes": {
-    "controller": "ghcr.io/ifran-project/nador-controller:sha-75a58721962c2e237babeb0b95354bec22296616",
-    "throughput": "ghcr.io/ifran-project/nador-throughput-probe:sha-75a58721962c2e237babeb0b95354bec22296616",
-    "user_plane_paths": "ghcr.io/ifran-project/nador-user-plane-path:sha-75a58721962c2e237babeb0b95354bec22296616",
-    "one_way": "ghcr.io/ifran-project/nador-n3-oneway:sha-75a58721962c2e237babeb0b95354bec22296616"
+    "controller": "ghcr.io/ifran-project/nador-controller:sha-75a58721962c2e237babeb0b95354bec22296616@sha256:c7485a39290e7fbb5cfac160d7e1c2f38aa94b30a07d7ecc1a1912e9b482a91d",
+    "throughput": "ghcr.io/ifran-project/nador-throughput-probe:sha-75a58721962c2e237babeb0b95354bec22296616@sha256:e31b63162f39bdb8e6a64846e7d804cbd2f7c67df560748fde327097bf7cec95",
+    "user_plane_paths": "ghcr.io/ifran-project/nador-user-plane-path:sha-75a58721962c2e237babeb0b95354bec22296616@sha256:cdba8d135bcb50fa973b01425838fcbea9d978c9ff7de520f15844ae21e8f3a5",
+    "one_way": "ghcr.io/ifran-project/nador-n3-oneway:sha-75a58721962c2e237babeb0b95354bec22296616@sha256:bf5574f473d2cb7a2b9a5278572b217a1ddc827efb20edd8880799b92318ee01"
   },
   "components": {
     "ue-mapper-api": {
       "repository": "ghcr.io/ifran-project/ue_mapper_api",
-      "image_tag": "sha-75a58721962c2e237babeb0b95354bec22296616",
+      "image_tag": "sha-75a58721962c2e237babeb0b95354bec22296616@sha256:a3ef0ee7705a0f2abbd0f29682cecaf4c018feeb4ddc176cd305753579ec82fb",
       "image_pull_policy": "IfNotPresent"
     },
     "packet-pairer": {
       "repository": "ghcr.io/ifran-project/packet-pairer",
-      "image_tag": "sha-75a58721962c2e237babeb0b95354bec22296616",
-      "image_pull_policy": "Always"
+      "image_tag": "sha-75a58721962c2e237babeb0b95354bec22296616@sha256:8a2d20bf1236d654ff067a8ad24339959cf179f2e8ea3114abc23fc0fcfd595e",
+      "image_pull_policy": "IfNotPresent"
     },
     "kpi-calculator-oai": {
       "repository": "ghcr.io/ifran-project/kpi-calculator-oai",
-      "image_tag": "sha-75a58721962c2e237babeb0b95354bec22296616",
+      "image_tag": "sha-75a58721962c2e237babeb0b95354bec22296616@sha256:5c331ad16b8019bb983a44b84259f563ebc8e5e96088167df7b73789afe175b4",
       "image_pull_policy": "IfNotPresent"
     }
   },

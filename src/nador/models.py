@@ -24,7 +24,7 @@ def component_image_defaults(name: str, controller_image: str | None = None) -> 
     if name == "monitoring-controller":
         reference = controller_image or DEFAULT_IMAGES["external_probes"]["controller"]
         repository, tag = split_image(reference)
-        return {"repository": repository, "image_tag": tag, "image_pull_policy": "Always"}
+        return {"repository": repository, "image_tag": tag, "image_pull_policy": "IfNotPresent"}
     return DEFAULT_IMAGES["components"].get(name)
 
 
