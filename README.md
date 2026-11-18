@@ -19,6 +19,12 @@ Optional protocol/path collectors and richer experiment collection are described
 in [ML observability](OBSERVABILITY.md). These additions require explicitly
 selected collector images and live validation before use in experiments.
 
+NADOR also handles the channel state information (CSI) of OAI and OCUDU gNBs: patched images log the raw
+uplink channel estimated from the SRS (one complex value per RB, receive antenna and port) to a CSV file on the
+RAN node. `nador.csi` enables the logger, prepares its storage, shows the CSI live in a Streamlit visualizer
+and collects it per experiment section, on the same timeline as the metrics. See [CSI](CSI.md) for the
+extraction, the proposed analysis and its use.
+
 Install from GitHub:
 
 ```bash
