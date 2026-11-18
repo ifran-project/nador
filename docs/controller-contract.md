@@ -1,28 +1,28 @@
 # Contract with the monitoring controller image
 
 The planner (`src/nador/planner.py`, `_controller_values`) writes the settings that the
-`nador-controller` image reads at runtime. The image is built in
+`nador-controller` image reads at runtime. The names below need the controller from
+`nador-images` with the `nador-controller-settings` ConfigMap or later. The image is built in
 [`ifran-project/nador-images`](https://github.com/ifran-project/nador-images), so the
 two repositories must agree on the shapes below. `tests/test_controller_contract.py`
 fails when this repository changes them; update the controller in the same release.
 
-## ConfigMap `nador-one-way`
+## ConfigMap `nador-controller-settings`
 
 Mounted into the controller pod by the `monitoring-controller` chart.
 
 ### `settings.json`
 
-One object. It merges the one-way probe settings with one request per probe family
-(the names are the controller's and do not follow the profile's metric names):
+One object. It merges the one-way probe settings with one request per probe family:
 
 | Key | Type | Meaning |
 | --- | --- | --- |
-| `image`, `sample`, `test_port`, `n3`, `upf_transit` | from `metrics.n3_one_way`, `metrics.upf_transit`, `tuning.one_way_sample` | One-way probe image and settings. |
+| `image`, `sample`, `test_port`, `n3_one_way`, `upf_transit` | from `metrics.n3_one_way`, `metrics.upf_transit`, `tuning.one_way_sample` | One-way probe image and settings. |
 | `one_way_targets` | list of targets, optional | Present when one-way probes need explicit anchors (several gNBs/UPFs, or no gNB). |
 | `rtt` | request | RTT probes. Also has `imsis`, `slices` and, with packet pairing, `pairer_image`. |
 | `throughput` | request | N3 throughput probes on UPFs. |
 | `user_plane_paths` | request | Path counters. Also has `port` and `interval`. |
-| `extended` | `{probe kind: bool}` | Startup state of each dedicated probe (`cpu`, `drops`, ...). |
+| `host_probes` | `{probe kind: bool}` | Startup state of each host probe (`cpu`, `drops`, ...). |
 
 Every request has `enabled` (the profile asked for it), `allowed` (the targets make it
 possible) and `image`. With several gNBs or UPFs it also has `targets`, a list of targets.
@@ -42,12 +42,15 @@ Every target, in `targets.json` or in a `targets` list, is a `ResolvedTarget` as
 
 ## Other names the controller relies on
 
-- Workloads it may pause and resume: `extendedProbeWorkloads` in the chart values, from
-  `probes.workload()`: DaemonSets `probe-<kind>-extended-node`, Deployment
-  `probe-measurement-quality-extended-service`.
+- Workloads it may pause and resume: `hostProbeWorkloads` in the chart values, from
+  `probes.workload()`: DaemonSets `probe-<kind>-node`, Deployment
+  `probe-measurement-quality-service`.
+- Pods it creates: `nador-probe-<role>`, labelled `nador-probe-managed=true` and
+  `nador-probe-role=<role>`, owned by the settings ConfigMap.
 - Environment: `MONITORING_NS`, `UE_MAPPER_URL`, and with a public API
   `NADOR_CONTROLLER_API_PUBLIC`, `NADOR_CONTROLLER_API_CERT`, `NADOR_CONTROLLER_API_KEY`,
   `NADOR_CONTROLLER_API_TOKEN`.
 - HTTP API used by `nador-controller` (`probe_control_cli.py`): `GET /v1/probes` and
-  `PUT /v1/probes/<probe>` with `enabled`, and optionally `imsis`, `slices`,
-  `log_samples`.
+  `PUT /v1/probes/<probe>` with `enabled`, and optionally `imsis`, `slices`, `log_samples`.
+  Probe names are `rtt`, `throughput`, `n3_one_way`, `upf_transit`, `user_plane_paths` and the
+  host probe kinds (`cpu`, `drops`, `queueing`, `tcp`, `split-signaling`, `measurement-quality`).

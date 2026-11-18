@@ -163,9 +163,9 @@ class MonitoringManagement(HelmManagement):
     ) -> None:
         """Start or stop deployed one-way metrics on the running controller, without reinstalling."""
         metrics = self.deployment_model.monitoring.metrics
-        requested = {"n3_one_way": ("n3", n3_one_way), "upf_transit": ("upf_transit", upf_transit)}
+        requested = {"n3_one_way": n3_one_way, "upf_transit": upf_transit}
         changes: dict[str, dict] = {}
-        for name, (_key, running) in requested.items():
+        for name, running in requested.items():
             if running is not None:
                 changes.setdefault(name, {})["enabled"] = running
         if n3_log_samples is not None:
@@ -177,7 +177,7 @@ class MonitoringManagement(HelmManagement):
             return
         await self._run_tasks(
             "patch_controller_settings",
-            settings={requested[name][0]: patch for name, patch in changes.items()},
+            settings=changes,
             quiet=quiet,
         )
         for name, patch in changes.items():

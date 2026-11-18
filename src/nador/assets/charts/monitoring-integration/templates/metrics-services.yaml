@@ -21,7 +21,7 @@ spec:
       targetPort: {{ .metrics_port }}
 {{- end }}
 {{- end }}
-{{- $settings := .Values.observability }}
+{{- $settings := .Values.sniffers }}
 {{- range .Values.targets }}
 {{- $port := 0 }}
 {{- $kind := "" }}
@@ -48,7 +48,7 @@ spec:
   selector:
     {{- toYaml .selector | nindent 4 }}
   ports:
-    - name: observability
+    - name: sniffer
       port: {{ $port }}
       targetPort: {{ $port }}
 {{- end }}

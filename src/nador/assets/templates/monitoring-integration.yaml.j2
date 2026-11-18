@@ -2,10 +2,10 @@ targets: {{ targets | tojson }}
 dashboards:
   variant: {{ ('srsran' if model.ran.implementation | string in ['srsRAN', 'ocudu'] else 'oai') | tojson }}
 {% set metrics = monitoring.metrics %}
-lokiEnabled: {{ (metrics.logs is not none) | tojson }}
-latencyEnabled: {{ metrics.running('rtt') | tojson }}
+logsEnabled: {{ (metrics.logs is not none) | tojson }}
+rttEnabled: {{ metrics.running('rtt') | tojson }}
 throughputEnabled: {{ (metrics.throughput is not none) | tojson }}
-observability:
+sniffers:
   ngap: {{ metrics.running('ngap') | tojson }}
   pfcp: {{ metrics.running('pfcp') | tojson }}
   ngap_port: {{ (metrics.ngap.port if metrics.ngap else 9102) | tojson }}

@@ -35,10 +35,10 @@ rules:
     verbs: [create, delete]
   - apiGroups: [""]
     resources: [configmaps]
-    resourceNames: [nador-one-way]
+    resourceNames: [nador-controller-settings]
     verbs: [get, patch]
-  {{- if $.Values.extendedProbeStates }}
-  {{- range $.Values.extendedProbeWorkloads }}
+  {{- if $.Values.hostProbeStates }}
+  {{- range $.Values.hostProbeWorkloads }}
   - apiGroups: [apps]
     resources: [{{ .resource }}]
     resourceNames: [{{ .name }}]

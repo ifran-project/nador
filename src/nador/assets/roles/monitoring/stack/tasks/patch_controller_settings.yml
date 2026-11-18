@@ -4,7 +4,7 @@
     api_version: v1
     kind: ConfigMap
     namespace: "{{ monitoring_namespace }}"
-    name: nador-one-way
+    name: nador-controller-settings
   register: controller_config
 
 - name: Update requested switches without resetting other settings
@@ -16,7 +16,7 @@
       kind: ConfigMap
       metadata:
         namespace: "{{ monitoring_namespace }}"
-        name: nador-one-way
+        name: nador-controller-settings
         resourceVersion: "{{ controller_config.resources[0].metadata.resourceVersion }}"
       data:
         settings.json: "{{ (controller_config.resources[0].data['settings.json'] | from_json | combine(controller_settings, recursive=true)) | to_json }}"

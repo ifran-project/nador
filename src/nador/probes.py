@@ -51,10 +51,10 @@ def probe_kind(release: str) -> str:
 
 
 def workload(kind: str) -> tuple[str, str]:
-    """Kubernetes resource type and name of the workload the extended-probes chart creates."""
+    """Kubernetes resource type and name of the workload the host-probes chart creates."""
     if kind in NODE_PROBES:
-        return "daemonsets", f"{release_name(kind)}-extended-node"
-    return "deployments", f"{release_name(kind)}-extended-service"
+        return "daemonsets", f"{release_name(kind)}-node"
+    return "deployments", f"{release_name(kind)}-service"
 
 
 def enabled_probes(config: dict[str, Any]) -> list[str]:

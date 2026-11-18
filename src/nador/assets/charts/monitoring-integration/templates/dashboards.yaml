@@ -1,4 +1,4 @@
-{{- if or .Values.dashboards.enabled (and .Values.lokiEnabled .Values.dashboards.logs) }}
+{{- if or .Values.dashboards.enabled (and .Values.logsEnabled .Values.dashboards.logs) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -10,7 +10,7 @@ metadata:
 data:
   {{- if .Values.dashboards.enabled }}
   {{- $dashboard := .Files.Get (printf "files/monitoring-dashboard-%s.json" .Values.dashboards.variant) | fromJson }}
-  {{- if .Values.latencyEnabled }}
+  {{- if .Values.rttEnabled }}
     {{- $tcp := .Files.Get "files/tcp-diagnostics-dashboard.json" | fromJson }}
     {{- $variation := first $tcp.panels }}
     {{- $_ := set $variation "id" 80 }}
@@ -39,7 +39,7 @@ data:
   n3-throughput-dashboard.json: |-
     {{- .Files.Get "files/n3-throughput-dashboard.json" | nindent 4 }}
   {{- end }}
-  {{- if and .Values.lokiEnabled .Values.dashboards.logs }}
+  {{- if and .Values.logsEnabled .Values.dashboards.logs }}
   component-logs-dashboard.json: |-
     {{- .Files.Get "files/component-logs-dashboard.json" | nindent 4 }}
   {{- end }}

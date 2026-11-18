@@ -90,16 +90,16 @@ def _host_probe_chart_context(
     model: MonitoringModel, targets: list[ResolvedTarget], probe_name: str, probe_states: dict[str, bool]
 ) -> dict:
     monitoring = model.monitoring
-    extended_targets = [
+    probe_targets = [
         target.values() | {"kind": str(getattr(model, target.category).components[target.component].type)}
         for target in targets
         if target.category in ("ran", "core")
     ]
-    existing = {(target["category"], target["component"]) for target in extended_targets}
+    existing = {(target["category"], target["component"]) for target in probe_targets}
     for category in ("ran", "core"):
         for name, nf in getattr(model, category).components.items():
             if (category, name) not in existing and nf.namespace:
-                extended_targets.append(
+                probe_targets.append(
                     {
                         "category": category,
                         "component": name,
@@ -111,19 +111,19 @@ def _host_probe_chart_context(
     config = monitoring.host_probe_config()
     selected = config["probe_targets"].get(probe_name)
     if selected:
-        available = {f"{t['category']}/{t['component']}" for t in extended_targets}
+        available = {f"{t['category']}/{t['component']}" for t in probe_targets}
         if set(selected) - available:
             raise ValueError(f"Unresolved probe targets for {probe_name}: {sorted(set(selected) - available)}")
-        extended_targets = [t for t in extended_targets if f"{t['category']}/{t['component']}" in selected]
-    extended_config = probe_values(config, probe_name)
+        probe_targets = [t for t in probe_targets if f"{t['category']}/{t['component']}" in selected]
+    probe_config = probe_values(config, probe_name)
     if probe_name in probe_states:
-        extended_config["paused"] = not probe_states[probe_name]
+        probe_config["paused"] = not probe_states[probe_name]
         if not probe_states[probe_name]:
             for flag in set(PROBES[probe_name]) - NOT_ENABLED_WHILE_PAUSED:
-                extended_config[flag] = True
+                probe_config[flag] = True
     return {
-        "extended_targets": extended_targets,
-        "extended_config": extended_config,
+        "probe_targets": probe_targets,
+        "probe_config": probe_config,
         "probe_image": monitoring.host_probe_images().get(probe_name),
     }
 
@@ -149,7 +149,7 @@ def _controller_values(
         "image": monitoring.image("one_way_probe") if monitoring.one_way_probes else None,
         "sample": monitoring.tuning.one_way_sample,
         "test_port": upf_transit.test_port if upf_transit else 0,
-        "n3": {
+        "n3_one_way": {
             "enabled": metrics.running("n3_one_way"),
             "log_samples": bool(metrics.n3_one_way and metrics.n3_one_way.log_samples),
         },
@@ -196,9 +196,9 @@ def _controller_values(
         "probeControllerImage": controller_image,
         "cleanupImage": monitoring.image("controller"),
         "probeControlTargets": {} if monitoring.multi_anchor else by_role,
-        "extendedProbeStates": probe_states,
+        "hostProbeStates": probe_states,
         # Workloads the controller may pause and resume; RBAC is generated from this list.
-        "extendedProbeWorkloads": [
+        "hostProbeWorkloads": [
             dict(zip(("resource", "name"), workload(kind), strict=True)) for kind in sorted(probe_states)
         ],
         "probeApiTlsSecret": monitoring.probe_api_tls_secret,
@@ -230,7 +230,7 @@ def _render_chart_values(
     if component.node_name:
         node_selector = {"kubernetes.io/hostname": component.node_name}
     context = {}
-    if chart == "extended-probes":
+    if chart == "host-probes":
         probe_name = probe_kind(component.release_name or "")
         context = _host_probe_chart_context(model, targets, probe_name, probe_states)
     elif chart == "ocudu-metrics":
@@ -282,7 +282,7 @@ def resolve_components(model: MonitoringModel, targets: list[ResolvedTarget]) ->
     kinds = probe_states if monitoring.uses_controller else enabled_probes(monitoring.host_probe_config())
     for kind in kinds:
         definitions[release_name(kind)] = {
-            "chart_ref": "extended-probes",
+            "chart_ref": "host-probes",
             "pod_selector": [f"app={workload(kind)[1]}"],
         }
     components = {}

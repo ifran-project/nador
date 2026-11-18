@@ -134,9 +134,9 @@
           "logs": true,
           "variant": "oai"
         },
-        "latencyEnabled": true,
-        "lokiEnabled": false,
-        "observability": {
+        "logsEnabled": false,
+        "rttEnabled": true,
+        "sniffers": {
           "ngap": false,
           "ngap_port": 9102,
           "pfcp": false,
@@ -257,32 +257,32 @@
       "chart_ref": "/tmp/monitoring-charts/monitoring-controller",
       "chart_values": {
         "cleanupImage": "ghcr.io/ifran-project/nador-controller:sha-75a58721962c2e237babeb0b95354bec22296616@sha256:c7485a39290e7fbb5cfac160d7e1c2f38aa94b30a07d7ecc1a1912e9b482a91d",
-        "extendedProbeStates": {
+        "hostProbeStates": {
           "cpu": true,
           "drops": false,
           "measurement-quality": false,
           "queueing": false,
           "tcp": false
         },
-        "extendedProbeWorkloads": [
+        "hostProbeWorkloads": [
           {
-            "name": "probe-cpu-extended-node",
+            "name": "probe-cpu-node",
             "resource": "daemonsets"
           },
           {
-            "name": "probe-drops-extended-node",
+            "name": "probe-drops-node",
             "resource": "daemonsets"
           },
           {
-            "name": "probe-measurement-quality-extended-service",
+            "name": "probe-measurement-quality-service",
             "resource": "deployments"
           },
           {
-            "name": "probe-queueing-extended-node",
+            "name": "probe-queueing-node",
             "resource": "daemonsets"
           },
           {
-            "name": "probe-tcp-extended-node",
+            "name": "probe-tcp-node",
             "resource": "daemonsets"
           }
         ],
@@ -306,7 +306,7 @@
         "probeApiTokenSecret": null,
         "probeControl": {
           "image": null,
-          "n3": {
+          "n3_one_way": {
             "enabled": false,
             "log_samples": false
           },
@@ -423,7 +423,7 @@
     },
     "probe-cpu": {
       "advanced_config": {},
-      "chart_ref": "/tmp/monitoring-charts/extended-probes",
+      "chart_ref": "/tmp/monitoring-charts/host-probes",
       "chart_values": {
         "probeImage": "ghcr.io/ifran-project/nador-probe-cpu@sha256:d76b479f156f43c30f57012f8b8f9d42b6d6114cf03bcf4d99da3d3cae63c77d",
         "prometheusUrl": "http://monitoring-prometheus-prometheus.monitoring.svc:9090",
@@ -559,7 +559,7 @@
       "node_name": null,
       "node_selector": null,
       "pod_selector": [
-        "app=probe-cpu-extended-node"
+        "app=probe-cpu-node"
       ],
       "release_name": "probe-cpu",
       "tolerations": [
@@ -578,7 +578,7 @@
     },
     "probe-drops": {
       "advanced_config": {},
-      "chart_ref": "/tmp/monitoring-charts/extended-probes",
+      "chart_ref": "/tmp/monitoring-charts/host-probes",
       "chart_values": {
         "probeImage": "ghcr.io/ifran-project/nador-probe-drops@sha256:1d0482292e38b9115fb8f3f2ca3f11ccdaa921256fceff6c716b2598d3f2d3ff",
         "prometheusUrl": "http://monitoring-prometheus-prometheus.monitoring.svc:9090",
@@ -731,7 +731,7 @@
     },
     "probe-measurement-quality": {
       "advanced_config": {},
-      "chart_ref": "/tmp/monitoring-charts/extended-probes",
+      "chart_ref": "/tmp/monitoring-charts/host-probes",
       "chart_values": {
         "probeImage": "ghcr.io/ifran-project/nador-probe-measurement-quality@sha256:6b236865c8bd1c4da5b58e9a08cd7b07845a7a8b11901562396caa45ff09ae5e",
         "prometheusUrl": "http://monitoring-prometheus-prometheus.monitoring.svc:9090",
@@ -884,7 +884,7 @@
     },
     "probe-queueing": {
       "advanced_config": {},
-      "chart_ref": "/tmp/monitoring-charts/extended-probes",
+      "chart_ref": "/tmp/monitoring-charts/host-probes",
       "chart_values": {
         "probeImage": "ghcr.io/ifran-project/nador-probe-queueing@sha256:8323fba56ea9974eebe7ce34e7c5302650e85c9fd946526ae3e405f38872c42c",
         "prometheusUrl": "http://monitoring-prometheus-prometheus.monitoring.svc:9090",
@@ -1037,7 +1037,7 @@
     },
     "probe-tcp": {
       "advanced_config": {},
-      "chart_ref": "/tmp/monitoring-charts/extended-probes",
+      "chart_ref": "/tmp/monitoring-charts/host-probes",
       "chart_values": {
         "probeImage": "ghcr.io/ifran-project/nador-probe-tcp@sha256:d39ccd2d3a65c41abfbb58142fc819ac89893dc6d7e3b80c656a1b1400a9979d",
         "prometheusUrl": "http://monitoring-prometheus-prometheus.monitoring.svc:9090",
@@ -1318,7 +1318,7 @@
                 "scrape_interval": "1s"
               },
               {
-                "job_name": "observability-endpoints",
+                "job_name": "sniffer-endpoints",
                 "kubernetes_sd_configs": [
                   {
                     "namespaces": {
@@ -1341,7 +1341,7 @@
                   },
                   {
                     "action": "keep",
-                    "regex": "observability",
+                    "regex": "sniffer",
                     "source_labels": [
                       "__meta_kubernetes_endpoint_port_name"
                     ]

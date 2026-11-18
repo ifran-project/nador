@@ -22,7 +22,7 @@ TARGET_FIELDS = {
     "implementation",
     "label_selectors",
 }
-ONE_WAY_FIELDS = {"image", "sample", "test_port", "n3", "upf_transit"}
+ONE_WAY_FIELDS = {"image", "sample", "test_port", "n3_one_way", "upf_transit"}
 REQUEST_FIELDS = {
     "rttRequest": {"enabled", "allowed", "image", "imsis", "slices"},
     "throughputRequest": {"enabled", "allowed", "image"},
@@ -54,7 +54,7 @@ def test_settings_shape(name):
     assert ONE_WAY_FIELDS <= set(values["probeControl"]) <= ONE_WAY_FIELDS | {"one_way_targets"}
     for request, fields in REQUEST_FIELDS.items():
         assert fields <= set(values[request]) <= fields | OPTIONAL_REQUEST_FIELDS, request
-    assert all(isinstance(state, bool) for state in values["extendedProbeStates"].values())
+    assert all(isinstance(state, bool) for state in values["hostProbeStates"].values())
     assert set(values["probeControlTargets"]) <= {"gnb", "upf"}
 
 

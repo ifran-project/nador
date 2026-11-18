@@ -3,7 +3,7 @@
 {{- $service := eq $kind "measurement-quality" -}}
 {{- $kernel := or (eq $kind "cpu") (eq $kind "drops") -}}
 {{- $image := required "probeImage must select a published build" .Values.probeImage -}}
-{{- $base := printf "%s-extended" .Release.Name | trunc 53 | trimSuffix "-" -}}
+{{- $base := .Release.Name | trunc 53 | trimSuffix "-" -}}
 {{- /* Existing published collectors expect this key; never schedule active checks. */ -}}
 {{- $config := merge (dict "targets" .Values.targets "prometheus_url" .Values.prometheusUrl) $s -}}
 {{- $_ := set $config "reachability" (list) -}}
@@ -54,7 +54,7 @@ spec:
     metadata:
       labels:
         app: {{ $base }}-node
-        app.kubernetes.io/part-of: nador-extended
+        app.kubernetes.io/part-of: nador-host-probes
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9500"
@@ -102,7 +102,7 @@ spec:
               memory: 512Mi
           volumeMounts:
             - name: config
-              mountPath: /etc/nador-extended
+              mountPath: /etc/nador-extended  # read by the published probe images
               readOnly: true
             - name: proc
               mountPath: /host/proc
@@ -155,7 +155,7 @@ spec:
     metadata:
       labels:
         app: {{ $base }}-service
-        app.kubernetes.io/part-of: nador-extended
+        app.kubernetes.io/part-of: nador-host-probes
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9501"
@@ -193,7 +193,7 @@ spec:
               memory: 128Mi
           volumeMounts:
             - name: config
-              mountPath: /etc/nador-extended
+              mountPath: /etc/nador-extended  # read by the published probe images
               readOnly: true
       volumes:
         - name: config

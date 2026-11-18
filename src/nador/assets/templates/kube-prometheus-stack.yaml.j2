@@ -57,7 +57,7 @@ prometheus:
           - __meta_kubernetes_service_name
           target_label: service
         scrape_interval: '{{ monitoring.prometheus_scrape_interval }}'
-      - job_name: observability-endpoints
+      - job_name: sniffer-endpoints
         kubernetes_sd_configs:
         - namespaces:
             names: {{ target_namespaces | tojson }}
@@ -67,7 +67,7 @@ prometheus:
           regex: endpoints
           source_labels: [__meta_kubernetes_service_annotation_monitoring_blueprint_scrape_mode]
         - action: keep
-          regex: observability
+          regex: sniffer
           source_labels: [__meta_kubernetes_endpoint_port_name]
         - source_labels: [__meta_kubernetes_namespace]
           target_label: namespace

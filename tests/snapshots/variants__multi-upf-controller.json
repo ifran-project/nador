@@ -134,9 +134,9 @@
           "logs": true,
           "variant": "oai"
         },
-        "latencyEnabled": false,
-        "lokiEnabled": false,
-        "observability": {
+        "logsEnabled": false,
+        "rttEnabled": false,
+        "sniffers": {
           "ngap": true,
           "ngap_port": 9102,
           "pfcp": true,
@@ -299,8 +299,8 @@
       "chart_ref": "/tmp/monitoring-charts/monitoring-controller",
       "chart_values": {
         "cleanupImage": "ghcr.io/ifran-project/nador-controller:sha-75a58721962c2e237babeb0b95354bec22296616",
-        "extendedProbeStates": {},
-        "extendedProbeWorkloads": [],
+        "hostProbeStates": {},
+        "hostProbeWorkloads": [],
         "image": {
           "pullPolicy": "IfNotPresent",
           "repository": "ghcr.io/ifran-project/nador-controller",
@@ -386,7 +386,7 @@
         "probeApiTokenSecret": null,
         "probeControl": {
           "image": "ghcr.io/ifran-project/nador-n3-oneway:sha-75a58721962c2e237babeb0b95354bec22296616",
-          "n3": {
+          "n3_one_way": {
             "enabled": true,
             "log_samples": false
           },
@@ -762,7 +762,7 @@
                 "scrape_interval": "1s"
               },
               {
-                "job_name": "observability-endpoints",
+                "job_name": "sniffer-endpoints",
                 "kubernetes_sd_configs": [
                   {
                     "namespaces": {
@@ -785,7 +785,7 @@
                   },
                   {
                     "action": "keep",
-                    "regex": "observability",
+                    "regex": "sniffer",
                     "source_labels": [
                       "__meta_kubernetes_endpoint_port_name"
                     ]
