@@ -1,0 +1,1347 @@
+{
+  "components": {
+    "grafana": {
+      "advanced_config": {},
+      "chart_ref": "grafana/grafana",
+      "chart_values": {
+        "adminPassword": "admin",
+        "adminUser": "admin",
+        "dashboardProviders": {
+          "dashboardproviders.yaml": {
+            "apiVersion": 1,
+            "providers": [
+              {
+                "disableDeletion": false,
+                "editable": true,
+                "folder": "",
+                "name": "default",
+                "options": {
+                  "path": "/var/lib/grafana/dashboards/default"
+                },
+                "orgId": 1,
+                "type": "file"
+              }
+            ]
+          }
+        },
+        "dashboardsConfigMaps": {
+          "default": "monitoring-dashboard-configmap"
+        },
+        "datasources": {
+          "datasources.yaml": {
+            "apiVersion": 1,
+            "datasources": [
+              {
+                "editable": true,
+                "isDefault": true,
+                "jsonData": {
+                  "timeInterval": "1s"
+                },
+                "name": "Prometheus",
+                "type": "prometheus",
+                "uid": "prometheus",
+                "url": "http://monitoring-prometheus-prometheus.monitoring.svc:9090"
+              },
+              {
+                "editable": true,
+                "isDefault": false,
+                "jsonData": {
+                  "timeInterval": "1s"
+                },
+                "name": "monitoring-prometheus",
+                "type": "prometheus",
+                "uid": "monitoring-prometheus",
+                "url": "http://monitoring-prometheus-prometheus.monitoring.svc:9090"
+              }
+            ]
+          }
+        },
+        "fullnameOverride": "monitoring-grafana",
+        "grafana.ini": {
+          "dashboards": {
+            "default_home_dashboard_path": "/var/lib/grafana/dashboards/default/monitoring-dashboard.json",
+            "min_refresh_interval": "1s"
+          },
+          "users": {
+            "default_theme": "dark",
+            "viewers_can_edit": true
+          }
+        },
+        "image": {
+          "pullPolicy": "IfNotPresent",
+          "registry": "docker.io",
+          "repository": "grafana/grafana",
+          "tag": "11.3.0"
+        },
+        "nodeSelector": {
+          "monitoring.blueprint/node": "monitoring"
+        },
+        "service": {
+          "enabled": true,
+          "nodePort": 32005,
+          "type": "NodePort"
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "node-role.kubernetes.io/control-plane",
+            "operator": "Exists"
+          },
+          {
+            "effect": "NoSchedule",
+            "key": "test-eviction",
+            "operator": "Equal",
+            "value": "true"
+          }
+        ]
+      },
+      "chart_version": "8.6.0",
+      "image": {
+        "image_pull_policy": "IfNotPresent",
+        "image_pull_secrets": null,
+        "image_tag": "11.3.0",
+        "repository": "docker.io/grafana/grafana"
+      },
+      "is_installed": false,
+      "namespace": "monitoring",
+      "node_name": null,
+      "node_selector": null,
+      "pod_selector": [
+        "app.kubernetes.io/name=grafana",
+        "app.kubernetes.io/instance=monitoring-grafana"
+      ],
+      "release_name": "monitoring-grafana",
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "node-role.kubernetes.io/control-plane",
+          "operator": "Exists"
+        },
+        {
+          "effect": "NoSchedule",
+          "key": "test-eviction",
+          "operator": "Equal",
+          "value": "true"
+        }
+      ]
+    },
+    "integration": {
+      "advanced_config": {},
+      "chart_ref": "/tmp/monitoring-charts/monitoring-integration",
+      "chart_values": {
+        "dashboards": {
+          "enabled": true,
+          "logs": true,
+          "variant": "oai"
+        },
+        "latencyEnabled": false,
+        "lokiEnabled": false,
+        "observability": {
+          "amf_image": null,
+          "mapper_coverage": true,
+          "mapper_image": "ghcr.io/ifran-project/ue_mapper_api:v1",
+          "ngap": true,
+          "ngap_port": 9102,
+          "node_metrics": true,
+          "path_interval_seconds": 5,
+          "path_port": 9403,
+          "pending_timeout_seconds": 30,
+          "pfcp": true,
+          "pfcp_port": 9104,
+          "smf_image": null,
+          "user_plane_paths": true
+        },
+        "targets": [
+          {
+            "category": "core",
+            "component": "amf",
+            "container": "amf",
+            "implementation": "open5gs",
+            "interface": "eth0",
+            "label_selectors": [
+              "app=open5gs-amf"
+            ],
+            "latency_mode": "BOTH",
+            "metrics_path": "/metrics",
+            "metrics_port": null,
+            "n3_interface": null,
+            "n3_network_names": [],
+            "n6_interface": null,
+            "namespace": "core",
+            "role": "amf",
+            "selector": {
+              "app": "open5gs-amf"
+            }
+          },
+          {
+            "category": "core",
+            "component": "smf1",
+            "container": "smf",
+            "implementation": "open5gs",
+            "interface": "eth0",
+            "label_selectors": [
+              "app=open5gs-smf1"
+            ],
+            "latency_mode": "BOTH",
+            "metrics_path": "/metrics",
+            "metrics_port": null,
+            "n3_interface": null,
+            "n3_network_names": [],
+            "n6_interface": null,
+            "namespace": "core",
+            "role": "smf",
+            "selector": {
+              "app": "open5gs-smf1"
+            }
+          },
+          {
+            "category": "core",
+            "component": "smf2",
+            "container": "smf",
+            "implementation": "open5gs",
+            "interface": "eth0",
+            "label_selectors": [
+              "app=open5gs-smf2"
+            ],
+            "latency_mode": "BOTH",
+            "metrics_path": "/metrics",
+            "metrics_port": null,
+            "n3_interface": null,
+            "n3_network_names": [],
+            "n6_interface": null,
+            "namespace": "core",
+            "role": "smf",
+            "selector": {
+              "app": "open5gs-smf2"
+            }
+          },
+          {
+            "category": "core",
+            "component": "upf1",
+            "container": "upf",
+            "implementation": "open5gs",
+            "interface": "eth0",
+            "label_selectors": [
+              "app=open5gs-upf1"
+            ],
+            "latency_mode": "BOTH",
+            "metrics_path": "/metrics",
+            "metrics_port": null,
+            "n3_interface": null,
+            "n3_network_names": [],
+            "n6_interface": null,
+            "namespace": "core",
+            "role": "upf",
+            "selector": {
+              "app": "open5gs-upf1"
+            }
+          },
+          {
+            "category": "core",
+            "component": "upf2",
+            "container": "upf",
+            "implementation": "open5gs",
+            "interface": "eth0",
+            "label_selectors": [
+              "app=open5gs-upf2"
+            ],
+            "latency_mode": "BOTH",
+            "metrics_path": "/metrics",
+            "metrics_port": null,
+            "n3_interface": null,
+            "n3_network_names": [],
+            "n6_interface": null,
+            "namespace": "core",
+            "role": "upf",
+            "selector": {
+              "app": "open5gs-upf2"
+            }
+          },
+          {
+            "category": "ran",
+            "component": "gnb",
+            "container": "gnb",
+            "implementation": "oai",
+            "interface": "eth0",
+            "label_selectors": [
+              "app=oai-gnb"
+            ],
+            "latency_mode": "BOTH",
+            "metrics_path": "/metrics",
+            "metrics_port": null,
+            "n3_interface": null,
+            "n3_network_names": [],
+            "n6_interface": null,
+            "namespace": "ran",
+            "role": "gnb",
+            "selector": {
+              "app": "oai-gnb"
+            }
+          }
+        ],
+        "throughputEnabled": true
+      },
+      "chart_version": null,
+      "image": null,
+      "is_installed": false,
+      "namespace": "monitoring",
+      "node_name": null,
+      "node_selector": null,
+      "pod_selector": [],
+      "release_name": "monitoring-integration",
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "node-role.kubernetes.io/control-plane",
+          "operator": "Exists"
+        },
+        {
+          "effect": "NoSchedule",
+          "key": "test-eviction",
+          "operator": "Equal",
+          "value": "true"
+        }
+      ]
+    },
+    "monitoring-controller": {
+      "advanced_config": {},
+      "chart_ref": "/tmp/monitoring-charts/monitoring-controller",
+      "chart_values": {
+        "cleanupImage": "ghcr.io/ifran-project/nador-controller:sha-75a58721962c2e237babeb0b95354bec22296616",
+        "extendedProbeStates": {},
+        "image": {
+          "pullPolicy": "Always",
+          "repository": "ghcr.io/ifran-project/nador-controller",
+          "tag": "sha-75a58721962c2e237babeb0b95354bec22296616"
+        },
+        "nodeSelector": {
+          "monitoring.blueprint/node": "monitoring"
+        },
+        "operationTimeoutSeconds": 600,
+        "pathRequest": {
+          "allowed": true,
+          "enabled": true,
+          "image": "ghcr.io/ifran-project/nador-user-plane-path:sha-75a58721962c2e237babeb0b95354bec22296616",
+          "interval": 5,
+          "port": 9403,
+          "targets": [
+            {
+              "category": "core",
+              "component": "upf1",
+              "container": "upf",
+              "implementation": "open5gs",
+              "interface": "eth0",
+              "label_selectors": [
+                "app=open5gs-upf1"
+              ],
+              "latency_mode": "BOTH",
+              "metrics_path": "/metrics",
+              "metrics_port": null,
+              "n3_interface": null,
+              "n3_network_names": [],
+              "n6_interface": null,
+              "namespace": "core",
+              "role": "upf",
+              "selector": {
+                "app": "open5gs-upf1"
+              }
+            },
+            {
+              "category": "core",
+              "component": "upf2",
+              "container": "upf",
+              "implementation": "open5gs",
+              "interface": "eth0",
+              "label_selectors": [
+                "app=open5gs-upf2"
+              ],
+              "latency_mode": "BOTH",
+              "metrics_path": "/metrics",
+              "metrics_port": null,
+              "n3_interface": null,
+              "n3_network_names": [],
+              "n6_interface": null,
+              "namespace": "core",
+              "role": "upf",
+              "selector": {
+                "app": "open5gs-upf2"
+              }
+            },
+            {
+              "category": "ran",
+              "component": "gnb",
+              "container": "gnb",
+              "implementation": "oai",
+              "interface": "eth0",
+              "label_selectors": [
+                "app=oai-gnb"
+              ],
+              "latency_mode": "BOTH",
+              "metrics_path": "/metrics",
+              "metrics_port": null,
+              "n3_interface": null,
+              "n3_network_names": [],
+              "n6_interface": null,
+              "namespace": "ran",
+              "role": "gnb",
+              "selector": {
+                "app": "oai-gnb"
+              }
+            }
+          ]
+        },
+        "probeApiTlsSecret": null,
+        "probeApiTokenSecret": null,
+        "probeControl": {
+          "image": "ghcr.io/ifran-project/nador-n3-oneway:sha-75a58721962c2e237babeb0b95354bec22296616",
+          "n3": {
+            "enabled": true,
+            "log_samples": false
+          },
+          "one_way_targets": [
+            {
+              "category": "core",
+              "component": "upf1",
+              "container": "upf",
+              "implementation": "open5gs",
+              "interface": "eth0",
+              "label_selectors": [
+                "app=open5gs-upf1"
+              ],
+              "latency_mode": "BOTH",
+              "metrics_path": "/metrics",
+              "metrics_port": null,
+              "n3_interface": null,
+              "n3_network_names": [],
+              "n6_interface": null,
+              "namespace": "core",
+              "role": "upf",
+              "selector": {
+                "app": "open5gs-upf1"
+              }
+            },
+            {
+              "category": "core",
+              "component": "upf2",
+              "container": "upf",
+              "implementation": "open5gs",
+              "interface": "eth0",
+              "label_selectors": [
+                "app=open5gs-upf2"
+              ],
+              "latency_mode": "BOTH",
+              "metrics_path": "/metrics",
+              "metrics_port": null,
+              "n3_interface": null,
+              "n3_network_names": [],
+              "n6_interface": null,
+              "namespace": "core",
+              "role": "upf",
+              "selector": {
+                "app": "open5gs-upf2"
+              }
+            },
+            {
+              "category": "ran",
+              "component": "gnb",
+              "container": "gnb",
+              "implementation": "oai",
+              "interface": "eth0",
+              "label_selectors": [
+                "app=oai-gnb"
+              ],
+              "latency_mode": "BOTH",
+              "metrics_path": "/metrics",
+              "metrics_port": null,
+              "n3_interface": null,
+              "n3_network_names": [],
+              "n6_interface": null,
+              "namespace": "ran",
+              "role": "gnb",
+              "selector": {
+                "app": "oai-gnb"
+              }
+            }
+          ],
+          "sample": 16,
+          "test_port": 0,
+          "upf_transit": {
+            "enabled": false,
+            "peer": null
+          }
+        },
+        "probeControlTargets": {},
+        "probeControllerImage": "ghcr.io/ifran-project/nador-controller:sha-75a58721962c2e237babeb0b95354bec22296616",
+        "rttRequest": {
+          "allowed": true,
+          "enabled": false,
+          "image": "ghcr.io/ifran-project/ebpf-latency-probe:sha-75a58721962c2e237babeb0b95354bec22296616",
+          "imsis": [],
+          "slices": [],
+          "targets": [
+            {
+              "category": "core",
+              "component": "upf1",
+              "container": "upf",
+              "implementation": "open5gs",
+              "interface": "eth0",
+              "label_selectors": [
+                "app=open5gs-upf1"
+              ],
+              "latency_mode": "BOTH",
+              "metrics_path": "/metrics",
+              "metrics_port": null,
+              "n3_interface": null,
+              "n3_network_names": [],
+              "n6_interface": null,
+              "namespace": "core",
+              "role": "upf",
+              "selector": {
+                "app": "open5gs-upf1"
+              }
+            },
+            {
+              "category": "core",
+              "component": "upf2",
+              "container": "upf",
+              "implementation": "open5gs",
+              "interface": "eth0",
+              "label_selectors": [
+                "app=open5gs-upf2"
+              ],
+              "latency_mode": "BOTH",
+              "metrics_path": "/metrics",
+              "metrics_port": null,
+              "n3_interface": null,
+              "n3_network_names": [],
+              "n6_interface": null,
+              "namespace": "core",
+              "role": "upf",
+              "selector": {
+                "app": "open5gs-upf2"
+              }
+            },
+            {
+              "category": "ran",
+              "component": "gnb",
+              "container": "gnb",
+              "implementation": "oai",
+              "interface": "eth0",
+              "label_selectors": [
+                "app=oai-gnb"
+              ],
+              "latency_mode": "BOTH",
+              "metrics_path": "/metrics",
+              "metrics_port": null,
+              "n3_interface": null,
+              "n3_network_names": [],
+              "n6_interface": null,
+              "namespace": "ran",
+              "role": "gnb",
+              "selector": {
+                "app": "oai-gnb"
+              }
+            }
+          ]
+        },
+        "targetNamespaces": [
+          "core",
+          "ran"
+        ],
+        "throughputRequest": {
+          "allowed": true,
+          "enabled": true,
+          "image": "ghcr.io/ifran-project/nador-throughput-probe:sha-75a58721962c2e237babeb0b95354bec22296616",
+          "targets": [
+            {
+              "category": "core",
+              "component": "upf1",
+              "container": "upf",
+              "implementation": "open5gs",
+              "interface": "eth0",
+              "label_selectors": [
+                "app=open5gs-upf1"
+              ],
+              "latency_mode": "BOTH",
+              "metrics_path": "/metrics",
+              "metrics_port": null,
+              "n3_interface": null,
+              "n3_network_names": [],
+              "n6_interface": null,
+              "namespace": "core",
+              "role": "upf",
+              "selector": {
+                "app": "open5gs-upf1"
+              }
+            },
+            {
+              "category": "core",
+              "component": "upf2",
+              "container": "upf",
+              "implementation": "open5gs",
+              "interface": "eth0",
+              "label_selectors": [
+                "app=open5gs-upf2"
+              ],
+              "latency_mode": "BOTH",
+              "metrics_path": "/metrics",
+              "metrics_port": null,
+              "n3_interface": null,
+              "n3_network_names": [],
+              "n6_interface": null,
+              "namespace": "core",
+              "role": "upf",
+              "selector": {
+                "app": "open5gs-upf2"
+              }
+            }
+          ]
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "node-role.kubernetes.io/control-plane",
+            "operator": "Exists"
+          },
+          {
+            "effect": "NoSchedule",
+            "key": "test-eviction",
+            "operator": "Equal",
+            "value": "true"
+          }
+        ]
+      },
+      "chart_version": null,
+      "image": {
+        "image_pull_policy": "Always",
+        "image_pull_secrets": null,
+        "image_tag": "sha-75a58721962c2e237babeb0b95354bec22296616",
+        "repository": "ghcr.io/ifran-project/nador-controller"
+      },
+      "is_installed": false,
+      "namespace": "monitoring",
+      "node_name": null,
+      "node_selector": null,
+      "pod_selector": [
+        "app.kubernetes.io/instance=monitoring-controller"
+      ],
+      "release_name": "monitoring-controller",
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "node-role.kubernetes.io/control-plane",
+          "operator": "Exists"
+        },
+        {
+          "effect": "NoSchedule",
+          "key": "test-eviction",
+          "operator": "Equal",
+          "value": "true"
+        }
+      ]
+    },
+    "prometheus": {
+      "advanced_config": {},
+      "chart_ref": "prometheus-community/kube-prometheus-stack",
+      "chart_values": {
+        "alertmanager": {
+          "enabled": false
+        },
+        "coreDns": {
+          "enabled": false
+        },
+        "fullnameOverride": "monitoring-prometheus",
+        "grafana": {
+          "enabled": false
+        },
+        "kube-state-metrics": {
+          "nodeSelector": {
+            "monitoring.blueprint/node": "monitoring"
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "node-role.kubernetes.io/control-plane",
+              "operator": "Exists"
+            },
+            {
+              "effect": "NoSchedule",
+              "key": "test-eviction",
+              "operator": "Equal",
+              "value": "true"
+            }
+          ]
+        },
+        "kubeApiServer": {
+          "enabled": false
+        },
+        "kubeControllerManager": {
+          "enabled": false
+        },
+        "kubeEtcd": {
+          "enabled": false
+        },
+        "kubeProxy": {
+          "enabled": false
+        },
+        "kubeScheduler": {
+          "enabled": false
+        },
+        "kubeStateMetrics": {
+          "enabled": true
+        },
+        "kubelet": {
+          "enabled": true
+        },
+        "nameOverride": "prometheus-stack",
+        "nodeExporter": {
+          "enabled": true
+        },
+        "prometheus": {
+          "enabled": true,
+          "prometheusSpec": {
+            "additionalScrapeConfigs": [
+              {
+                "job_name": "kubernetes-annotated-services",
+                "kubernetes_sd_configs": [
+                  {
+                    "namespaces": {
+                      "names": [
+                        "core",
+                        "monitoring",
+                        "ran"
+                      ]
+                    },
+                    "role": "service"
+                  }
+                ],
+                "relabel_configs": [
+                  {
+                    "action": "drop",
+                    "regex": "endpoints",
+                    "source_labels": [
+                      "__meta_kubernetes_service_annotation_monitoring_blueprint_scrape_mode"
+                    ]
+                  },
+                  {
+                    "action": "keep",
+                    "regex": "true",
+                    "source_labels": [
+                      "__meta_kubernetes_service_annotation_prometheus_io_scrape"
+                    ]
+                  },
+                  {
+                    "action": "replace",
+                    "regex": "(.+)",
+                    "source_labels": [
+                      "__meta_kubernetes_service_annotation_prometheus_io_path"
+                    ],
+                    "target_label": "__metrics_path__"
+                  },
+                  {
+                    "action": "replace",
+                    "regex": "([^:]+)(?::\\d+)?;(\\d+)",
+                    "replacement": "$1:$2",
+                    "source_labels": [
+                      "__address__",
+                      "__meta_kubernetes_service_annotation_prometheus_io_port"
+                    ],
+                    "target_label": "__address__"
+                  },
+                  {
+                    "action": "labelmap",
+                    "regex": "__meta_kubernetes_service_label_(.+)"
+                  },
+                  {
+                    "action": "replace",
+                    "source_labels": [
+                      "__meta_kubernetes_namespace"
+                    ],
+                    "target_label": "namespace"
+                  },
+                  {
+                    "action": "replace",
+                    "source_labels": [
+                      "__meta_kubernetes_service_name"
+                    ],
+                    "target_label": "service"
+                  }
+                ],
+                "scrape_interval": "1s"
+              },
+              {
+                "job_name": "observability-endpoints",
+                "kubernetes_sd_configs": [
+                  {
+                    "namespaces": {
+                      "names": [
+                        "core",
+                        "monitoring",
+                        "ran"
+                      ]
+                    },
+                    "role": "endpoints"
+                  }
+                ],
+                "relabel_configs": [
+                  {
+                    "action": "keep",
+                    "regex": "endpoints",
+                    "source_labels": [
+                      "__meta_kubernetes_service_annotation_monitoring_blueprint_scrape_mode"
+                    ]
+                  },
+                  {
+                    "action": "keep",
+                    "regex": "observability",
+                    "source_labels": [
+                      "__meta_kubernetes_endpoint_port_name"
+                    ]
+                  },
+                  {
+                    "source_labels": [
+                      "__meta_kubernetes_namespace"
+                    ],
+                    "target_label": "namespace"
+                  },
+                  {
+                    "source_labels": [
+                      "__meta_kubernetes_pod_name"
+                    ],
+                    "target_label": "pod"
+                  },
+                  {
+                    "source_labels": [
+                      "__meta_kubernetes_pod_node_name"
+                    ],
+                    "target_label": "node"
+                  },
+                  {
+                    "source_labels": [
+                      "__meta_kubernetes_service_name"
+                    ],
+                    "target_label": "service"
+                  }
+                ],
+                "scrape_interval": "1s"
+              },
+              {
+                "job_name": "latency-probes",
+                "kubernetes_sd_configs": [
+                  {
+                    "namespaces": {
+                      "names": [
+                        "core",
+                        "monitoring",
+                        "ran"
+                      ]
+                    },
+                    "role": "pod"
+                  }
+                ],
+                "metrics_path": "/latency",
+                "relabel_configs": [
+                  {
+                    "action": "keep",
+                    "regex": "monitoring",
+                    "source_labels": [
+                      "__meta_kubernetes_pod_annotation_monitoring_blueprint_latency_owner"
+                    ]
+                  },
+                  {
+                    "regex": "(.+);([0-9]+)",
+                    "replacement": "$1:$2",
+                    "source_labels": [
+                      "__meta_kubernetes_pod_ip",
+                      "__meta_kubernetes_pod_annotation_monitoring_blueprint_latency_port"
+                    ],
+                    "target_label": "__address__"
+                  },
+                  {
+                    "source_labels": [
+                      "__meta_kubernetes_namespace"
+                    ],
+                    "target_label": "namespace"
+                  },
+                  {
+                    "source_labels": [
+                      "__meta_kubernetes_pod_name"
+                    ],
+                    "target_label": "pod"
+                  }
+                ],
+                "scrape_interval": "1s"
+              },
+              {
+                "job_name": "throughput-probes",
+                "kubernetes_sd_configs": [
+                  {
+                    "namespaces": {
+                      "names": [
+                        "core",
+                        "monitoring",
+                        "ran"
+                      ]
+                    },
+                    "role": "pod"
+                  }
+                ],
+                "metrics_path": "/metrics",
+                "relabel_configs": [
+                  {
+                    "action": "keep",
+                    "regex": "monitoring",
+                    "source_labels": [
+                      "__meta_kubernetes_pod_annotation_monitoring_blueprint_throughput_owner"
+                    ]
+                  },
+                  {
+                    "regex": "(.+);([0-9]+)",
+                    "replacement": "$1:$2",
+                    "source_labels": [
+                      "__meta_kubernetes_pod_ip",
+                      "__meta_kubernetes_pod_annotation_monitoring_blueprint_throughput_port"
+                    ],
+                    "target_label": "__address__"
+                  },
+                  {
+                    "source_labels": [
+                      "__meta_kubernetes_namespace"
+                    ],
+                    "target_label": "namespace"
+                  },
+                  {
+                    "source_labels": [
+                      "__meta_kubernetes_pod_name"
+                    ],
+                    "target_label": "pod"
+                  }
+                ],
+                "scrape_interval": "1s"
+              },
+              {
+                "job_name": "kubernetes-annotated-pods",
+                "kubernetes_sd_configs": [
+                  {
+                    "namespaces": {
+                      "names": [
+                        "core",
+                        "monitoring",
+                        "ran"
+                      ]
+                    },
+                    "role": "pod"
+                  }
+                ],
+                "relabel_configs": [
+                  {
+                    "action": "keep",
+                    "regex": "true",
+                    "source_labels": [
+                      "__meta_kubernetes_pod_annotation_prometheus_io_scrape"
+                    ]
+                  },
+                  {
+                    "action": "replace",
+                    "regex": "(.+)",
+                    "source_labels": [
+                      "__meta_kubernetes_pod_annotation_prometheus_io_path"
+                    ],
+                    "target_label": "__metrics_path__"
+                  },
+                  {
+                    "action": "replace",
+                    "regex": "([^:]+)(?::\\d+)?;(\\d+)",
+                    "replacement": "$1:$2",
+                    "source_labels": [
+                      "__address__",
+                      "__meta_kubernetes_pod_annotation_prometheus_io_port"
+                    ],
+                    "target_label": "__address__"
+                  },
+                  {
+                    "action": "labelmap",
+                    "regex": "__meta_kubernetes_pod_label_(.+)"
+                  },
+                  {
+                    "action": "replace",
+                    "source_labels": [
+                      "__meta_kubernetes_namespace"
+                    ],
+                    "target_label": "namespace"
+                  },
+                  {
+                    "action": "replace",
+                    "source_labels": [
+                      "__meta_kubernetes_pod_name"
+                    ],
+                    "target_label": "pod"
+                  }
+                ],
+                "scrape_interval": "1s"
+              }
+            ],
+            "evaluationInterval": "1s",
+            "externalLabels": {
+              "cluster": "core"
+            },
+            "image": {
+              "pullPolicy": "IfNotPresent",
+              "registry": "quay.io",
+              "repository": "prometheus/prometheus",
+              "tag": "v2.47.1"
+            },
+            "nodeSelector": {
+              "monitoring.blueprint/node": "monitoring"
+            },
+            "podMonitorNamespaceSelector": {},
+            "podMonitorSelectorNilUsesHelmValues": false,
+            "retention": "5d",
+            "scrapeInterval": "1s",
+            "serviceMonitorNamespaceSelector": {},
+            "serviceMonitorSelectorNilUsesHelmValues": false,
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "node-role.kubernetes.io/control-plane",
+                "operator": "Exists"
+              },
+              {
+                "effect": "NoSchedule",
+                "key": "test-eviction",
+                "operator": "Equal",
+                "value": "true"
+              }
+            ]
+          },
+          "service": {
+            "nodePort": 30095,
+            "type": "NodePort"
+          },
+          "serviceMonitor": {
+            "interval": "1s",
+            "selfMonitor": true
+          }
+        },
+        "prometheus-node-exporter": {
+          "extraArgs": [
+            "--no-collector.cpufreq"
+          ],
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "operator": "Exists"
+            }
+          ]
+        },
+        "prometheusOperator": {
+          "admissionWebhooks": {
+            "patch": {
+              "nodeSelector": {
+                "monitoring.blueprint/node": "monitoring"
+              },
+              "tolerations": [
+                {
+                  "effect": "NoSchedule",
+                  "key": "node-role.kubernetes.io/control-plane",
+                  "operator": "Exists"
+                },
+                {
+                  "effect": "NoSchedule",
+                  "key": "test-eviction",
+                  "operator": "Equal",
+                  "value": "true"
+                }
+              ]
+            }
+          },
+          "kubeletService": {
+            "enabled": true
+          },
+          "nodeSelector": {
+            "monitoring.blueprint/node": "monitoring"
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "node-role.kubernetes.io/control-plane",
+              "operator": "Exists"
+            },
+            {
+              "effect": "NoSchedule",
+              "key": "test-eviction",
+              "operator": "Equal",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "chart_version": "51.9.4",
+      "image": {
+        "image_pull_policy": "IfNotPresent",
+        "image_pull_secrets": null,
+        "image_tag": "v2.47.1",
+        "repository": "quay.io/prometheus/prometheus"
+      },
+      "is_installed": false,
+      "namespace": "monitoring",
+      "node_name": null,
+      "node_selector": null,
+      "pod_selector": [
+        "app.kubernetes.io/name=prometheus"
+      ],
+      "release_name": "monitoring-prometheus",
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "node-role.kubernetes.io/control-plane",
+          "operator": "Exists"
+        },
+        {
+          "effect": "NoSchedule",
+          "key": "test-eviction",
+          "operator": "Equal",
+          "value": "true"
+        }
+      ]
+    },
+    "redis": {
+      "advanced_config": {},
+      "chart_ref": "/tmp/monitoring-charts/redis",
+      "chart_values": {
+        "image": {
+          "pullPolicy": "IfNotPresent",
+          "repository": "redis",
+          "tag": "7"
+        },
+        "nodeSelector": {
+          "monitoring.blueprint/node": "monitoring"
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "node-role.kubernetes.io/control-plane",
+            "operator": "Exists"
+          },
+          {
+            "effect": "NoSchedule",
+            "key": "test-eviction",
+            "operator": "Equal",
+            "value": "true"
+          }
+        ]
+      },
+      "chart_version": null,
+      "image": {
+        "image_pull_policy": "IfNotPresent",
+        "image_pull_secrets": null,
+        "image_tag": "7",
+        "repository": "redis"
+      },
+      "is_installed": false,
+      "namespace": "monitoring",
+      "node_name": null,
+      "node_selector": null,
+      "pod_selector": [
+        "app=redis"
+      ],
+      "release_name": "redis",
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "node-role.kubernetes.io/control-plane",
+          "operator": "Exists"
+        },
+        {
+          "effect": "NoSchedule",
+          "key": "test-eviction",
+          "operator": "Equal",
+          "value": "true"
+        }
+      ]
+    },
+    "ue-mapper-api": {
+      "advanced_config": {},
+      "chart_ref": "/tmp/monitoring-charts/ue-mapper-api",
+      "chart_values": {
+        "image": {
+          "pullPolicy": "Always",
+          "repository": "ghcr.io/ifran-project/ue_mapper_api",
+          "tag": "v1"
+        },
+        "nodeSelector": {
+          "monitoring.blueprint/node": "monitoring"
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "node-role.kubernetes.io/control-plane",
+            "operator": "Exists"
+          },
+          {
+            "effect": "NoSchedule",
+            "key": "test-eviction",
+            "operator": "Equal",
+            "value": "true"
+          }
+        ]
+      },
+      "chart_version": null,
+      "image": {
+        "image_pull_policy": "Always",
+        "image_pull_secrets": null,
+        "image_tag": "v1",
+        "repository": "ghcr.io/ifran-project/ue_mapper_api"
+      },
+      "is_installed": false,
+      "namespace": "monitoring",
+      "node_name": null,
+      "node_selector": null,
+      "pod_selector": [
+        "app=ue-mapper-api"
+      ],
+      "release_name": "ue-mapper-api",
+      "tolerations": [
+        {
+          "effect": "NoSchedule",
+          "key": "node-role.kubernetes.io/control-plane",
+          "operator": "Exists"
+        },
+        {
+          "effect": "NoSchedule",
+          "key": "test-eviction",
+          "operator": "Equal",
+          "value": "true"
+        }
+      ]
+    }
+  },
+  "targets": [
+    {
+      "category": "core",
+      "component": "amf",
+      "container": "amf",
+      "implementation": "open5gs",
+      "interface": "eth0",
+      "label_selectors": [
+        "app=open5gs-amf"
+      ],
+      "latency_mode": "BOTH",
+      "metrics_path": "/metrics",
+      "metrics_port": null,
+      "n3_interface": null,
+      "n3_network_names": [],
+      "n6_interface": null,
+      "namespace": "core",
+      "role": "amf",
+      "selector": {
+        "app": "open5gs-amf"
+      }
+    },
+    {
+      "category": "core",
+      "component": "smf1",
+      "container": "smf",
+      "implementation": "open5gs",
+      "interface": "eth0",
+      "label_selectors": [
+        "app=open5gs-smf1"
+      ],
+      "latency_mode": "BOTH",
+      "metrics_path": "/metrics",
+      "metrics_port": null,
+      "n3_interface": null,
+      "n3_network_names": [],
+      "n6_interface": null,
+      "namespace": "core",
+      "role": "smf",
+      "selector": {
+        "app": "open5gs-smf1"
+      }
+    },
+    {
+      "category": "core",
+      "component": "smf2",
+      "container": "smf",
+      "implementation": "open5gs",
+      "interface": "eth0",
+      "label_selectors": [
+        "app=open5gs-smf2"
+      ],
+      "latency_mode": "BOTH",
+      "metrics_path": "/metrics",
+      "metrics_port": null,
+      "n3_interface": null,
+      "n3_network_names": [],
+      "n6_interface": null,
+      "namespace": "core",
+      "role": "smf",
+      "selector": {
+        "app": "open5gs-smf2"
+      }
+    },
+    {
+      "category": "core",
+      "component": "upf1",
+      "container": "upf",
+      "implementation": "open5gs",
+      "interface": "eth0",
+      "label_selectors": [
+        "app=open5gs-upf1"
+      ],
+      "latency_mode": "BOTH",
+      "metrics_path": "/metrics",
+      "metrics_port": null,
+      "n3_interface": null,
+      "n3_network_names": [],
+      "n6_interface": null,
+      "namespace": "core",
+      "role": "upf",
+      "selector": {
+        "app": "open5gs-upf1"
+      }
+    },
+    {
+      "category": "core",
+      "component": "upf2",
+      "container": "upf",
+      "implementation": "open5gs",
+      "interface": "eth0",
+      "label_selectors": [
+        "app=open5gs-upf2"
+      ],
+      "latency_mode": "BOTH",
+      "metrics_path": "/metrics",
+      "metrics_port": null,
+      "n3_interface": null,
+      "n3_network_names": [],
+      "n6_interface": null,
+      "namespace": "core",
+      "role": "upf",
+      "selector": {
+        "app": "open5gs-upf2"
+      }
+    },
+    {
+      "category": "ran",
+      "component": "gnb",
+      "container": "gnb",
+      "implementation": "oai",
+      "interface": "eth0",
+      "label_selectors": [
+        "app=oai-gnb"
+      ],
+      "latency_mode": "BOTH",
+      "metrics_path": "/metrics",
+      "metrics_port": null,
+      "n3_interface": null,
+      "n3_network_names": [],
+      "n6_interface": null,
+      "namespace": "ran",
+      "role": "gnb",
+      "selector": {
+        "app": "oai-gnb"
+      }
+    }
+  ]
+}
