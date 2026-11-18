@@ -4,14 +4,15 @@ from __future__ import annotations
 
 import asyncio
 import json
-import math
 import shlex
 import threading
 from contextlib import AsyncExitStack
 from pathlib import Path
 from types import SimpleNamespace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated, Any
 from urllib.parse import urlsplit
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from . import ue_context
 from .connection import loki_connection
@@ -21,88 +22,71 @@ if TYPE_CHECKING:
     from nador.deployment import MonitoringManagement
 
 
+class ObservabilityOptions(BaseModel):
+    """What ObservabilityRun collects and how hard it may poll."""
+
+    model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
+
+    mapper_url: str | None = None
+    collect_setup: bool = True
+    collect_ue_context: bool = True
+    setup_hosts: list[Annotated[str, Field(min_length=1)]] | None = None
+    interval_seconds: float = Field(default=2, ge=0.1, le=3600, allow_inf_nan=False)
+    timeout_seconds: int = Field(default=5, ge=1, le=60)
+    max_seconds: int = Field(default=7200, ge=1)
+    limit: int = Field(default=5000, ge=1)
+    namespace: str | None = None
+    service: str = "ue-mapper-api"
+    service_port: int = Field(default=8080, ge=1, le=65535)
+    loki_url: str | None = None
+    collect_loki: bool = False
+    loki_selector: str = '{namespace=~".+"}'
+    loki_limit: int = Field(default=5000, ge=1, le=100_000)
+    loki_max_queries: int = Field(default=1024, ge=1, le=100_000)
+
+    @field_validator("mapper_url")
+    @classmethod
+    def _check_mapper_url(cls, url: str | None) -> str | None:
+        if url:
+            parsed = urlsplit(url)
+            if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.query or parsed.fragment:
+                raise ValueError("mapper_url must be an HTTP(S) base URL without query or fragment")
+        return url
+
+    def sampler_args(self) -> dict:
+        """Arguments shared by the local and remote UE context samplers."""
+        return self.model_dump(
+            include={"interval_seconds", "timeout_seconds", "max_seconds", "limit", "service", "service_port"}
+        )
+
+
 class ObservabilityRun(ExperimentRun):
     """Collect setup before/after a workload and bounded sampled UE inventory.
 
-    A stage enables remote host/cluster snapshots and service-proxy sampling.
-    A mapper_url instead samples directly from this process. Sampling observes
-    inventory, not every UE transition. Collection errors follow ExperimentRun's
-    policy: fail successful workloads, but never replace a workload exception.
+    A monitoring manager enables remote host/cluster snapshots and service-proxy
+    sampling. A mapper_url instead samples directly from this process. Sampling
+    observes inventory, not every UE transition. Collection errors follow
+    ExperimentRun's policy: fail successful workloads, but never replace a
+    workload exception.
+
+    Keyword arguments are either ObservabilityOptions fields or ExperimentRun
+    arguments (name, prometheus_url, queries_file, step, timezone).
     """
 
-    def __init__(
-        self,
-        directory,
-        *,
-        monitoring: MonitoringManagement | None = None,
-        mapper_url=None,
-        collect_setup=True,
-        collect_ue_context=True,
-        setup_hosts=None,
-        interval_seconds=2,
-        timeout_seconds=5,
-        max_seconds=7200,
-        limit=5000,
-        namespace=None,
-        service="ue-mapper-api",
-        service_port=8080,
-        loki_url=None,
-        collect_loki=False,
-        loki_selector='{namespace=~".+"}',
-        loki_limit=5000,
-        loki_max_queries=1024,
-        **kwargs,
-    ):
+    def __init__(self, directory: str | Path, *, monitoring: MonitoringManagement | None = None, **kwargs: Any) -> None:
+        settings = {key: kwargs.pop(key) for key in list(kwargs) if key in ObservabilityOptions.model_fields}
+        options = ObservabilityOptions(**settings)
         kwargs.setdefault("queries_file", Path(__file__).resolve().parents[1] / "assets" / "observability_queries.json")
         super().__init__(directory, monitoring=monitoring, **kwargs)
-        if (
-            isinstance(interval_seconds, bool)
-            or not math.isfinite(interval_seconds)
-            or not 0.1 <= interval_seconds <= 3600
+        if options.setup_hosts and (
+            monitoring is None or any(host not in monitoring.deployment_model.nodes for host in options.setup_hosts)
         ):
-            raise ValueError("interval_seconds must be finite and between 0.1 and 3600")
-        for name, value in [("timeout_seconds", timeout_seconds), ("max_seconds", max_seconds), ("limit", limit)]:
-            if type(value) is not int or value < 1:
-                raise ValueError(f"{name} must be a positive integer")
-        if timeout_seconds > 60:
-            raise ValueError("timeout_seconds must not exceed 60")
-        if type(service_port) is not int or not 1 <= service_port <= 65535:
-            raise ValueError("service_port must be an integer between 1 and 65535")
-        if type(loki_limit) is not int or not 1 <= loki_limit <= 100000:
-            raise ValueError("loki_limit must be between 1 and 100000")
-        if type(loki_max_queries) is not int or not 1 <= loki_max_queries <= 100000:
-            raise ValueError("loki_max_queries must be between 1 and 100000")
-        if mapper_url:
-            parsed = urlsplit(mapper_url)
-            if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.query or parsed.fragment:
-                raise ValueError("mapper_url must be an HTTP(S) base URL without query or fragment")
-        self.stage = monitoring
-        self.mapper_url = mapper_url
-        self.loki_url = loki_url
-        self.collect_loki = collect_loki or bool(loki_url)
-        self.loki_selector = loki_selector
-        self.loki_limit = loki_limit
-        self.loki_max_queries = loki_max_queries
-        self.collect_setup = collect_setup
-        self.collect_ue_context = collect_ue_context
-        if setup_hosts is not None and (
-            not isinstance(setup_hosts, list) or any(not isinstance(host, str) or not host for host in setup_hosts)
-        ):
-            raise ValueError("setup_hosts must be a list of node names")
-        if setup_hosts and (
-            monitoring is None or any(host not in monitoring.deployment_model.nodes for host in setup_hosts)
-        ):
-            raise ValueError("setup_hosts must refer to nodes in the supplied stage")
-        self.setup_hosts = setup_hosts
-        self.options = dict(
-            interval_seconds=interval_seconds,
-            timeout_seconds=timeout_seconds,
-            max_seconds=max_seconds,
-            limit=limit,
-            service=service,
-            service_port=service_port,
-        )
-        self.namespace = namespace
+            raise ValueError("setup_hosts must refer to nodes in the supplied monitoring manager")
+        self.settings = options
+        self.mapper_url = options.mapper_url
+        self.loki_url = options.loki_url
+        self.collect_loki = options.collect_loki or bool(options.loki_url)
+        self.options = options.sampler_args()
         self._stop = threading.Event()
         self._ready = threading.Event()
         self._thread = None
@@ -129,11 +113,11 @@ class ObservabilityRun(ExperimentRun):
                 summary = collect_logs(
                     self.directory / "logs",
                     url=self.loki_url,
-                    selector=self.loki_selector,
+                    selector=self.settings.loki_selector,
                     start=self.started,
                     end=ended,
-                    limit=self.loki_limit,
-                    max_queries=self.loki_max_queries,
+                    limit=self.settings.loki_limit,
+                    max_queries=self.settings.loki_max_queries,
                 )
                 if summary.get("error"):
                     self._error("loki", summary["error"])
@@ -156,19 +140,19 @@ class ObservabilityRun(ExperimentRun):
 
     def _control(self):
         if self._remote_config is None:
-            model = self.stage.deployment_model
+            model = self.monitoring.deployment_model
             cfg = model.monitoring
             name = model.params.k8s.master_node
             if not name or name not in model.nodes:
-                raise ValueError("ML context requires a control node in stage.deployment_model.nodes")
-            self._remote_config = (name, cfg.kubeconfig, self.namespace or cfg.namespace)
+                raise ValueError("ML context requires a control node in monitoring.deployment_model.nodes")
+            self._remote_config = (name, cfg.kubeconfig, self.settings.namespace or cfg.namespace)
         return self._remote_config
 
     async def _run(self, tasks, *, host=None, output_keys=None):
         # Keep Ansible (and its model dependencies) optional for direct HTTP runs.
         from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_playbook
 
-        model = self.stage.deployment_model
+        model = self.monitoring.deployment_model
         host = host or self._control()[0]
         inventory = "[ml_context]\n" + get_ansible_inventory_line(host, model.nodes[host]) + "\n"
         return await run_ansible_playbook(
@@ -188,13 +172,13 @@ class ObservabilityRun(ExperimentRun):
         )
 
     async def _snapshot(self, phase):
-        if not self.stage or not self.collect_setup:
+        if not self.monitoring or not self.settings.collect_setup:
             return
         output = self.directory / "setup" / phase
         script = Path(__file__).with_name("collect_setup.py")
         hosts = []
-        nodes = self.stage.deployment_model.nodes
-        selected = self.setup_hosts
+        nodes = self.monitoring.deployment_model.nodes
+        selected = self.settings.setup_hosts
         if selected is None:
             control = self._control()[0]
             selected = [
@@ -249,7 +233,7 @@ class ObservabilityRun(ExperimentRun):
             self._ready.set()
 
     async def _start_sampler(self):
-        if not self.collect_ue_context or not (self.mapper_url or self.stage):
+        if not self.settings.collect_ue_context or not (self.mapper_url or self.monitoring):
             return
         if self.mapper_url:
             args = SimpleNamespace(
