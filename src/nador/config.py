@@ -79,6 +79,10 @@ class ObservabilitySettings(StrictBaseModel):
             image = getattr(self, field)
             if image is not None and not image.strip():
                 raise ValueError(f"{field} must be a non-empty image or null to inherit the default")
+        if self.mapper_coverage and self.mapper_image:
+            repository, tag = split_image(self.mapper_image)
+            if not repository or not tag or "@" in self.mapper_image:
+                raise ValueError("mapper_image must use an explicit repository:tag")
         if self.path_port in range(9100, 9200) or self.path_port in range(9300, 9400):
             raise ValueError("path_port overlaps the latency/throughput exporter ranges; use 9403 or another range")
         return self

@@ -190,3 +190,12 @@ def test_default_images_are_pinned_to_their_recorded_builds():
         assert digest in digests, reference
         commit = next(b["source_commit"] for b in builds.values() if b["digest"] == digest)
         assert tag.endswith(f":sha-{commit}"), reference
+
+
+@pytest.mark.parametrize("image", ["ghcr.io/x/mapper", "ghcr.io/x/mapper@sha256:abc", "registry:5000/mapper"])
+def test_mapper_image_is_checked_when_the_profile_is_read(image):
+    from nador.config import ObservabilitySettings
+
+    with pytest.raises(ValueError, match="mapper_image must use an explicit repository:tag"):
+        ObservabilitySettings(mapper_coverage=True, mapper_image=image)
+    ObservabilitySettings(mapper_coverage=False, mapper_image=image)  # unused images are not checked

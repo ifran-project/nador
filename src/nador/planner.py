@@ -279,11 +279,7 @@ def resolve_components(model: MonitoringModel, targets: list[ResolvedTarget]) ->
             and monitoring.observability.mapper_coverage
             and (image := monitoring.observability.mapper_image)
         ):
-            repository, tag = split_image(image)
-            if not repository or not tag or "@" in image:
-                raise ValueError("mapper_image must use an explicit repository:tag")
-            component.image.repository = repository
-            component.image.image_tag = tag
+            component.image.repository, component.image.image_tag = split_image(image)
         component.namespace = monitoring.namespace
         component.chart_values = _render_chart_values(component, model, targets, probe_states)
         if probe_kind(name) and component.chart_values.get("settings", {}).get("paused"):
