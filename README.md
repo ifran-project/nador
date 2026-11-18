@@ -43,7 +43,8 @@ pytest
 
 The tests plan every example profile offline and compare the rendered Helm
 values with `tests/snapshots/`. After an intended change, regenerate them with
-`NADOR_UPDATE_SNAPSHOTS=1 pytest` and review the diff.
+`NADOR_UPDATE_SNAPSHOTS=1 pytest` and review the diff. The settings the controller
+image reads are described in [docs/controller-contract.md](docs/controller-contract.md).
 
 ## Monitoring
 
