@@ -33,13 +33,6 @@ def to_float(value, default: float = 0.0) -> float:
         return default
 
 
-def is_false(value) -> bool:
-    """Whether a flag value means false (False, 0, no, off)."""
-    if isinstance(value, bool):
-        return value is False
-    return str(value).strip().lower() in {"false", "0", "no", "off"}
-
-
 def split_windows(directory: Path) -> None:
     """Write one compressed CSV and metadata file per recorded experiment window."""
     full_csv = directory / "prometheus_timeseries.csv"
@@ -57,19 +50,8 @@ def split_windows(directory: Path) -> None:
             return
 
     windows = load_windows(timeline_json, selected_levels)
-    skipped = [
-        {
-            "window_id": window.get("window_id"),
-            "level": window.get("level"),
-            "name": window.get("name"),
-            "reason": "prometheus_disabled_for_window",
-        }
-        for window in windows
-        if is_false(window.get("prometheus_enabled", ""))
-    ]
-    windows = [window for window in windows if not is_false(window.get("prometheus_enabled", ""))]
     if not windows:
-        summary = {"error": "no matching windows", "windows": [], "skipped_windows": skipped}
+        summary = {"error": "no matching windows", "windows": []}
         summary_file.write_text(json.dumps(summary, indent=2), encoding="utf-8")
         logger.warning(summary["error"])
         return
@@ -119,9 +101,7 @@ def split_windows(directory: Path) -> None:
             {
                 "window_id": metadata["window"].get("window_id"),
                 "level": metadata["window"].get("level"),
-                "scenario": metadata["window"].get("scenario"),
-                "step": metadata["window"].get("step"),
-                "direction": metadata["window"].get("direction"),
+                "name": metadata["window"].get("name"),
                 "rows": metadata["rows"],
                 "directory": str(subdir),
                 "prometheus_csv": metadata["prometheus_csv"],
@@ -135,7 +115,6 @@ def split_windows(directory: Path) -> None:
         "padding_seconds": 0.0,
         "compressed": True,
         "windows": summary_windows,
-        "skipped_windows": skipped,
     }
     summary_file.write_text(json.dumps(summary, indent=2), encoding="utf-8")
     total_rows = sum(item["rows"] for item in summary_windows)
