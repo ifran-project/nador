@@ -17,6 +17,8 @@ from nador.csi.storage import prepare_csi_storage
 # Upstream default OAI gNB repository -> CSI logger image built from the same OAI tag.
 CSI_IMAGE_REPOSITORIES = {
     "docker.io/oaisoftwarealliance/oai-gnb": "docker.io/r2labuser/oai-gnb-csi",
+    # O-RAN 7.2 (Benetel RUs)
+    "docker.io/oaisoftwarealliance/oai-gnb-fhi72": "docker.io/r2labuser/oai-gnb-fhi72-csi",
 }
 
 # OCUDU gNB: one CSI image per radio variant (ocudu-csi-logging build_image.sh), matched to the upstream

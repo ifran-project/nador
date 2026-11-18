@@ -70,11 +70,15 @@
   register: csi_collect_out
   changed_when: true
 
+# Without become: with become, fetch reads the file through the slurp module (whole file base64-encoded in memory,
+# then sent in the module result), which takes minutes and GBs of memory for the hundreds of MB of a 4T4R 273 PRB
+# capture; without become, the file is copied over SFTP/SCP. The work directory and its files are world-readable.
 - name: CSI - fetch the full file
   ansible.builtin.fetch:
     src: "{{ csi_workdir }}/out/{{ csi_src_file | basename }}.gz"
     dest: "{{ csi_dest_dir }}/{{ csi_src_file | basename }}.gz"
     flat: true
+  become: false
   when: csi_fetch_full | bool
 
 - name: CSI - fetch the per-window files
@@ -82,6 +86,7 @@
     src: "{{ csi_workdir }}/by_window.tar"
     dest: "{{ csi_dest_dir }}/by_window.tar"
     flat: true
+  become: false
   when: csi_windows_json | length > 0
 
 - name: CSI - remove the remote work directory
