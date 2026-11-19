@@ -35,7 +35,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ printf "obs-%s-%s-%s" $kind .category .component | replace "_" "-" | lower | trunc 63 | trimSuffix "-" }}
+  name: {{ printf "sniffer-%s-%s-%s" $kind .category .component | replace "_" "-" | lower | trunc 63 | trimSuffix "-" }}
   namespace: {{ .namespace }}
   labels:
     {{- include "monitoring.labels" $ | nindent 4 }}
