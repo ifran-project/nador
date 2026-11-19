@@ -1,4 +1,4 @@
-"""Monitoring and experiment artifacts for the unmodified 5G orchestrator."""
+"""Monitoring and experiment artifacts for the unmodified IFRAN orchestrator."""
 
 from .deployment import MonitoringManagement
 from .models import MonitoringDeployment

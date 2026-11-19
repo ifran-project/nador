@@ -2,12 +2,12 @@
 
 from importlib.resources import files
 
-from metamodel.models.ran import RANComponentType
-from orchestrator.deployment import RANManagement
-from orchestrator.models.k8s import ContainerImage
-from orchestrator.models.provisioning import RUVendor
-from orchestrator.models.ran import RANImplementation
-from orchestrator.utils.defaults import DEFAULT_RAN_IMAGES
+from ifran.deployment import RANManagement
+from ifran.models.k8s import ContainerImage
+from ifran.models.provisioning import RUVendor
+from ifran.models.ran import RANImplementation
+from ifran.utils.defaults import DEFAULT_RAN_IMAGES
+from metamodel_3gpp.models.ran import RANComponentType
 
 from nador.csi.collection import CsiCollector
 from nador.csi.live import CsiLiveView
@@ -17,10 +17,12 @@ from nador.csi.storage import prepare_csi_storage
 # Upstream default OAI gNB repository -> CSI logger image built from the same OAI tag.
 CSI_IMAGE_REPOSITORIES = {
     "docker.io/oaisoftwarealliance/oai-gnb": "docker.io/r2labuser/oai-gnb-csi",
+    # O-RAN 7.2 (Benetel RUs)
+    "docker.io/oaisoftwarealliance/oai-gnb-fhi72": "docker.io/r2labuser/oai-gnb-fhi72-csi",
 }
 
 # OCUDU gNB: one CSI image per radio variant (ocudu-csi-logging build_image.sh), matched to the upstream
-# default gNB image of that variant (orchestrator DEFAULT_RAN_IMAGES).
+# default gNB image of that variant (IFRAN DEFAULT_RAN_IMAGES).
 OCUDU_CSI_REPOSITORY = "docker.io/r2labuser/ocudu-gnb-csi"
 OCUDU_CSI_TAGS = {None: "release_26_10-zmq", RUVendor.USRP: "release_26_10-uhd", RUVendor.BENETEL: "release_26_10"}
 OCUDU_SRS_PERIODS_MS = (1, 2, 2.5, 4, 5, 8, 10, 16, 20, 32, 40, 64, 80, 160, 320, 640, 1280, 2560)
@@ -136,7 +138,7 @@ def _ocudu_rendered_files() -> list[str]:
 
 
 def _ocudu_variants() -> dict:
-    """Upstream default OCUDU gNB image (orchestrator DEFAULT_RAN_IMAGES) of each radio variant."""
+    """Upstream default OCUDU gNB image (IFRAN DEFAULT_RAN_IMAGES) of each radio variant."""
     defaults = DEFAULT_RAN_IMAGES[RANImplementation.OCUDU]
     return {vendor: defaults[vendor][RANComponentType.GNB] for vendor in OCUDU_CSI_TAGS if vendor in defaults}
 

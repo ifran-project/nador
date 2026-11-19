@@ -1,0 +1,24 @@
+network:
+  version: 2
+  ethernets:
+    # trunk radio (sopnode-sw5-rt Ethernet1/37): O-RAN 7.2 fronthaul VFs, USRP and AW2S VLANs
+    rrus:
+      match:
+        macaddress: "40:a6:b7:d9:b3:aa"
+      mtu: 9216
+      dhcp4: true
+    # PTP fronthaul (sopnode-sw5-rt Ethernet1/26): PTP and RU management network (192.168.233.0/24)
+    ptp:
+      match:
+        macaddress: "40:a6:b7:d9:b3:ab"
+      mtu: 9216
+      dhcp4: true
+  vlans:
+    r2lab_usrp:
+      id: 3010
+      link: rrus
+      dhcp4: true
+    r2lab_aw2s:
+      id: 3011
+      link: rrus
+      dhcp4: true

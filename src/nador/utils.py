@@ -3,12 +3,12 @@
 from pathlib import Path
 
 import yaml
+from ifran.models.provisioning import ProvisionableNode
+from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_role
+from ifran.utils.k8s import build_k8s_safe
+from ifran.utils.utils import deep_merge
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
-from metamodel.models.metamodel import MetaModel
-from orchestrator.models.provisioning import ProvisionableNode
-from orchestrator.utils.ansible import get_ansible_inventory_line, run_ansible_role
-from orchestrator.utils.k8s import build_k8s_safe
-from orchestrator.utils.utils import deep_merge
+from metamodel_3gpp.models.metamodel import MetaModel
 
 from nador.models import DEFAULT_IMAGES, DeployedMonitoringComponent, MonitoringModel
 

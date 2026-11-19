@@ -9,7 +9,7 @@ and report their findings.
 NADOR extends [IFRAN](https://github.com/ifran-project/ifran), the Infrastructure
 Framework for Reproducible Automation of Networks. Inspired by Ifrane and an
 anagram of INFRA, IFRAN handles reproducible network provisioning and slice management.
-Its current Python distribution and imports remain named `orchestrator`.
+It depends on the `ifran` Python distribution and imports.
 
 It integrates Prometheus, Grafana and Loki, correlates UE/slice/tunnel/session
 information, deploys latency and N3 throughput probes, and exports experiment
@@ -18,6 +18,12 @@ timelines and metrics. Network deployment remains handled by upstream managers.
 Optional protocol/path collectors and richer experiment collection are described
 in [ML observability](OBSERVABILITY.md). These additions require explicitly
 selected collector images and live validation before use in experiments.
+
+NADOR also handles the channel state information (CSI) of OAI and OCUDU gNBs: patched images log the raw
+uplink channel estimated from the SRS (one complex value per RB, receive antenna and port) to a CSV file on the
+RAN node. `nador.csi` enables the logger, prepares its storage, shows the CSI live in a Streamlit visualizer
+and collects it per experiment section, on the same timeline as the metrics. See [CSI](CSI.md) for the
+extraction, the proposed analysis and its use.
 
 Install from GitHub:
 

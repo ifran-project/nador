@@ -4,9 +4,9 @@ import json
 from pathlib import Path
 from typing import Any, Literal, Self
 
-from metamodel.models.base import StrictBaseModel
-from orchestrator.models.deployment import DeploymentModel
-from orchestrator.models.k8s import ContainerImage
+from metamodel_3gpp.models.base import StrictBaseModel
+from ifran.models.deployment import DeploymentModel
+from ifran.models.k8s import ContainerImage
 from pydantic import Field, model_validator
 from nador.observability import ObservabilitySettings
 

@@ -122,7 +122,7 @@ class ObservabilityRun(ExperimentRun):
 
     async def _run(self, tasks, *, host=None, output_keys=None):
         # Keep Ansible (and its model dependencies) optional for direct HTTP runs.
-        from orchestrator.utils.ansible import get_ansible_inventory_line, run_ansible_playbook
+        from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_playbook
 
         model = self.stage.deployment_model
         host = host or self._control()[0]

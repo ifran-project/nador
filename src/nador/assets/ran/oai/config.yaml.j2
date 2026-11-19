@@ -35,12 +35,16 @@
 {% set config = config | regex_replace('^(    min_rxtxtime: [^\n]*)$', '\\1\n    pdsch_AntennaPorts_N1: 2\n    pdsch_AntennaPorts_N2: 1\n    pdsch_AntennaPorts_XP: 1\n    pusch_AntennaPorts: 2\n    maxMIMO_layers: 2', multiline=True) %}
 {% endif %}
 {% if csi %}
+{# Already rendered by the upstream template from advanced_config (e.g. O-RAN 7.2 Benetel gNB): kept when periodic #}
+{% set srs_set = config is search('(?m)^    do_SRS: periodic$') and config is search('(?m)^    do_CSIRS: 1$') %}
+{% if not srs_set %}
 {# Text insertion after the single gNBs[0] min_rxtxtime line. #}
 {% if config is search('(?m)^ +do_(SRS|CSIRS):') or config is not search('(?m)^    min_rxtxtime: ') %}
 {# Undefined variable on purpose: fail the prepare step instead of rendering a config without SRS. #}
 {{ csi_config_injection_failed_do_SRS_already_set_or_min_rxtxtime_not_found }}
 {% endif %}
 {% set config = config | regex_replace('^(    min_rxtxtime: [^\n]*)$', '\\1\n    do_SRS: periodic\n    do_CSIRS: 1', multiline=True) %}
+{% endif %}
 {% endif %}
 {{ config }}{% else %}
 {% include 'ran/oai/oai-' ~ component.type ~ '/config.yaml.j2' %}

@@ -9,8 +9,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from orchestrator.deployment.base import BaseManagement
-from orchestrator.utils.ansible import get_ansible_inventory_line, run_ansible_role
+from ifran.deployment.base import BaseManagement
+from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_role
 
 ROLES = Path(__file__).resolve().parent.parent / "assets" / "roles"
 CSI_FILE_NAME = "csi_per_rb.csv"
