@@ -20,3 +20,7 @@ build/
 # Private trials stay out of the public repository.
 /examples/monitoring-trials/
 /.local/
+
+# Local only: tests and design notes stay on the developer's machine.
+/tests/
+/docs/

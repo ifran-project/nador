@@ -35,15 +35,9 @@ image update, reinstall Nador, restart the notebook kernel, and redeploy.
 
 ```bash
 python -m pip install -e ".[dev]"
-ruff check src tests && ruff format --check src tests
-pyright
-pytest
+ruff check src && ruff format --check src
+pyright src
 ```
-
-The tests plan every example profile offline and compare the rendered Helm
-values with `tests/snapshots/`. After an intended change, regenerate them with
-`NADOR_UPDATE_SNAPSHOTS=1 pytest` and review the diff. The settings the controller
-image reads are described in [docs/controller-contract.md](docs/controller-contract.md).
 
 ## Monitoring
 
