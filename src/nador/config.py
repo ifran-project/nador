@@ -347,7 +347,14 @@ class MonitoringDeployment(StrictBaseModel):
     @classmethod
     def from_yaml_file(cls, path: str | Path) -> Self:
         """Read and check a full monitoring profile before any cluster work."""
-        return read_deployment(path, cls)
+        path = Path(path)
+        try:
+            data = yaml.load(path.read_text(), Loader=ProfileLoader)  # noqa: S506 - ProfileLoader is a SafeLoader
+        except (OSError, yaml.YAMLError) as exc:
+            raise ValueError(f"Invalid monitoring profile {path}: {exc}") from exc
+        if not isinstance(data, dict):
+            raise ValueError(f"Invalid monitoring profile {path}: expected a YAML mapping")
+        return validate_deployment(data, cls, source=f"Invalid monitoring profile {path}", explicit=True)
 
     def image(self, key: str) -> str:
         """The image for a key of images.json, after profile overrides."""
@@ -524,15 +531,7 @@ ProfileLoader.yaml_implicit_resolvers = {
 ProfileLoader.add_implicit_resolver("tag:yaml.org,2002:bool", re.compile("^(true|false)$"), list("tf"))
 
 
-def load_profile(path: Path) -> dict:
-    """Read a profile with the strict loader and complete partial component image overrides."""
-    data = yaml.load(path.read_text(), Loader=ProfileLoader)  # noqa: S506 - ProfileLoader is a SafeLoader
-    if not isinstance(data, dict):
-        raise ValueError("expected a YAML mapping")
-    return complete_component_images(data)
-
-
-def complete_component_images(data: dict) -> dict:
+def _complete_component_images(data: dict) -> dict:
     """Fill the repository and tag of ``components.<name>.image`` overrides that only set other fields."""
     components = data.get("components")
     if isinstance(components, dict):
@@ -550,7 +549,8 @@ def validate_deployment[M: MonitoringDeployment](
     source: str = "Monitoring configuration",
     explicit: bool = False,
 ) -> M:
-    """Validate a profile. ``explicit`` also requires every metric to be listed under metrics:."""
+    """Validate a profile. ``explicit`` also requires every metric, and every option, to be written out."""
+    data = _complete_component_images(data)
     errors = []
     if explicit:
         listed = data.get("metrics")
@@ -615,13 +615,3 @@ def _flow(value: Any) -> str:
 
 def _report(source: str, errors: list[str]) -> str:
     return f"{source}:\n  - " + "\n  - ".join(errors)
-
-
-def read_deployment[M: MonitoringDeployment](path: str | Path, model: type[M] = MonitoringDeployment) -> M:
-    """Load a full monitoring profile before planning or deploying it."""
-    path = Path(path)
-    try:
-        data = load_profile(path)
-    except (OSError, ValueError, yaml.YAMLError) as exc:
-        raise ValueError(f"Invalid monitoring profile {path}: {exc}") from exc
-    return validate_deployment(data, model, source=f"Invalid monitoring profile {path}", explicit=True)

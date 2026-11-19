@@ -29,7 +29,7 @@ rules:
     resourceNames: [monitoring-controller]
     verbs: [patch]
   {{- end }}
-  {{- if and $.Values.probeControllerImage (eq . $.Release.Namespace) }}
+  {{- if and $.Values.controllerImage (eq . $.Release.Namespace) }}
   - apiGroups: [""]
     resources: [pods]
     verbs: [create, delete]

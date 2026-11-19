@@ -124,17 +124,14 @@ class ExperimentRun:
         """Record a collection problem; it fails the run only if the workload itself succeeded."""
         self.metadata["collection_errors"].append(f"{label}: {error}")
 
-    def write_json(self, relative_path: str | Path, data: Any) -> Path:
-        """Write a JSON file under the run directory, creating folders as needed."""
-        path = self.directory / relative_path
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-        return path
-
-    def save_json(self, filename: str | Path, data: Any) -> None:
-        """Save a JSON artifact inside the active experiment directory."""
-        self._require_active("Save artifacts")
-        self.write_json(filename, data)
+    def save_json(self, path: str | Path, data: Any) -> Path:
+        """Save JSON under the run directory, creating folders as needed (collectors use it too)."""
+        if not self._entered:
+            raise RuntimeError(f"Save artifacts inside async with {type(self).__name__}(...)")
+        target = self.directory / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        return target
 
     @contextmanager
     def section(self, name: str) -> Iterator[None]:
@@ -176,7 +173,7 @@ class ExperimentRun:
             f.write(json.dumps(event) + "\n")
 
     def _save_metadata(self) -> None:
-        self.write_json("experiment_metadata.json", self.metadata)
+        self.save_json("experiment_metadata.json", self.metadata)
 
     # --- lifecycle ---------------------------------------------------------------------------------------------------
 

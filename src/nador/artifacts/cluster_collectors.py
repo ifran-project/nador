@@ -92,14 +92,14 @@ class SetupSnapshot(Collector):
             except Exception as exc:
                 run.error(f"setup {phase} host {host}", exc)
                 results.append({"host": host, "status": "error", "error": str(exc)})
-        run.write_json(f"setup/{phase}/hosts.json", results)
+        run.save_json(f"setup/{phase}/hosts.json", results)
         try:
             args = ["--mode", "cluster", "--kubeconfig", self.hosts.kubeconfig]
             cluster = await self._read(run, self.hosts.control, args)
         except Exception as exc:
             run.error(f"setup {phase} cluster", exc)
             cluster = {"status": "error", "error": str(exc)}
-        run.write_json(f"setup/{phase}/cluster.json", cluster)
+        run.save_json(f"setup/{phase}/cluster.json", cluster)
 
     async def _read(self, run: ExperimentRun, host: str, args: list[str]) -> dict:
         inputs = {"snapshot_script": str(SNAPSHOT_SCRIPT), "snapshot_args": args}
@@ -193,7 +193,7 @@ class UEContext(Collector):
             status.update(status="error", error=str(exc))
             run.error("ue_context stop/fetch", exc)
         finally:
-            run.write_json("ue_context/collection_status.json", status)
+            run.save_json("ue_context/collection_status.json", status)
 
     async def _stop_local(self, run: ExperimentRun, process: asyncio.subprocess.Process) -> None:
         (run.directory / "ue_context" / "STOP").touch()

@@ -176,13 +176,13 @@ class MonitoringManagement(HelmManagement):
         ``tcp_flows`` and ``attributed_drops`` only collect when they were deployed running.
         """
         options = {"imsis": imsis, "slices": slices, "at": at, "log_samples": log_samples}
-        await self._switch(metric, True, options, quiet)
+        await self._set_running(metric, True, options, quiet)
 
     async def stop(self, metric: str, *, quiet: bool = False) -> None:
         """Stop a controller-managed metric; ``start`` resumes it."""
-        await self._switch(metric, False, {}, quiet)
+        await self._set_running(metric, False, {}, quiet)
 
-    async def _switch(self, metric: str, running: bool, options: dict[str, Any], quiet: bool) -> None:
+    async def _set_running(self, metric: str, running: bool, options: dict[str, Any], quiet: bool) -> None:
         """Merge a start or stop into the controller's settings; it reconciles within seconds."""
         metrics = self.deployment_model.monitoring.metrics
         if metric not in CONTROLLER_METRICS and metric not in HOST_PROBES:
@@ -194,9 +194,9 @@ class MonitoringManagement(HelmManagement):
         if extra:
             raise ValueError(f"{metric} does not take {', '.join(sorted(extra))}")
         if running:
-            self._check_startable(metric)
+            self._check_can_start(metric)
         given = {k: v for k, v in options.items() if v is not None}
-        moved, settings = self._settings_change(metric, running, given)
+        moved, settings = self._controller_change(metric, running, given)
         await self._run_tasks("patch_controller_settings", settings=settings, quiet=quiet)
         # Keep the in-memory profile in step, so plan() and later saves show what runs.
         for name in moved:
@@ -208,7 +208,7 @@ class MonitoringManagement(HelmManagement):
                 update |= {k: v for k, v in given.items() if k in type(current).model_fields}
             setattr(metrics, name, current.model_copy(update=update))
 
-    def _settings_change(self, metric: str, running: bool, given: dict[str, Any]) -> tuple[list[str], dict]:
+    def _controller_change(self, metric: str, running: bool, given: dict[str, Any]) -> tuple[list[str], dict]:
         """The metrics a start or stop moves, and the partial settings the controller reads."""
         metrics = self.deployment_model.monitoring.metrics
         if metric in HOST_PROBES:
@@ -239,8 +239,8 @@ class MonitoringManagement(HelmManagement):
             raise ValueError(f"rtt cannot measure at {', '.join(sorted(missing))}: no target has that role")
         return anchors
 
-    def _check_startable(self, metric: str) -> None:
-        """The checks the controller's API made, against the settings it was deployed with."""
+    def _check_can_start(self, metric: str) -> None:
+        """Refuse a start the deployed controller settings cannot run: a missing probe, target or image."""
         controller = self.deployment_model.monitoring.components.get("monitoring-controller")
         if controller is None:
             raise ValueError("Deploy monitoring first: the controller is not part of this deployment")
@@ -249,12 +249,12 @@ class MonitoringManagement(HelmManagement):
             if kind_of(metric) not in values.get("hostProbeStates", {}):
                 raise ValueError(f"{metric}: its probe is not deployed for this RAN")
             return
-        requests = {"rtt": "rttRequest", "throughput": "throughputRequest", "user_plane_paths": "pathRequest"}
-        if metric in requests:
-            if not values.get(requests[metric], {}).get("allowed"):
+        chart_keys = {"rtt": "rtt", "throughput": "throughput", "user_plane_paths": "userPlanePaths"}
+        if metric in chart_keys:
+            if not values.get(chart_keys[metric], {}).get("allowed"):
                 raise ValueError(f"{metric} needs gNB/UPF targets, AMF/SMF session context and its probe image")
             return
-        one_way = values.get("probeControl", {})
+        one_way = values.get("oneWay", {})
         if not one_way.get("image"):
             raise ValueError(f"Deploy with metrics.{metric} first")
         if metric == "upf_transit" and not (one_way["upf_transit"].get("peer") and one_way.get("test_port")):
@@ -280,15 +280,15 @@ class MonitoringManagement(HelmManagement):
         """
         if options is False:
             raise ValueError("Use remove_probe to undeploy a metric")
-        await self._change_metric(metric, options, quiet)
+        await self._redeploy_with(metric, options, quiet)
 
     async def remove_probe(self, metric: str, *, quiet: bool = False) -> None:
         """Undeploy one metric, uninstalling the releases nothing else needs."""
         if not self.deployment_model.monitoring.metrics.available(metric):
             raise ValueError(f"{metric} is not deployed")
-        await self._change_metric(metric, False, quiet)
+        await self._redeploy_with(metric, False, quiet)
 
-    async def _change_metric(self, metric: str, value: dict[str, Any] | bool, quiet: bool) -> None:
+    async def _redeploy_with(self, metric: str, value: dict[str, Any] | bool, quiet: bool) -> None:
         if metric not in Metrics.model_fields:
             raise ValueError(f"Unknown metric {metric!r}")
         previous = self.deployment_model.monitoring

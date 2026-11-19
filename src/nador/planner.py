@@ -133,7 +133,7 @@ def _controller_values(
 ) -> dict:
     """Build controller values.
 
-    Single-anchor deployments describe their gNB/UPF through probeControlTargets (targets.json);
+    Single-anchor deployments describe their gNB/UPF through ``anchors`` (targets.json);
     multi-anchor deployments pass explicit per-request target lists instead.
     """
     metrics = monitoring.metrics
@@ -197,9 +197,9 @@ def _controller_values(
     return {
         "targetNamespaces": sorted({target.namespace for target in targets}),
         "operationTimeoutSeconds": monitoring.operation_timeout_seconds,
-        "probeControllerImage": controller_image,
+        "controllerImage": controller_image,
         "cleanupImage": monitoring.image("controller"),
-        "probeControlTargets": {} if monitoring.multi_anchor else by_role,
+        "anchors": {} if monitoring.multi_anchor else by_role,
         "hostProbeStates": probe_states,
         # Workloads the controller may pause and resume; RBAC is generated from this list.
         "hostProbeWorkloads": [
@@ -207,10 +207,10 @@ def _controller_values(
         ],
         "probeApiTlsSecret": monitoring.probe_api_tls_secret,
         "probeApiTokenSecret": monitoring.probe_api_token_secret,
-        "probeControl": one_way,
-        "rttRequest": rtt_request,
-        "throughputRequest": throughput,
-        "pathRequest": paths,
+        "oneWay": one_way,
+        "rtt": rtt_request,
+        "throughput": throughput,
+        "userPlanePaths": paths,
     }
 
 

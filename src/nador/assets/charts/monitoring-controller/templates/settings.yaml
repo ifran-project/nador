@@ -1,12 +1,12 @@
-{{- if .Values.probeControllerImage }}
+{{- if .Values.controllerImage }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: nador-controller-settings
 data:
-  settings.json: {{ merge (dict "rtt" .Values.rttRequest "throughput" .Values.throughputRequest "user_plane_paths" .Values.pathRequest "host_probes" (.Values.hostProbeStates | default dict)) .Values.probeControl | toJson | quote }}
-  targets.json: {{ .Values.probeControlTargets | toJson | quote }}
-{{- if get (.Values.rttRequest | default dict) "pairer_image" }}
+  settings.json: {{ merge (dict "rtt" .Values.rtt "throughput" .Values.throughput "user_plane_paths" .Values.userPlanePaths "host_probes" (.Values.hostProbeStates | default dict)) .Values.oneWay | toJson | quote }}
+  targets.json: {{ .Values.anchors | toJson | quote }}
+{{- if get (.Values.rtt | default dict) "pairer_image" }}
 ---
 apiVersion: v1
 kind: Service

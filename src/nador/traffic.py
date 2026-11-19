@@ -95,10 +95,6 @@ class Iperf:
             raise ValueError(f"UEs share a tunnel address: {addresses}")
         return addresses
 
-    def next_port(self) -> int:
-        """A port no earlier test of this object used, from 5201 up."""
-        return next(self._ports)
-
     async def serve(self, port: int) -> None:
         """Start a one-shot iperf3 server on ``port``; it exits after one test or 60 idle seconds."""
         await run_ansible_command(
@@ -127,6 +123,6 @@ class Iperf:
 
     async def run(self, client: str, direction: Literal["uplink", "downlink"], duration: int) -> dict[str, Any]:
         """Start a server on a fresh port, then run the client against it."""
-        port = self.next_port()
+        port = next(self._ports)  # a port no earlier run() of this object used
         await self.serve(port)
         return await self.client(client, direction, duration, port)
