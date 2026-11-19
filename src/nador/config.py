@@ -211,7 +211,6 @@ class Metrics(StrictBaseModel):
     ngap: Annotated[Ngap | None, Switch] = None
     pfcp: Annotated[Pfcp | None, Switch] = None
     ue_mapper_coverage: Annotated[Metric | None, Switch] = None
-    core_kpis: Annotated[Metric | None, Switch] = None
     ran_kpis: Annotated[RanKpis | None, Switch] = None
     logs: Annotated[Metric | None, Switch] = None
     node_metrics: Annotated[Metric | None, Switch] = None

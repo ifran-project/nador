@@ -69,7 +69,6 @@ metrics:
   ngap: false                     # session setup times from the AMF sniffer: {port}
   pfcp: false                     # session establishment times from the SMF sniffer: {port}
   ue_mapper_coverage: false       # how much UE context the mapper resolved
-  core_kpis: false                # Open5GS KPIs
   ran_kpis: false                 # OAI or OCUDU KPIs: {ocudu_port}
   logs: true                      # Loki and Promtail
   node_metrics: false             # node exporter

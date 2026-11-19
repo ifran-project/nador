@@ -63,12 +63,6 @@ components:
       image_tag: '7'
       image_pull_policy: IfNotPresent
   ue-mapper-api: {}
-  kpi-calculator-open5gs:
-    chart_ref: kpi-calculator
-    image:
-      repository: ghcr.io/ziyad-mabrouk/kpi-calculator-open5gs
-      image_tag: v1.0.0-standard
-      image_pull_policy: IfNotPresent
   kpi-calculator-oai:
     chart_ref: kpi-calculator
   ocudu-metrics:

@@ -13,7 +13,6 @@ metrics:
   ngap: false
   pfcp: false
   ue_mapper_coverage: false
-  core_kpis: false
   # The default notebook enables the OAI statistics parser before RAN deployment.
   ran_kpis: {ocudu_port: 8001}
   logs: true

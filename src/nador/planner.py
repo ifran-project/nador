@@ -257,11 +257,8 @@ def _render_chart_values(
 
 def _enabled_components(model: MonitoringModel) -> set[str]:
     monitoring = model.monitoring
-    core = str(model.core.implementation)
     ran = str(model.ran.implementation)
     metrics = monitoring.metrics
-    if metrics.core_kpis and core != "open5gs":
-        raise ValueError("Core KPI calculator requires Open5GS")
     if metrics.ran_kpis and ran not in {"oai", "ocudu"}:
         raise ValueError("RAN KPIs support OAI and OCUDU")
     enabled = {"integration", "prometheus", "grafana"}
@@ -269,8 +266,6 @@ def _enabled_components(model: MonitoringModel) -> set[str]:
         enabled.update(("redis", "ue-mapper-api", "monitoring-controller"))
     if metrics.logs:
         enabled.update(("loki", "promtail"))
-    if metrics.core_kpis:
-        enabled.add("kpi-calculator-open5gs")
     if metrics.ran_kpis:
         enabled.add("ocudu-metrics" if ran == "ocudu" else "kpi-calculator-oai")
     return enabled
