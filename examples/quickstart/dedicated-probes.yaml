@@ -1,5 +1,5 @@
 # Overlay for an existing monitoring profile: CPU scheduler wait runs, and the other
-# host probes are deployed stopped so `monitoring.set_running("<metric>")` can start them.
+# host probes are deployed stopped so `monitoring.start("<metric>")` can start them.
 metrics:
   scheduler_wait: true
   kernel_drops: {on_demand: true}

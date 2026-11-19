@@ -155,29 +155,35 @@ class MonitoringManagement(HelmManagement):
             quiet=quiet,
         )
 
-    async def set_running(
+    async def start(
         self,
         metric: str,
-        running: bool = True,
         *,
         imsis: list[str] | None = None,
         slices: list[str] | None = None,
         log_samples: bool | None = None,
         quiet: bool = False,
     ) -> None:
-        """Start or stop a deployed controller-managed metric, without reinstalling.
+        """Start a deployed controller-managed metric, without reinstalling.
 
         ``imsis`` and ``slices`` narrow ``rtt`` and ``throughput`` to some UEs (an empty list clears
         the filter); ``log_samples`` applies to ``n3_one_way``. Host-probe metrics start and stop
-        with their probe, so ``scheduler_wait`` and the other metrics of the same probe move together.
+        with their probe, so ``kernel_drops`` and ``attributed_drops`` move together.
         ``tcp_flows`` and ``attributed_drops`` only collect when they were deployed running.
         """
+        await self._switch(metric, True, {"imsis": imsis, "slices": slices, "log_samples": log_samples}, quiet)
+
+    async def stop(self, metric: str, *, quiet: bool = False) -> None:
+        """Stop a controller-managed metric; ``start`` resumes it."""
+        await self._switch(metric, False, {}, quiet)
+
+    async def _switch(self, metric: str, running: bool, options: dict[str, Any], quiet: bool) -> None:
+        """Merge a start or stop into the controller's settings; it reconciles within seconds."""
         metrics = self.deployment_model.monitoring.metrics
         if metric not in CONTROLLER_METRICS and metric not in HOST_PROBES:
             raise ValueError(f"{metric} is not started or stopped by the controller")
         if not metrics.available(metric):
             raise ValueError(f"Deploy with metrics.{metric} (on_demand: true starts it stopped)")
-        options = {"imsis": imsis, "slices": slices, "log_samples": log_samples}
         allowed = {"rtt": {"imsis", "slices"}, "throughput": {"imsis", "slices"}, "n3_one_way": {"log_samples"}}
         extra = {key for key, value in options.items() if value is not None} - allowed.get(metric, set())
         if extra:
