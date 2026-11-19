@@ -13,7 +13,6 @@ dependencies = [
 ]
 
 [project.scripts]
-nador-controller = "nador.probe_control_cli:main"
 nador-check-metrics = "nador.artifacts.metrics_check_cli:main"
 
 [tool.poetry]
@@ -107,7 +106,6 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 # Command-line entry points: printing is their output.
-"src/nador/probe_control_cli.py" = ["T201"]
 "src/nador/artifacts/metrics_check_cli.py" = ["T201"]
 # Scripts copied to and run on hosts; they call fixed system tools.
 "src/nador/artifacts/setup_snapshot.py" = ["T201", "S603", "S607"]

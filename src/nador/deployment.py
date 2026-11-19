@@ -12,6 +12,7 @@ from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_role
 from metamodel_3gpp.models.metamodel import MetaModel
 
 from nador.config import (
+    CONTROLLER_METRICS,
     DeployedMonitoringComponent,
     MonitoringDeployment,
     MonitoringModel,
@@ -19,6 +20,7 @@ from nador.config import (
     validate_deployment,
 )
 from nador.planner import ASSETS, resolve_components, resolve_targets
+from nador.probes import HOST_PROBES, kind_of
 
 
 @dataclass(frozen=True)
@@ -155,37 +157,71 @@ class MonitoringManagement(HelmManagement):
 
     async def set_running(
         self,
+        metric: str,
+        running: bool = True,
         *,
-        n3_one_way: bool | None = None,
-        upf_transit: bool | None = None,
-        n3_log_samples: bool | None = None,
+        imsis: list[str] | None = None,
+        slices: list[str] | None = None,
+        log_samples: bool | None = None,
         quiet: bool = False,
     ) -> None:
-        """Start or stop deployed one-way metrics on the running controller, without reinstalling."""
+        """Start or stop a deployed controller-managed metric, without reinstalling.
+
+        ``imsis`` and ``slices`` narrow ``rtt`` and ``throughput`` to some UEs (an empty list clears
+        the filter); ``log_samples`` applies to ``n3_one_way``. Host-probe metrics start and stop
+        with their probe, so ``scheduler_wait`` and the other metrics of the same probe move together.
+        ``tcp_flows`` and ``attributed_drops`` only collect when they were deployed running.
+        """
         metrics = self.deployment_model.monitoring.metrics
-        requested = {"n3_one_way": n3_one_way, "upf_transit": upf_transit}
-        changes: dict[str, dict] = {}
-        for name, running in requested.items():
-            if running is not None:
-                changes.setdefault(name, {})["enabled"] = running
-        if n3_log_samples is not None:
-            changes.setdefault("n3_one_way", {})["log_samples"] = n3_log_samples
-        for name in changes:
-            if not metrics.available(name):
-                raise ValueError(f"Deploy with metrics.{name} (on_demand: true starts it stopped)")
-        if not changes:
+        if metric not in CONTROLLER_METRICS and metric not in HOST_PROBES:
+            raise ValueError(f"{metric} is not started or stopped by the controller")
+        if not metrics.available(metric):
+            raise ValueError(f"Deploy with metrics.{metric} (on_demand: true starts it stopped)")
+        options = {"imsis": imsis, "slices": slices, "log_samples": log_samples}
+        allowed = {"rtt": {"imsis", "slices"}, "throughput": {"imsis", "slices"}, "n3_one_way": {"log_samples"}}
+        extra = {key for key, value in options.items() if value is not None} - allowed.get(metric, set())
+        if extra:
+            raise ValueError(f"{metric} does not take {', '.join(sorted(extra))}")
+        if running:
+            self._check_startable(metric)
+        if metric in HOST_PROBES:
+            kind = kind_of(metric)
+            moved = [name for name in HOST_PROBES if kind_of(name) == kind and metrics.available(name)]
+            settings: dict[str, Any] = {"host_probes": {kind: running}}
+        else:
+            moved = [metric]
+            settings = {metric: {"enabled": running} | {k: v for k, v in options.items() if v is not None}}
+        await self._run_tasks("patch_controller_settings", settings=settings, quiet=quiet)
+        # Keep the in-memory profile in step, so plan() and later saves show what runs.
+        for name in moved:
+            current = metrics.get(name)
+            if current is None:
+                continue
+            update: dict[str, Any] = {"on_demand": not running}
+            if name == metric:
+                update |= {k: v for k, v in options.items() if v is not None and k in type(current).model_fields}
+            setattr(metrics, name, current.model_copy(update=update))
+
+    def _check_startable(self, metric: str) -> None:
+        """The checks the controller's API made, against the settings it was deployed with."""
+        controller = self.deployment_model.monitoring.components.get("monitoring-controller")
+        if controller is None:
+            raise ValueError("Deploy monitoring first: the controller is not part of this deployment")
+        values = controller.chart_values
+        if metric in HOST_PROBES:
+            if kind_of(metric) not in values.get("hostProbeStates", {}):
+                raise ValueError(f"{metric}: its probe is not deployed for this RAN")
             return
-        await self._run_tasks(
-            "patch_controller_settings",
-            settings=changes,
-            quiet=quiet,
-        )
-        for name, patch in changes.items():
-            update = {"log_samples": patch["log_samples"]} if "log_samples" in patch else {}
-            if "enabled" in patch:
-                update["on_demand"] = not patch["enabled"]
-            if (metric := metrics.get(name)) is not None:
-                setattr(metrics, name, metric.model_copy(update=update))
+        requests = {"rtt": "rttRequest", "throughput": "throughputRequest", "user_plane_paths": "pathRequest"}
+        if metric in requests:
+            if not values.get(requests[metric], {}).get("allowed"):
+                raise ValueError(f"{metric} needs gNB/UPF targets, AMF/SMF session context and its probe image")
+            return
+        one_way = values.get("probeControl", {})
+        if not one_way.get("image"):
+            raise ValueError(f"Deploy with metrics.{metric} first")
+        if metric == "upf_transit" and not (one_way["upf_transit"].get("peer") and one_way.get("test_port")):
+            raise ValueError("upf_transit needs its peer and test_port")
 
     async def deploy(self, *, quiet: bool = False) -> None:
         """Deploy monitoring and wait for its components and sniffers."""

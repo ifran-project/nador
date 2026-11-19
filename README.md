@@ -80,7 +80,7 @@ metrics:
 ```
 
 Probes the controller manages accept `{on_demand: true}`: they are deployed
-stopped, and `nador-controller start <probe>` starts them later. Rarely changed
+stopped, and `await monitoring.set_running("<metric>")` starts them later. Rarely changed
 knobs (probe intervals, sniffer timeouts) live under `tuning:`. Every profile must
 list all metrics, so it always says what it collects.
 
