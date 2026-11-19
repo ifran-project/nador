@@ -52,37 +52,48 @@ await monitoring.deploy()
 
 ### Metrics
 
-A profile lists every metric under `metrics:`. `true` turns a metric on, `false`
-leaves it out, and a mapping turns it on with options:
+A profile lists every metric under `metrics:`. `false` leaves a metric out. A metric
+without options is turned on with `true`; a metric with options is turned on by writing
+all of them, defaults included, so the profile shows exactly what runs. If one is missing,
+the error message gives the full line to write.
 
 ```yaml
 metrics:
-  rtt: {packet_pairing: true, imsis: ["001010000000001"]}  # round-trip latency per UE/slice
-  throughput: true             # N3 throughput per UE/slice
-  n3_one_way: false            # one-way gNB-UPF latency
-  upf_transit: false           # one-way latency through the UPF; needs {peer, test_port}
-  user_plane_paths: false      # per-path packet counters on gNBs and UPFs
-  ngap: false                  # session setup times from the AMF sniffer
-  pfcp: false                  # session establishment times from the SMF sniffer
-  ue_mapper_coverage: false    # how much UE context the mapper resolved
-  core_kpis: false             # Open5GS KPIs
-  ran_kpis: false              # OAI or OCUDU KPIs
-  logs: true                   # Loki and Promtail
-  node_metrics: false          # node exporter
-  scheduler_wait: false        # host probes: CPU, drops, queues, sockets, TCP, F1/E1, quality
+  # TCP round-trip time per UE and slice, at the gNB, the UPF or both. packet_pairing matches
+  # the same packet at both to split the latency; empty imsis/slices mean every UE and slice.
+  rtt: {on_demand: false, at: [gnb, upf], packet_pairing: false, imsis: [], slices: []}
+  throughput: {on_demand: false}  # N3 throughput per UE/slice
+  n3_one_way: false               # one-way gNB-UPF latency: {on_demand, log_samples}
+  upf_transit: false              # one-way latency through the UPF: {on_demand, peer, test_port}
+  user_plane_paths: false         # per-path packet counters: {on_demand, port, interval_seconds}
+  ngap: false                     # session setup times from the AMF sniffer: {port}
+  pfcp: false                     # session establishment times from the SMF sniffer: {port}
+  ue_mapper_coverage: false       # how much UE context the mapper resolved
+  core_kpis: false                # Open5GS KPIs
+  ran_kpis: false                 # OAI or OCUDU KPIs: {ocudu_port}
+  logs: true                      # Loki and Promtail
+  node_metrics: false             # node exporter
+  scheduler_wait: false           # host probes: {on_demand, targets}
   kernel_drops: false
   attributed_drops: false
   network_queues: false
   socket_counters: false
-  tcp_flows: false             # needs {identity_secret: <Kubernetes Secret>}
+  tcp_flows: false                # also needs identity_secret: <Kubernetes Secret>
   split_signaling: false
-  measurement_quality: false
+  measurement_quality: false      # also takes queries
 ```
 
-Probes the controller manages accept `{on_demand: true}`: they are deployed
-stopped, and `await monitoring.start("<metric>")` starts them later. Rarely changed
-knobs (probe intervals, sniffer timeouts) live under `tuning:`. Every profile must
-list all metrics, so it always says what it collects.
+Metrics the controller manages (`rtt`, `throughput`, `n3_one_way`, `upf_transit`,
+`user_plane_paths` and the host probes) take `on_demand: true` to deploy stopped.
+On a running deployment they start, stop and change scope without redeploying:
+
+```python
+await monitoring.start("rtt", slices=["01:ffffff"], at=["upf"])  # one slice, at the UPF only
+await monitoring.start("rtt", slices=[], at=["gnb", "upf"])      # back to every UE, both anchors
+await monitoring.stop("rtt")
+```
+
+Rarely changed knobs (probe intervals, sniffer timeouts) live under `tuning:`.
 
 For OCUDU native KPIs, turn on `ran_kpis` and call
 `nador.configure_ran_kpis(ran, config)` **before** deploying the RAN.

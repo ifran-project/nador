@@ -4,8 +4,8 @@ node_name: node11
 kubeconfig: /etc/kubernetes/admin.conf
 operation_timeout_seconds: 600
 metrics:
-  rtt: true
-  throughput: true
+  rtt: {on_demand: false, at: [gnb, upf], packet_pairing: false, imsis: [], slices: []}
+  throughput: {on_demand: false}
   n3_one_way: false
   upf_transit: false
   user_plane_paths: false
@@ -13,7 +13,7 @@ metrics:
   pfcp: false
   ue_mapper_coverage: false
   core_kpis: false
-  ran_kpis: true
+  ran_kpis: {ocudu_port: 8001}
   logs: true
   node_metrics: false
   scheduler_wait: false

@@ -162,9 +162,10 @@ def _controller_values(
         one_way["one_way_targets"] = anchors
 
     rtt = metrics.rtt
+    rtt_anchors = [target for target in anchors if rtt is None or target["role"] in rtt.at]
     rtt_request: dict = {
         "enabled": metrics.running("rtt"),
-        "allowed": scoped_probes_allowed and bool(anchors),
+        "allowed": scoped_probes_allowed and bool(rtt_anchors),
         "image": monitoring.image("rtt_probe"),
         "imsis": rtt.imsis if rtt else [],
         "slices": rtt.slices if rtt else [],
@@ -187,8 +188,11 @@ def _controller_values(
         "interval": paths_metric.interval_seconds if paths_metric else 5,
     }
     if monitoring.multi_anchor and controller_image:
-        rtt_request["targets"] = paths["targets"] = anchors
+        paths["targets"] = anchors
         throughput["targets"] = upfs
+    if controller_image and (monitoring.multi_anchor or len(rtt_anchors) < len(anchors)):
+        # An explicit list limits RTT probes to the anchors rtt.at names.
+        rtt_request["targets"] = rtt_anchors
 
     return {
         "targetNamespaces": sorted({target.namespace for target in targets}),

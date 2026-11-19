@@ -10,6 +10,7 @@ from ifran.models.deployment import DeploymentModel
 from ifran.models.provisioning import ProvisionableNode
 from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_role
 from metamodel_3gpp.models.metamodel import MetaModel
+from pydantic import ValidationError
 
 from nador.config import (
     CONTROLLER_METRICS,
@@ -161,17 +162,20 @@ class MonitoringManagement(HelmManagement):
         *,
         imsis: list[str] | None = None,
         slices: list[str] | None = None,
+        at: list[str] | None = None,
         log_samples: bool | None = None,
         quiet: bool = False,
     ) -> None:
-        """Start a deployed controller-managed metric, without reinstalling.
+        """Start a deployed controller-managed metric, or change its scope, without reinstalling.
 
         ``imsis`` and ``slices`` narrow ``rtt`` and ``throughput`` to some UEs (an empty list clears
-        the filter); ``log_samples`` applies to ``n3_one_way``. Host-probe metrics start and stop
+        the filter); ``at`` moves ``rtt`` to ``["gnb"]``, ``["upf"]`` or both; ``log_samples``
+        applies to ``n3_one_way``. Host-probe metrics start and stop
         with their probe, so ``kernel_drops`` and ``attributed_drops`` move together.
         ``tcp_flows`` and ``attributed_drops`` only collect when they were deployed running.
         """
-        await self._switch(metric, True, {"imsis": imsis, "slices": slices, "log_samples": log_samples}, quiet)
+        options = {"imsis": imsis, "slices": slices, "at": at, "log_samples": log_samples}
+        await self._switch(metric, True, options, quiet)
 
     async def stop(self, metric: str, *, quiet: bool = False) -> None:
         """Stop a controller-managed metric; ``start`` resumes it."""
@@ -184,19 +188,14 @@ class MonitoringManagement(HelmManagement):
             raise ValueError(f"{metric} is not started or stopped by the controller")
         if not metrics.available(metric):
             raise ValueError(f"Deploy with metrics.{metric} (on_demand: true starts it stopped)")
-        allowed = {"rtt": {"imsis", "slices"}, "throughput": {"imsis", "slices"}, "n3_one_way": {"log_samples"}}
+        allowed = {"rtt": {"imsis", "slices", "at"}, "throughput": {"imsis", "slices"}, "n3_one_way": {"log_samples"}}
         extra = {key for key, value in options.items() if value is not None} - allowed.get(metric, set())
         if extra:
             raise ValueError(f"{metric} does not take {', '.join(sorted(extra))}")
         if running:
             self._check_startable(metric)
-        if metric in HOST_PROBES:
-            kind = kind_of(metric)
-            moved = [name for name in HOST_PROBES if kind_of(name) == kind and metrics.available(name)]
-            settings: dict[str, Any] = {"host_probes": {kind: running}}
-        else:
-            moved = [metric]
-            settings = {metric: {"enabled": running} | {k: v for k, v in options.items() if v is not None}}
+        given = {k: v for k, v in options.items() if v is not None}
+        moved, settings = self._settings_change(metric, running, given)
         await self._run_tasks("patch_controller_settings", settings=settings, quiet=quiet)
         # Keep the in-memory profile in step, so plan() and later saves show what runs.
         for name in moved:
@@ -205,8 +204,39 @@ class MonitoringManagement(HelmManagement):
                 continue
             update: dict[str, Any] = {"on_demand": not running}
             if name == metric:
-                update |= {k: v for k, v in options.items() if v is not None and k in type(current).model_fields}
+                update |= {k: v for k, v in given.items() if k in type(current).model_fields}
             setattr(metrics, name, current.model_copy(update=update))
+
+    def _settings_change(self, metric: str, running: bool, given: dict[str, Any]) -> tuple[list[str], dict]:
+        """The metrics a start or stop moves, and the partial settings the controller reads."""
+        metrics = self.deployment_model.monitoring.metrics
+        if metric in HOST_PROBES:
+            kind = kind_of(metric)
+            moved = [name for name in HOST_PROBES if kind_of(name) == kind and metrics.available(name)]
+            return moved, {"host_probes": {kind: running}}
+        current = metrics.get(metric)
+        if current is not None and given:
+            # Same checks as the profile: IMSI and slice formats, packet pairing needs both anchors.
+            try:
+                type(current).model_validate(current.model_dump() | given)
+            except ValidationError as exc:
+                problems = "; ".join(
+                    ": ".join([*(str(part) for part in e["loc"][:1]), e["msg"].removeprefix("Value error, ")])
+                    for e in exc.errors()
+                )
+                raise ValueError(f"{metric}: {problems}") from None
+        change: dict[str, Any] = {"enabled": running} | given
+        if "at" in change:
+            change["targets"] = self._rtt_anchors(change.pop("at"))
+        return [metric], {metric: change}
+
+    def _rtt_anchors(self, at: list[str]) -> list[dict[str, Any]]:
+        """The gNB/UPF targets RTT probes should run on, as the controller's target list."""
+        anchors = [target.values() for target in resolve_targets(self.deployment_model) if target.role in at]
+        missing = set(at) - {anchor["role"] for anchor in anchors}
+        if missing:
+            raise ValueError(f"rtt cannot measure at {', '.join(sorted(missing))}: no target has that role")
+        return anchors
 
     def _check_startable(self, metric: str) -> None:
         """The checks the controller's API made, against the settings it was deployed with."""

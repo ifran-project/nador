@@ -10,7 +10,7 @@ import json
 import re
 from ipaddress import IPv4Address
 from pathlib import Path
-from typing import Annotated, Any, Literal, Self
+from typing import Annotated, Any, Literal, Self, get_args
 
 import yaml
 from ifran.models.deployment import DeploymentModel
@@ -72,11 +72,29 @@ class OnDemand(Metric):
 
 
 class Rtt(OnDemand):
-    """Round-trip latency per UE and slice, measured by eBPF probes on gNBs and UPFs."""
+    """TCP round-trip time per UE and slice, measured by eBPF probes on the N3 side of gNBs and UPFs.
 
+    ``at`` chooses where it is measured; ``packet_pairing`` matches the same packet at both to split
+    the latency into segments, so it needs ``at: [gnb, upf]``. Empty ``imsis`` and ``slices`` mean all.
+    """
+
+    at: list[Literal["gnb", "upf"]] = Field(default_factory=lambda: ["gnb", "upf"], min_length=1)
     packet_pairing: bool = False
     imsis: list[str] = Field(default_factory=list)
     slices: list[str] = Field(default_factory=list)
+
+    @field_validator("at")
+    @classmethod
+    def _check_at(cls, values: list[str]) -> list[str]:
+        if len(set(values)) != len(values):
+            raise ValueError("rtt at lists gnb and upf at most once each")
+        return values
+
+    @model_validator(mode="after")
+    def _pairing_needs_both(self) -> Self:
+        if self.packet_pairing and set(self.at) != {"gnb", "upf"}:
+            raise ValueError("rtt packet_pairing needs at: [gnb, upf]")
+        return self
 
     @field_validator("imsis")
     @classmethod
@@ -431,10 +449,13 @@ class MonitoringDeployment(StrictBaseModel):
     def _check_roles(self) -> None:
         """Each metric needs the network functions it measures among the targets."""
         metrics, roles = self.metrics, self.roles
-        if metrics.rtt and metrics.rtt.packet_pairing and (metrics.rtt.on_demand or not {"gnb", "upf"} <= roles):
-            raise ValueError("Packet pairing requires a running rtt metric and both gNB and UPF targets")
-        if metrics.rtt and (not {"amf", "smf"} <= roles or roles.isdisjoint({"gnb", "upf"})):
-            raise ValueError("rtt requires AMF/SMF and a gNB or UPF target")
+        if metrics.rtt and metrics.rtt.packet_pairing and metrics.rtt.on_demand:
+            raise ValueError("Packet pairing requires rtt to run from the start (on_demand: false)")
+        if metrics.rtt and not {"amf", "smf"} <= roles:
+            raise ValueError("rtt requires AMF and SMF targets to map sessions to UEs")
+        if metrics.rtt and self.targets and not set(metrics.rtt.at) <= roles:
+            missing = sorted(set(metrics.rtt.at) - roles)
+            raise ValueError(f"rtt measures at {', '.join(missing)}, but no target has that role")
         # An empty target list is allowed here so defaults can be built; plan() requires targets.
         if metrics.throughput and self.targets and not {"amf", "smf", "upf"} <= roles:
             raise ValueError("throughput requires AMF, SMF and UPF packet targets")
@@ -536,6 +557,11 @@ def validate_deployment[M: MonitoringDeployment](
         listed = listed if isinstance(listed, dict) else {}
         missing = [name for name in Metrics.model_fields if name not in listed]
         errors += [f"metrics.{name}: write true, false or its options" for name in missing]
+        errors += [
+            f"metrics.{name}: list every option, e.g. {name}: {_options_example(name, value)}"
+            for name, value in listed.items()
+            if name in Metrics.model_fields and not _lists_all_options(name, value)
+        ]
     try:
         config = model.model_validate(data)
     except ValidationError as exc:
@@ -544,6 +570,47 @@ def validate_deployment[M: MonitoringDeployment](
     if errors:
         raise ValueError(_report(source, errors))
     return config
+
+
+def _option_names(name: str) -> list[str]:
+    """Options of a metric, in declaration order (empty for metrics that are just on or off)."""
+    model = next(arg for arg in get_args(Metrics.model_fields[name].annotation) if arg is not type(None))
+    return list(model.model_fields)
+
+
+def _lists_all_options(name: str, value: Any) -> bool:
+    """Off, a metric without options, or a mapping that names every option."""
+    options = _option_names(name)
+    if value is False or value is None or not options:
+        return True
+    return isinstance(value, dict) and set(options) <= set(value)
+
+
+def _options_example(name: str, value: Any) -> str:
+    """The flow mapping to write: given values kept, other options at their default."""
+    model = next(arg for arg in get_args(Metrics.model_fields[name].annotation) if arg is not type(None))
+    given = value if isinstance(value, dict) else {}
+    parts = []
+    for option, field in model.model_fields.items():
+        if option in given:
+            shown = given[option]
+        elif field.is_required():
+            parts.append(f"{option}: <{option}>")
+            continue
+        else:
+            shown = field.get_default(call_default_factory=True)
+        parts.append(f"{option}: {_flow(shown)}")
+    return "{" + ", ".join(parts) + "}"
+
+
+def _flow(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, list):
+        return "[" + ", ".join(_flow(item) for item in value) + "]"
+    if isinstance(value, dict):
+        return "{" + ", ".join(f"{k}: {_flow(v)}" for k, v in value.items()) + "}"
+    return str(value)
 
 
 def _report(source: str, errors: list[str]) -> str:

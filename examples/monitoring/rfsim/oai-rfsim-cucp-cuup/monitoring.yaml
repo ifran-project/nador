@@ -3,8 +3,8 @@ namespace: monitoring
 node_name: node4
 kubeconfig: /etc/kubernetes/admin.conf
 metrics:
-  rtt: true
-  throughput: true
+  rtt: {on_demand: false, at: [gnb, upf], packet_pairing: false, imsis: [], slices: []}
+  throughput: {on_demand: false}
   n3_one_way: false
   upf_transit: false
   user_plane_paths: false
