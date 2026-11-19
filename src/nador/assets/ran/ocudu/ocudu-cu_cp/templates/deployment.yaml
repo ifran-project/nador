@@ -1,0 +1,177 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Chart.Name }}
+  labels:
+    app: {{ .Release.Name }}
+    {{- include "ocudu-cu_cp.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "ocudu-cu_cp.selectorLabels" . | nindent 6 }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        {{- include "ocudu-cu_cp.selectorLabels" . | nindent 8 }}
+        app: {{ .Release.Name }}
+    {{- if or .Values.staticPodIp (and .Values.multus.enabled .Values.multus.interfaces) }}
+      annotations:
+
+        {{- if .Values.staticPodIp }}
+        cni.projectcalico.org/ipAddrs: '["{{ .Values.staticPodIp }}"]'
+        {{- end }}
+
+        {{- if and .Values.multus.enabled .Values.multus.interfaces }}
+        k8s.v1.cni.cncf.io/networks: |-
+          [
+          {{- $first := true }}
+          {{- range .Values.multus.interfaces }}
+          {{- if .enabled }}
+            {{- if not $first }},{{- end }}
+            {
+              "name": "{{ $.Release.Name }}-{{ .name }}",
+              "interface": "{{ .name }}"
+              {{- if .mac }},
+              "mac": "{{ .mac }}"
+              {{- end }}
+              {{- if .defaultRoute }},
+              "default-route": ["{{ .defaultRoute }}"]
+              {{- end }}
+              {{- if .gateway }},
+              "gateway": "{{ .gateway }}"
+              {{- end }}
+            }
+            {{- $first = false }}
+          {{- end }}
+          {{- end }}
+          ]
+        {{- end }}
+    {{- end }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.imagePullSecrets | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: cucp
+        image: "{{ .Values.nfimage.repository }}:{{ .Values.nfimage.version }}"
+        # console of the CU-CP: handover command "ho <serving pci> <rnti> <target pci>", written with kubectl attach -i
+        # (nador.handover.run_handover)
+        stdin: true
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        volumeMounts:
+          - name: configuration
+            mountPath: /etc/config
+          - name: host-mount
+            mountPath: /mnt/
+        {{- if .Values.resources.define}}
+        resources:
+          requests:
+            memory: {{ .Values.resources.requests.nf.memory | quote }}
+            cpu: {{ .Values.resources.requests.nf.cpu | quote }}
+          limits:
+            memory: {{ .Values.resources.limits.nf.memory | quote }}
+            cpu: {{ .Values.resources.limits.nf.cpu | quote }}
+        {{- end}}
+        {{- if .Values.readinessProbe}}
+        readinessProbe:
+          exec:
+            command: ["pgrep", "ocucp"]
+          initialDelaySeconds: 0
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 6
+          successThreshold: 1
+        {{- end}}
+        {{- if .Values.livenessProbe}}
+        livenessProbe:
+          exec:
+            command: ["pgrep", "ocucp"]
+          initialDelaySeconds: 90
+          periodSeconds: 30
+          timeoutSeconds: 1
+          failureThreshold: 3
+          successThreshold: 1
+        {{- end}}
+        securityContext:
+           privileged: true
+        ports:
+        {{- range $name, $port := .Values.exposedPorts }}
+        - containerPort: {{ $port.port }}
+          name: {{ $name }}
+          {{- if $port.protocol }}
+          protocol: {{ $port.protocol }}
+          {{- end }}
+        {{- end }}
+        {{- if .Values.customEntrypointCommand}}
+        command:
+          {{- toYaml .Values.customEntrypointCommand | nindent 10 }}
+        {{- else if .Values.start.cu_cp }}
+        command: [ "/usr/local/bin/ocucp", "-c", "/etc/config/config.yaml" ]
+        {{- else }}
+        command: [ "/bin/sleep", "infinity" ]
+        {{- end }}
+        {{- if .Values.extraEnvVars }}
+        env:
+          {{- range $key, $value := .Values.extraEnvVars }}
+          - name: {{ $key }}
+            value: {{ $value | quote }}
+          {{- end }}
+        {{- end }}
+      {{- if .Values.includeTcpDumpContainer }}
+      - name: tcpdump
+        image: "{{ .Values.tcpdumpimage.repository }}:{{ .Values.tcpdumpimage.version }}"
+        imagePullPolicy: {{ .Values.tcpdumpimage.pullPolicy }}
+        securityContext:
+          capabilities:
+            add: [ "NET_ADMIN", "NET_RAW" ]
+            drop: [ "ALL" ]
+        {{- if .Values.resources.define }}
+        resources:
+          requests:
+            cpu: {{ .Values.resources.requests.tcpdump.cpu | quote }}
+            memory: {{ .Values.resources.requests.tcpdump.memory | quote }}
+          limits:
+            cpu: {{ .Values.resources.limits.tcpdump.cpu | quote }}
+            memory: {{ .Values.resources.limits.tcpdump.memory | quote }}
+        {{- end }}
+        {{- if .Values.start.tcpdump }}
+        command: [ "/bin/sh", "-c", "/usr/bin/tcpdump -i any -w /tmp/pcap/{{ .Chart.Name }}_$(date +%Y-%m-%d_%H_%M-%S-%Z).pcap" ]
+        {{- else }}
+        command: [ "/bin/sleep", "infinity" ]
+        {{- end }}
+      {{- end }}
+      volumes:
+        - name: configuration
+          configMap:
+            name: {{ .Chart.Name }}-configmap
+        - name: host-mount
+          hostPath:
+            path: /mnt/
+            type: Directory
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      serviceAccountName: {{ .Chart.Name }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+         {{- toYaml .Values.nodeSelector | nindent 12 }}
+      {{- end }}
+      {{- if .Values.affinity }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 12 }}
+      {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 12 }}
+      {{- end }}
+      {{- if .Values.nodeName }}
+      nodeName: {{ .Values.nodeName }}
+      {{- end }}
