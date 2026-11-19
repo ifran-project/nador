@@ -52,38 +52,43 @@ await monitoring.deploy()
 
 ### Metrics
 
-A profile lists every metric under `metrics:`. `false` leaves a metric out. A metric
+A profile lists every metric under `metrics:`, grouped by where it measures: the RAN,
+the core, end to end between them, or the hosts. `false` leaves a metric out. A metric
 without options is turned on with `true`; a metric with options is turned on by writing
-all of them, defaults included, so the profile shows exactly what runs. If one is missing,
-the error message gives the full line to write.
+all of them, defaults included, so the profile shows exactly what runs. If one is missing
+or in the wrong group, the error message says what to write.
 
 ```yaml
 metrics:
-  # TCP round-trip time per UE and slice, at the gNB, the UPF or both. packet_pairing matches
-  # the same packet at both to split the latency; empty imsis/slices mean every UE and slice.
-  rtt: {on_demand: false, at: [gnb, upf], packet_pairing: false, imsis: [], slices: []}
-  throughput: {on_demand: false}  # N3 throughput per UE/slice
-  n3_one_way: false               # one-way gNB-UPF latency: {on_demand, log_samples}
-  upf_transit: false              # one-way latency through the UPF: {on_demand, peer, test_port}
-  user_plane_paths: false         # per-path packet counters: {on_demand, port, interval_seconds}
-  ngap: false                     # session setup times from the AMF sniffer: {port}
-  pfcp: false                     # session establishment times from the SMF sniffer: {port}
-  ue_mapper_coverage: false       # how much UE context the mapper resolved
-  ran_kpis: false                 # OAI or OCUDU KPIs: {ocudu_port}
-  logs: true                      # Loki and Promtail
-  node_metrics: false             # node exporter
-  scheduler_wait: false           # host probes: {on_demand, targets}
-  kernel_drops: false
-  attributed_drops: false
-  network_queues: false
-  socket_counters: false
-  tcp_flows: false                # also needs identity_secret: <Kubernetes Secret>
-  split_signaling: false
-  measurement_quality: false      # also takes queries
+  ran:
+    ran_kpis: false                 # OAI or OCUDU KPIs: {ocudu_port}
+    split_signaling: false          # F1/E1 signalling (split RANs): {on_demand, targets}
+  core:
+    ngap: false                     # session setup times from the AMF sniffer: {port}
+    pfcp: false                     # session establishment times from the SMF sniffer: {port}
+    throughput: {on_demand: false}  # N3 throughput per UE/slice, at the UPFs
+    upf_transit: false              # one-way latency through the UPF: {on_demand, peer, test_port}
+    ue_mapper_coverage: false       # how much UE context the mapper resolved
+  e2e:
+    # TCP round-trip time per UE and slice, at the gNB, the UPF or both. packet_pairing matches
+    # the same packet at both to split the path; empty imsis/slices mean every UE and slice.
+    rtt: {on_demand: false, at: [gnb, upf], packet_pairing: false, imsis: [], slices: []}
+    n3_one_way: false               # one-way gNB-UPF latency: {on_demand, log_samples}
+    user_plane_paths: false         # per-path packet counters: {on_demand, port, interval_seconds}
+  host:
+    node_metrics: false             # node exporter
+    logs: true                      # Loki and Promtail
+    scheduler_wait: false           # host probes: {on_demand, targets}
+    kernel_drops: false
+    attributed_drops: false
+    network_queues: false
+    socket_counters: false
+    tcp_flows: false                # also needs identity_secret: <Kubernetes Secret>
+    measurement_quality: false      # also takes queries
 ```
 
 Metrics the controller manages (`rtt`, `throughput`, `n3_one_way`, `upf_transit`,
-`user_plane_paths` and the host probes) take `on_demand: true` to deploy stopped.
+`user_plane_paths`, `split_signaling` and the host probes) take `on_demand: true` to deploy stopped.
 On a running deployment they start, stop and change scope without redeploying:
 
 ```python

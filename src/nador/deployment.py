@@ -14,6 +14,7 @@ from pydantic import ValidationError
 
 from nador.config import (
     CONTROLLER_METRICS,
+    GROUP_OF,
     DeployedMonitoringComponent,
     Metrics,
     MonitoringDeployment,
@@ -188,7 +189,7 @@ class MonitoringManagement(HelmManagement):
         if metric not in CONTROLLER_METRICS and metric not in HOST_PROBES:
             raise ValueError(f"{metric} is not started or stopped by the controller")
         if not metrics.available(metric):
-            raise ValueError(f"Deploy with metrics.{metric} (on_demand: true starts it stopped)")
+            raise ValueError(f"Deploy with metrics.{GROUP_OF[metric]}.{metric} (on_demand: true starts it stopped)")
         allowed = {"rtt": {"imsis", "slices", "at"}, "throughput": {"imsis", "slices"}, "n3_one_way": {"log_samples"}}
         extra = {key for key, value in options.items() if value is not None} - allowed.get(metric, set())
         if extra:
@@ -256,7 +257,7 @@ class MonitoringManagement(HelmManagement):
             return
         one_way = values.get("oneWay", {})
         if not one_way.get("image"):
-            raise ValueError(f"Deploy with metrics.{metric} first")
+            raise ValueError(f"Deploy with metrics.{GROUP_OF[metric]}.{metric} first")
         if metric == "upf_transit" and not (one_way["upf_transit"].get("peer") and one_way.get("test_port")):
             raise ValueError("upf_transit needs its peer and test_port")
 
@@ -295,7 +296,7 @@ class MonitoringManagement(HelmManagement):
         before = previous.components
         had_sniffers = previous.needs_session_stack
         data = previous.model_dump(mode="python")
-        data["metrics"][metric] = value
+        data["metrics"][GROUP_OF[metric]][metric] = value
         self.deployment_model.monitoring = validate_deployment(data, explicit=True)
         try:
             plan = self.plan()

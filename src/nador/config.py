@@ -17,7 +17,16 @@ from ifran.models.deployment import DeploymentModel
 from ifran.models.k8s import ContainerImage
 from ifran.utils.utils import deep_merge
 from metamodel_3gpp.models.base import StrictBaseModel
-from pydantic import AfterValidator, BeforeValidator, Field, ValidationError, field_validator, model_validator
+from pydantic import (
+    AfterValidator,
+    BeforeValidator,
+    Field,
+    SerializerFunctionWrapHandler,
+    ValidationError,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
 from nador.probes import HOST_PROBES, image_key, kind_of
 
@@ -200,28 +209,78 @@ def _on_off(value: Any) -> Any:
 Switch = BeforeValidator(_on_off)
 
 
-class Metrics(StrictBaseModel):
-    """Every metric NADOR can collect. Each is ``None`` when off."""
+# Where each metric measures; profiles write metrics under these groups.
+METRIC_GROUPS = {
+    "ran": ("ran_kpis", "split_signaling"),
+    "core": ("ngap", "pfcp", "throughput", "upf_transit", "ue_mapper_coverage"),
+    "e2e": ("rtt", "n3_one_way", "user_plane_paths"),
+    "host": (
+        "node_metrics",
+        "logs",
+        "scheduler_wait",
+        "kernel_drops",
+        "attributed_drops",
+        "network_queues",
+        "socket_counters",
+        "tcp_flows",
+        "measurement_quality",
+    ),
+}
+GROUP_OF = {name: group for group, names in METRIC_GROUPS.items() for name in names}
 
-    rtt: Annotated[Rtt | None, Switch] = None
-    throughput: Annotated[OnDemand | None, Switch] = None
-    n3_one_way: Annotated[N3OneWay | None, Switch] = None
-    upf_transit: Annotated[UpfTransit | None, Switch] = None
-    user_plane_paths: Annotated[UserPlanePaths | None, Switch] = None
+
+class Metrics(StrictBaseModel):
+    """Every metric NADOR can collect, each ``None`` when off. Profiles group them as ``METRIC_GROUPS``."""
+
+    # ran
+    ran_kpis: Annotated[RanKpis | None, Switch] = None
+    split_signaling: Annotated[HostProbe | None, Switch] = None
+    # core
     ngap: Annotated[Ngap | None, Switch] = None
     pfcp: Annotated[Pfcp | None, Switch] = None
+    throughput: Annotated[OnDemand | None, Switch] = None
+    upf_transit: Annotated[UpfTransit | None, Switch] = None
     ue_mapper_coverage: Annotated[Metric | None, Switch] = None
-    ran_kpis: Annotated[RanKpis | None, Switch] = None
-    logs: Annotated[Metric | None, Switch] = None
+    # e2e
+    rtt: Annotated[Rtt | None, Switch] = None
+    n3_one_way: Annotated[N3OneWay | None, Switch] = None
+    user_plane_paths: Annotated[UserPlanePaths | None, Switch] = None
+    # host
     node_metrics: Annotated[Metric | None, Switch] = None
+    logs: Annotated[Metric | None, Switch] = None
     scheduler_wait: Annotated[HostProbe | None, Switch] = None
     kernel_drops: Annotated[HostProbe | None, Switch] = None
     attributed_drops: Annotated[HostProbe | None, Switch] = None
     network_queues: Annotated[HostProbe | None, Switch] = None
     socket_counters: Annotated[HostProbe | None, Switch] = None
     tcp_flows: Annotated[TcpFlows | None, Switch] = None
-    split_signaling: Annotated[HostProbe | None, Switch] = None
     measurement_quality: Annotated[MeasurementQuality | None, Switch] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _ungroup(cls, data: Any) -> Any:
+        """Read ``{group: {metric: value}}``; each metric must sit in its own group."""
+        if not isinstance(data, dict):
+            return data
+        flat = {}
+        for group, entries in data.items():
+            if group not in METRIC_GROUPS:
+                hint = f"; {group} belongs under metrics.{GROUP_OF[group]}" if group in GROUP_OF else ""
+                raise ValueError(f"metrics.{group}: groups are {', '.join(METRIC_GROUPS)}{hint}")
+            if not isinstance(entries, dict):
+                raise ValueError(f"metrics.{group}: expected a mapping of metrics")
+            for name, value in entries.items():
+                if name not in GROUP_OF:
+                    raise ValueError(f"metrics.{group}.{name}: unknown metric")
+                if GROUP_OF[name] != group:
+                    raise ValueError(f"metrics.{group}.{name}: {name} belongs under metrics.{GROUP_OF[name]}")
+                flat[name] = value
+        return flat
+
+    @model_serializer(mode="wrap")
+    def _group(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        flat = handler(self)
+        return {group: {name: flat[name] for name in names} for group, names in METRIC_GROUPS.items()}
 
     def get(self, name: str) -> Metric | None:
         """The metric's options, or None when it is off."""
@@ -552,14 +611,21 @@ def validate_deployment[M: MonitoringDeployment](
     data = _complete_component_images(data)
     errors = []
     if explicit:
-        listed = data.get("metrics")
-        listed = listed if isinstance(listed, dict) else {}
+        groups = data.get("metrics")
+        groups = groups if isinstance(groups, dict) else {}
+        listed = {
+            name: value
+            for group in METRIC_GROUPS
+            if isinstance(groups.get(group), dict)
+            for name, value in groups[group].items()
+            if GROUP_OF.get(name) == group
+        }
         missing = [name for name in Metrics.model_fields if name not in listed]
-        errors += [f"metrics.{name}: write true, false or its options" for name in missing]
+        errors += [f"metrics.{GROUP_OF[name]}.{name}: write true, false or its options" for name in missing]
         errors += [
-            f"metrics.{name}: list every option, e.g. {name}: {_options_example(name, value)}"
+            f"metrics.{GROUP_OF[name]}.{name}: list every option, e.g. {name}: {_options_example(name, value)}"
             for name, value in listed.items()
-            if name in Metrics.model_fields and not _lists_all_options(name, value)
+            if not _lists_all_options(name, value)
         ]
     try:
         config = model.model_validate(data)

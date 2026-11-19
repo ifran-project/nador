@@ -3,25 +3,29 @@ namespace: monitoring
 node_name: sopnode-f2
 kubeconfig: /root/.kube/config
 metrics:
-  rtt: {on_demand: false, at: [gnb, upf], packet_pairing: false, imsis: [], slices: []}
-  throughput: {on_demand: false}
-  n3_one_way: false
-  upf_transit: false
-  user_plane_paths: false
-  ngap: false
-  pfcp: false
-  ue_mapper_coverage: false
-  ran_kpis: {ocudu_port: 8001}
-  logs: true
-  node_metrics: false
-  scheduler_wait: false
-  kernel_drops: false
-  attributed_drops: false
-  network_queues: false
-  socket_counters: false
-  tcp_flows: false
-  split_signaling: false
-  measurement_quality: false
+  ran:
+    ran_kpis: {ocudu_port: 8001}
+    split_signaling: false
+  core:
+    ngap: false
+    pfcp: false
+    throughput: {on_demand: false}
+    upf_transit: false
+    ue_mapper_coverage: false
+  e2e:
+    rtt: {on_demand: false, at: [gnb, upf], packet_pairing: false, imsis: [], slices: []}
+    n3_one_way: false
+    user_plane_paths: false
+  host:
+    node_metrics: false
+    logs: true
+    scheduler_wait: false
+    kernel_drops: false
+    attributed_drops: false
+    network_queues: false
+    socket_counters: false
+    tcp_flows: false
+    measurement_quality: false
 targets:
 - category: core
   component: amf
