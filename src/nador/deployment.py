@@ -270,7 +270,7 @@ class MonitoringManagement(HelmManagement):
             # Start capture before UEs attach, so the mapper sees session establishment.
             await self._run_tasks("inject_sniffers", targets=plan.targets, quiet=quiet)
 
-    async def deploy_metric(self, metric: str, options: dict[str, Any] | bool = True, *, quiet: bool = False) -> None:
+    async def deploy_probe(self, metric: str, options: dict[str, Any] | bool = True, *, quiet: bool = False) -> None:
         """Deploy one metric on a running deployment, or redeploy it with new options.
 
         ``options`` are written as in ``monitoring.yaml``: every option of the metric, or ``True``
@@ -279,10 +279,10 @@ class MonitoringManagement(HelmManagement):
         attached before that are only seen once they reattach.
         """
         if options is False:
-            raise ValueError("Use remove_metric to undeploy a metric")
+            raise ValueError("Use remove_probe to undeploy a metric")
         await self._change_metric(metric, options, quiet)
 
-    async def remove_metric(self, metric: str, *, quiet: bool = False) -> None:
+    async def remove_probe(self, metric: str, *, quiet: bool = False) -> None:
         """Undeploy one metric, uninstalling the releases nothing else needs."""
         if not self.deployment_model.monitoring.metrics.available(metric):
             raise ValueError(f"{metric} is not deployed")

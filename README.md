@@ -98,12 +98,12 @@ written as in the profile; only the releases the change affects are installed, u
 or removed, and the AMF/SMF sniffers start with the first metric that needs them:
 
 ```python
-await monitoring.deploy_metric("scheduler_wait", {"on_demand": False, "targets": []})
-await monitoring.remove_metric("scheduler_wait")
+await monitoring.deploy_probe("scheduler_wait", {"on_demand": False, "targets": []})
+await monitoring.remove_probe("scheduler_wait")
 ```
 
 `stop` keeps a probe installed and only removes its running pods, so `start` brings it back in
-seconds; `remove_metric` uninstalls it.
+seconds; `remove_probe` uninstalls it.
 
 Rarely changed knobs (probe intervals, sniffer timeouts) live under `tuning:`.
 
