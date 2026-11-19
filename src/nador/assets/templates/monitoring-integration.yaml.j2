@@ -2,7 +2,7 @@ targets: {{ targets | tojson }}
 dashboards:
   variant: {{ ('srsran' if model.ran.implementation | string in ['srsRAN', 'ocudu'] else 'oai') | tojson }}
 {% set metrics = monitoring.metrics %}
-logsEnabled: {{ (metrics.logs is not none) | tojson }}
+logsEnabled: {{ (metrics.log_groups | length > 0) | tojson }}
 rttEnabled: {{ metrics.running('rtt') | tojson }}
 throughputEnabled: {{ (metrics.throughput is not none) | tojson }}
 sniffers:

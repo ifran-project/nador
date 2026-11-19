@@ -221,6 +221,17 @@ def _chart_name(component: DeployedMonitoringComponent) -> str:
     return component.chart_ref.rsplit("/", 1)[-1]
 
 
+def _log_namespaces(model: MonitoringModel) -> list[str]:
+    """Namespaces whose pods' logs are kept: the RAN's, the core's and/or NADOR's own."""
+    groups = model.monitoring.metrics.log_groups
+    namespaces = {model.monitoring.namespace} if "host" in groups else set()
+    for group in ("ran", "core"):
+        if group in groups:
+            components = getattr(model, group).components.values()
+            namespaces |= {component.namespace for component in components if component.namespace}
+    return sorted(namespaces)
+
+
 def _render_chart_values(
     component: DeployedMonitoringComponent,
     model: MonitoringModel,
@@ -239,6 +250,8 @@ def _render_chart_values(
         context = _host_probe_chart_context(model, targets, probe_name, probe_states)
     elif chart == "ocudu-metrics":
         context["ocudu_sources"] = ocudu_sources(model)
+    elif chart == "promtail":
+        context["log_namespaces"] = _log_namespaces(model)
     elif chart == "kube-prometheus-stack":
         context["target_namespaces"] = sorted({model.monitoring.namespace} | {t.namespace for t in targets})
     rendered = VALUES_TEMPLATES.get_template(f"{chart}.yaml.j2").render(
@@ -264,7 +277,7 @@ def _enabled_components(model: MonitoringModel) -> set[str]:
     enabled = {"integration", "prometheus", "grafana"}
     if monitoring.needs_session_stack:
         enabled.update(("redis", "ue-mapper-api", "monitoring-controller"))
-    if metrics.logs:
+    if metrics.log_groups:
         enabled.update(("loki", "promtail"))
     if metrics.ran_kpis:
         enabled.add("ocudu-metrics" if ran == "ocudu" else "kpi-calculator-oai")

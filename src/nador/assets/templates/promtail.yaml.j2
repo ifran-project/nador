@@ -1,5 +1,36 @@
 {% from '_component.yaml.j2' import settings with context %}
 {{ settings(split_registry=true, all_nodes=true) }}
+{# Keep only the namespaces whose logs the profile collects (metrics.<ran|core|host>.logs). #}
+{% set keep = log_namespaces | join('|') %}
 config:
   clients:
     - url: "http://monitoring-loki.{{ monitoring.namespace }}.svc:3100/loki/api/v1/push"
+  snippets:
+    extraRelabelConfigs:
+      - action: keep
+        source_labels: [__meta_kubernetes_namespace]
+        regex: {{ keep | tojson }}
+    extraScrapeConfigs: |
+      - job_name: kubernetes-sniffer-ephemeral-containers
+        static_configs:
+          - targets:
+              - localhost
+            labels:
+              job: kubernetes-sniffer-ephemeral-containers
+              __path__: /sniffer-var-log-pods/*/*sniffer*/*.log
+        relabel_configs:
+          - source_labels: [__path__]
+            regex: .*/([^_]+)_([^_]+)_[^/]+/([^/]+)/[0-9]+\.log
+            target_label: namespace
+            replacement: $1
+          - source_labels: [__path__]
+            regex: .*/([^_]+)_([^_]+)_[^/]+/([^/]+)/[0-9]+\.log
+            target_label: pod
+            replacement: $2
+          - source_labels: [__path__]
+            regex: .*/([^_]+)_([^_]+)_[^/]+/([^/]+)/[0-9]+\.log
+            target_label: container
+            replacement: $3
+          - action: keep
+            source_labels: [namespace]
+            regex: {{ keep | tojson }}

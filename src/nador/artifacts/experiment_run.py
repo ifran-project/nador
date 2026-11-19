@@ -3,7 +3,7 @@
 A run writes timeline events for the whole campaign and for each ``section``. Collectors
 (see ``collectors.py``) add evidence around it: they may ``start`` before the workload,
 ``stop`` after it, and ``collect`` data for the run's time range. With a monitoring manager
-a run saves metrics, logs (when ``metrics.logs`` is on), the UE context (when the UE mapper
+a run saves metrics, logs (when a group collects them), the UE context (when the UE mapper
 is deployed) and setup snapshots. A collector failure is recorded in
 ``experiment_metadata.json`` and never hides an exception raised by the workload.
 """
@@ -107,7 +107,7 @@ class ExperimentRun:
             collectors.append(UEContext(options, hosts))
         if monitoring is not None or prometheus_url is not None:
             collectors.append(PrometheusExport(url=prometheus_url, queries_file=self.queries_file, step=step))
-        if options.loki_url or (profile is not None and profile.metrics.logs):
+        if options.loki_url or (profile is not None and profile.metrics.log_groups):
             collectors.append(
                 LokiExport(
                     url=options.loki_url,

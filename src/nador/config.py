@@ -212,12 +212,12 @@ Switch = BeforeValidator(_on_off)
 
 # Where each metric measures; profiles write metrics under these groups.
 METRIC_GROUPS = {
-    "ran": ("ran_kpis", "split_signaling"),
-    "core": ("ngap", "pfcp", "throughput", "upf_transit", "ue_mapper_coverage"),
+    "ran": ("ran_kpis", "split_signaling", "ran_logs"),
+    "core": ("ngap", "pfcp", "throughput", "upf_transit", "ue_mapper_coverage", "core_logs"),
     "e2e": ("rtt", "n3_one_way", "user_plane_paths"),
     "host": (
         "node_metrics",
-        "logs",
+        "host_logs",
         "scheduler_wait",
         "kernel_drops",
         "attributed_drops",
@@ -230,25 +230,38 @@ METRIC_GROUPS = {
 GROUP_OF = {name: group for group, names in METRIC_GROUPS.items() for name in names}
 
 
+def profile_key(name: str) -> str:
+    """How a metric is written inside its group: ``ran_logs`` is ``logs`` under ``ran``."""
+    group = GROUP_OF[name]
+    return name.removeprefix(f"{group}_") if name == f"{group}_logs" else name
+
+
+def metric_path(name: str) -> str:
+    """The metric's place in a profile, such as ``metrics.e2e.rtt`` or ``metrics.core.logs``."""
+    return f"metrics.{GROUP_OF[name]}.{profile_key(name)}"
+
+
 class Metrics(StrictBaseModel):
     """Every metric NADOR can collect, each ``None`` when off. Profiles group them as ``METRIC_GROUPS``."""
 
     # ran
     ran_kpis: Annotated[RanKpis | None, Switch] = None
     split_signaling: Annotated[HostProbe | None, Switch] = None
+    ran_logs: Annotated[Metric | None, Switch] = None  # pods in the RAN's namespaces
     # core
     ngap: Annotated[Ngap | None, Switch] = None
     pfcp: Annotated[Pfcp | None, Switch] = None
     throughput: Annotated[OnDemand | None, Switch] = None
     upf_transit: Annotated[UpfTransit | None, Switch] = None
     ue_mapper_coverage: Annotated[Metric | None, Switch] = None
+    core_logs: Annotated[Metric | None, Switch] = None  # pods in the core's namespaces
     # e2e
     rtt: Annotated[Rtt | None, Switch] = None
     n3_one_way: Annotated[N3OneWay | None, Switch] = None
     user_plane_paths: Annotated[UserPlanePaths | None, Switch] = None
     # host
     node_metrics: Annotated[Metric | None, Switch] = None
-    logs: Annotated[Metric | None, Switch] = None
+    host_logs: Annotated[Metric | None, Switch] = None  # NADOR's monitoring pods
     scheduler_wait: Annotated[HostProbe | None, Switch] = None
     kernel_drops: Annotated[HostProbe | None, Switch] = None
     attributed_drops: Annotated[HostProbe | None, Switch] = None
@@ -263,25 +276,27 @@ class Metrics(StrictBaseModel):
         """Read ``{group: {metric: value}}``; each metric must sit in its own group."""
         if not isinstance(data, dict):
             return data
+        keys = {(group, profile_key(name)): name for name in GROUP_OF for group in [GROUP_OF[name]]}
         flat = {}
         for group, entries in data.items():
             if group not in METRIC_GROUPS:
-                hint = f"; {group} belongs under metrics.{GROUP_OF[group]}" if group in GROUP_OF else ""
+                hint = f"; {group} belongs under {metric_path(group)}" if group in GROUP_OF else ""
                 raise ValueError(f"metrics.{group}: groups are {', '.join(METRIC_GROUPS)}{hint}")
             if not isinstance(entries, dict):
                 raise ValueError(f"metrics.{group}: expected a mapping of metrics")
-            for name, value in entries.items():
-                if name not in GROUP_OF:
-                    raise ValueError(f"metrics.{group}.{name}: unknown metric")
-                if GROUP_OF[name] != group:
-                    raise ValueError(f"metrics.{group}.{name}: {name} belongs under metrics.{GROUP_OF[name]}")
-                flat[name] = value
+            for key, value in entries.items():
+                if (group, key) in keys:
+                    flat[keys[(group, key)]] = value
+                    continue
+                places = [metric_path(name) for (_, written), name in keys.items() if written == key]
+                where = f"; it belongs under {' or '.join(places)}" if places else ": unknown metric"
+                raise ValueError(f"metrics.{group}.{key}{where}")
         return flat
 
     @model_serializer(mode="wrap")
     def _group(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
         flat = handler(self)
-        return {group: {name: flat[name] for name in names} for group, names in METRIC_GROUPS.items()}
+        return {group: {profile_key(name): flat[name] for name in names} for group, names in METRIC_GROUPS.items()}
 
     def get(self, name: str) -> Metric | None:
         """The metric's options, or None when it is off."""
@@ -295,6 +310,11 @@ class Metrics(StrictBaseModel):
         """Deployed and started."""
         metric = self.get(name)
         return metric is not None and not getattr(metric, "on_demand", False)
+
+    @property
+    def log_groups(self) -> list[str]:
+        """The groups whose pods' logs are collected: ``ran``, ``core`` and/or ``host``."""
+        return [group for group in ("ran", "core", "host") if self.get(f"{group}_logs") is not None]
 
 
 class Tuning(StrictBaseModel):
@@ -615,16 +635,14 @@ def validate_deployment[M: MonitoringDeployment](
         groups = data.get("metrics")
         groups = groups if isinstance(groups, dict) else {}
         listed = {
-            name: value
-            for group in METRIC_GROUPS
-            if isinstance(groups.get(group), dict)
-            for name, value in groups[group].items()
-            if GROUP_OF.get(name) == group
+            name: groups[GROUP_OF[name]][profile_key(name)]
+            for name in Metrics.model_fields
+            if isinstance(groups.get(GROUP_OF[name]), dict) and profile_key(name) in groups[GROUP_OF[name]]
         }
         missing = [name for name in Metrics.model_fields if name not in listed]
-        errors += [f"metrics.{GROUP_OF[name]}.{name}: write true, false or its options" for name in missing]
+        errors += [f"{metric_path(name)}: write true, false or its options" for name in missing]
         errors += [
-            f"metrics.{GROUP_OF[name]}.{name}: list every option, e.g. {name}: {_options_example(name, value)}"
+            f"{metric_path(name)}: list every option, e.g. {profile_key(name)}: {_options_example(name, value)}"
             for name, value in listed.items()
             if not _lists_all_options(name, value)
         ]

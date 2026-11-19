@@ -7,12 +7,14 @@ metrics:
   ran:
     ran_kpis: false
     split_signaling: false
+    logs: true
   core:
     ngap: false
     pfcp: false
     throughput: {on_demand: false}
     upf_transit: false
     ue_mapper_coverage: false
+    logs: true
   e2e:
     rtt: {on_demand: false, at: [gnb, upf], packet_pairing: false, imsis: [], slices: []}
     n3_one_way: false

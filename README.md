@@ -56,19 +56,22 @@ A profile lists every metric under `metrics:`, grouped by where it measures: the
 the core, end to end between them, or the hosts. `false` leaves a metric out. A metric
 without options is turned on with `true`; a metric with options is turned on by writing
 all of them, defaults included, so the profile shows exactly what runs. If one is missing
-or in the wrong group, the error message says what to write.
+or in the wrong group, the error message says what to write. `logs` collects pod logs into
+Loki per group: the RAN's pods, the core's pods, and NADOR's own monitoring pods under `host`.
 
 ```yaml
 metrics:
   ran:
     ran_kpis: false                 # OAI or OCUDU KPIs: {ocudu_port}
     split_signaling: false          # F1/E1 signalling (split RANs): {on_demand, targets}
+    logs: true                      # logs of the RAN's pods
   core:
     ngap: false                     # session setup times from the AMF sniffer: {port}
     pfcp: false                     # session establishment times from the SMF sniffer: {port}
     throughput: {on_demand: false}  # N3 throughput per UE/slice, at the UPFs
     upf_transit: false              # one-way latency through the UPF: {on_demand, peer, test_port}
     ue_mapper_coverage: false       # how much UE context the mapper resolved
+    logs: true                      # logs of the core's pods
   e2e:
     # TCP round-trip time per UE and slice, at the gNB, the UPF or both. packet_pairing matches
     # the same packet at both to split the path; empty imsis/slices mean every UE and slice.
@@ -77,7 +80,7 @@ metrics:
     user_plane_paths: false         # per-path packet counters: {on_demand, port, interval_seconds}
   host:
     node_metrics: false             # node exporter
-    logs: true                      # Loki and Promtail
+    logs: true                      # logs of NADOR's monitoring pods
     scheduler_wait: false           # host probes: {on_demand, targets}
     kernel_drops: false
     attributed_drops: false

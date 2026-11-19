@@ -21,7 +21,7 @@ datasources:
         type: prometheus
         uid: monitoring-prometheus
         url: http://monitoring-prometheus-prometheus.{{ monitoring.namespace }}.svc:9090
-{% if monitoring.metrics.logs %}
+{% if monitoring.metrics.log_groups %}
       - access: proxy
         editable: true
         isDefault: false
