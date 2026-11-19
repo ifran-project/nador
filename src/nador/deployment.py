@@ -15,6 +15,7 @@ from pydantic import ValidationError
 from nador.config import (
     CONTROLLER_METRICS,
     DeployedMonitoringComponent,
+    Metrics,
     MonitoringDeployment,
     MonitoringModel,
     ResolvedTarget,
@@ -267,6 +268,65 @@ class MonitoringManagement(HelmManagement):
         monitoring = self.deployment_model.monitoring
         if monitoring.needs_session_stack:
             # Start capture before UEs attach, so the mapper sees session establishment.
+            await self._run_tasks("inject_sniffers", targets=plan.targets, quiet=quiet)
+
+    async def deploy_metric(self, metric: str, options: dict[str, Any] | bool = True, *, quiet: bool = False) -> None:
+        """Deploy one metric on a running deployment, or redeploy it with new options.
+
+        ``options`` are written as in ``monitoring.yaml``: every option of the metric, or ``True``
+        for a metric without options. Only the releases this changes are installed or upgraded,
+        and the AMF/SMF sniffers start if this is the first metric that needs them; UEs that
+        attached before that are only seen once they reattach.
+        """
+        if options is False:
+            raise ValueError("Use remove_metric to undeploy a metric")
+        await self._change_metric(metric, options, quiet)
+
+    async def remove_metric(self, metric: str, *, quiet: bool = False) -> None:
+        """Undeploy one metric, uninstalling the releases nothing else needs."""
+        if not self.deployment_model.monitoring.metrics.available(metric):
+            raise ValueError(f"{metric} is not deployed")
+        await self._change_metric(metric, False, quiet)
+
+    async def _change_metric(self, metric: str, value: dict[str, Any] | bool, quiet: bool) -> None:
+        if metric not in Metrics.model_fields:
+            raise ValueError(f"Unknown metric {metric!r}")
+        previous = self.deployment_model.monitoring
+        before = previous.components
+        had_sniffers = previous.needs_session_stack
+        data = previous.model_dump(mode="python")
+        data["metrics"][metric] = value
+        self.deployment_model.monitoring = validate_deployment(data, explicit=True)
+        try:
+            plan = self.plan()
+        except ValueError:
+            self.deployment_model.monitoring = previous
+            raise
+        after = plan.components
+
+        def same(name: str) -> bool:
+            old, new = before[name], after[name]
+            return old.is_installed and old.model_dump(exclude={"is_installed"}) == new.model_dump(
+                exclude={"is_installed"}
+            )
+
+        for name in after.keys() & before.keys():
+            after[name].is_installed = before[name].is_installed
+        gone = [name for name in before if name not in after and before[name].is_installed]
+        node = self._get_deployment_node(None)
+        for name in reversed(gone):
+            await _run_component_action(
+                model=self.deployment_model,
+                component=before[name],
+                component_name=name,
+                node=node,
+                action="uninstall",
+                quiet=quiet,
+            )
+        changed = [name for name in after if name not in before or not same(name)]
+        if changed:
+            await self.install(components=changed, quiet=quiet)
+        if self.deployment_model.monitoring.needs_session_stack and not had_sniffers:
             await self._run_tasks("inject_sniffers", targets=plan.targets, quiet=quiet)
 
     async def remove(self, *, quiet: bool = False) -> None:

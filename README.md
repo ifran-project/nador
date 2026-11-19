@@ -93,6 +93,18 @@ await monitoring.start("rtt", slices=[], at=["gnb", "upf"])      # back to every
 await monitoring.stop("rtt")
 ```
 
+Any metric can also be deployed or undeployed on a running deployment. Options are
+written as in the profile; only the releases the change affects are installed, upgraded
+or removed, and the AMF/SMF sniffers start with the first metric that needs them:
+
+```python
+await monitoring.deploy_metric("scheduler_wait", {"on_demand": False, "targets": []})
+await monitoring.remove_metric("scheduler_wait")
+```
+
+`stop` keeps a probe installed and only removes its running pods, so `start` brings it back in
+seconds; `remove_metric` uninstalls it.
+
 Rarely changed knobs (probe intervals, sniffer timeouts) live under `tuning:`.
 
 For OCUDU native KPIs, turn on `ran_kpis` and call
