@@ -1,8 +1,9 @@
 """The monitoring profile: which metrics to collect, where, and how it is read from YAML.
 
 A profile (``monitoring.yaml``) becomes a ``MonitoringDeployment``. Every metric is a key
-under ``metrics:``: ``true`` turns it on, ``false`` leaves it out, and a mapping turns it
-on with options. Probes the controller can start later take ``{on_demand: true}``.
+under its group in ``metrics:`` (``ran``, ``core``, ``e2e``, ``host``): ``false`` leaves it
+out, ``true`` turns on a metric without options, and a mapping with every option turns on
+one that has them. Probes the controller can start later take ``on_demand: true``.
 Container images default to ``assets/images.json``; ``images:`` overrides them.
 """
 
