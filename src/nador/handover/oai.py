@@ -17,6 +17,8 @@ preamble    target DU ``TC-RNTI <new rnti>: initiating RA procedure for RAPID <p
 response    target DU ``(rnti 0x<new rnti>) CFRA procedure succeeded!`` (logged when the DU sends the response, not
                       when the UE receives it); ``ignoring RAPID <preamble>`` afterwards: the UE sent the preamble
                       again, it did not decode the response
+on target   target DU ``Received a MAC CE for C-RNTI with <new rnti>``: the UE, on the target cell, sent its new C-RNTI
+                      in the Msg3 of a contention-based random access (it had no uplink grant it could use)
 completion  CU-CP     ``(cellID <target cell>, UE ID <id> RNTI <rnti>) Received RRCReconfigurationComplete``
 release     CU-CP     ``UE <id> Handover: trigger release on cell PCI <pci>`` (``handover for UE <id>/RNTI <rnti>
                       complete!`` just before)
@@ -25,7 +27,14 @@ release     CU-CP     ``UE <id> Handover: trigger release on cell PCI <pci>`` (`
 After a failure: ``Reestablishment RNTI <r> req C-RNTI <c> physCellId <pci>`` (re-establishment), ``handover for UE
 <id>/RNTI <rnti> failed, rollback`` (the CU-CP keeps the UE on the source cell), ``Create UE context: CU UE ID <id>``
 (new attachment). OAI before 2026.w45 aborts the target DU ("Could not encode CellGroup") when the UE re-establishes
-on it with SRB1 only.
+on it with SRB1 only; 2026.w46 still aborts it after such a failed handover on the R2Lab Benetel setup.
+
+OAI 2026.w46 (``ue_context_setup_request``): the target DU creates the UE with the CellGroup built without the UE
+capabilities (``SRS configured with 1 ports`` just before ``Added new CFRA process``), then sends the UE, in the
+handover command, a copy updated with the capabilities of the UE (``SRS configured with 2 ports`` just after). After
+the random access, it keeps scheduling the UE with the first one, until the UE acknowledges an RRC message sent by
+this DU (``ack_reconfig``): when the two differ (SRS ports, uplink rank), the UE and the DU do not use the same DCI,
+and the UE cannot send its RRCReconfigurationComplete.
 """
 
 import re
@@ -38,6 +47,9 @@ __all__ = ["CONTAINERS", "analyze_oai_handover", "connected_ues", "trigger_comma
 CONTAINERS = ("gnb", "cu", "cucp", "cuup", "du")
 # Lines read at the end of a DU log to tell which UEs it still serves (MAC statistics every 1.28 s).
 STATS_TAIL_LINES = 300
+# Lines around "Added new CFRA process" where the target DU logs the SRS ports of the two CellGroups of the UE.
+SRS_LINES_BEFORE = 3
+SRS_LINES_AFTER = 12
 # CU-CP refusals of the trigger command.
 REFUSALS = (
     "cannot trigger handover",
@@ -135,6 +147,19 @@ def _cucp(ue: int, lines: list[str]) -> dict:  # noqa: C901, PLR0912 (one branch
     return found
 
 
+def _srs_ports(new: str, lines: list[str]) -> tuple[int, int] | None:
+    """SRS ports of the CellGroup without, then with, the UE capabilities, logged around the CFRA process of the UE."""
+    prepared = [i for i, line in enumerate(lines) if f"Added new CFRA process for UE RNTI {new}" in line]
+    if not prepared:
+        return None
+    i = prepared[-1]
+    ports = [
+        [int(m.group(1)) for line in part if (m := re.search(r"SRS configured with (\d+) ports", line))]
+        for part in (lines[max(0, i - SRS_LINES_BEFORE) : i], lines[i + 1 : i + 1 + SRS_LINES_AFTER])
+    ]
+    return (ports[0][-1], ports[1][0]) if ports[0] and ports[1] else None
+
+
 def _target_du(target: str, new: str | None, lines: list[str]) -> dict:  # noqa: C901 (one branch per kind of line)
     """Target DU lines: CFRA preparation of the UE, its preamble, the response, preamble sent again, abort."""
     found: dict = {"retransmissions": 0, "events": []}
@@ -146,6 +171,9 @@ def _target_du(target: str, new: str | None, lines: list[str]) -> dict:  # noqa:
     if new is None:
         return found
     found["rnti"] = new
+    found["c_rnti_ce"] = 0
+    if ports := _srs_ports(new, lines):
+        found["srs_ports"] = ports
     for line in after_last(lines, f"Added new CFRA process for UE RNTI {new}"):
         if m := re.search(rf"Added new CFRA process for UE RNTI {new} .*preamble\(s\):\s+(\d+)", line):
             found["preparation"], found["preamble"] = line, int(m.group(1))
@@ -156,6 +184,10 @@ def _target_du(target: str, new: str | None, lines: list[str]) -> dict:  # noqa:
         elif "response" in found and re.search(rf"ignoring RAPID {found.get('preamble')}\b", line):
             found["retransmissions"] += 1
             found.setdefault("retransmission", line)
+        elif f"Received a MAC CE for C-RNTI with {new}" in line:
+            found["c_rnti_ce"] += 1
+        elif re.search(rf"UE {new}: ulsch_rounds ", line):
+            found["ul_stats"] = line
         elif "re-establishment with only one LCID" in line:
             found["events"].append(f"{target}: re-establishment with SRB1 only refused (OAI 2026.w45 and later)")
         elif "Could not encode CellGroup" in line or "Assertion" in line:
@@ -210,6 +242,8 @@ def analyze_oai_handover(
     for step in report.steps:
         step.evidence = clean(step.evidence)
     report.aftermath = cucp["events"] + du["events"]
+    if "ul_stats" in du:
+        report.aftermath.append(f"{target}: uplink of RNTI {du['rnti']}: {clean(du['ul_stats'])}")
     report.success = completed
 
     if report.success:
@@ -228,6 +262,19 @@ def analyze_oai_handover(
             f"{target} never received the dedicated preamble {report.preamble}: the UE did not execute the "
             "handover command (not received from the source cell), or its preamble did not reach the target RU."
         )
+    elif du.get("c_rnti_ce"):
+        report.diagnosis = (
+            f"The UE reached the target cell: it sent its new C-RNTI {du['rnti']} to {target} in "
+            f"{du['c_rnti_ce']} contention-based random access(es), but {target} did not decode its uplink "
+            "afterwards, and its RRCReconfigurationComplete never reached the CU-CP."
+        )
+        before, after = du.get("srs_ports", (None, None))
+        if before is not None and before != after:
+            report.diagnosis += (
+                f" {target} prepared the UE with a CellGroup without its capabilities (SRS on {before} port(s)) and "
+                f"sent it a CellGroup with its capabilities (SRS on {after} port(s)): OAI keeps scheduling the UE with "
+                "the first one after the random access, so the UE and the DU do not use the same uplink configuration."
+            )
     elif du["retransmissions"]:
         report.diagnosis = (
             "The UE did not decode the random access response of the target cell: it sent its dedicated "
