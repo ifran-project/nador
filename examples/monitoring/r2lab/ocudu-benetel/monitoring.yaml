@@ -7,7 +7,7 @@ packet_pairing: true
 loki: true
 core_kpis: false
 ran_kpis: false
-# OCUDU: no metrics sidecar (the OAI statistics parser does not apply); RAN KPIs off
+# RAN KPIs off (OAI KPI calculator); the gNB exports the OCUDU JSON metrics on port 9090 (metrics-exporter sidecar)
 targets:
 - category: core
   component: amf
@@ -32,3 +32,5 @@ targets:
   role: gnb
   container: gnb
   interface: eth0
+  # OCUDU JSON metrics of the gNB (metrics-exporter sidecar)
+  metrics_port: 9090

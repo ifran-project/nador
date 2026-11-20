@@ -32,7 +32,7 @@ import re
 
 from nador.handover.report import HandoverReport, Step, after_last, clean
 
-__all__ = ["CONTAINERS", "analyze_oai_handover", "trigger_command"]
+__all__ = ["CONTAINERS", "analyze_oai_handover", "connected_ues", "trigger_command"]
 
 # Container running the gNB, CU-CP or DU in each pod of the OAI charts (the others are sidecars).
 CONTAINERS = ("gnb", "cu", "cucp", "cuup", "du")
@@ -61,6 +61,38 @@ def trigger_command(ue_id: int, telnet_port: int) -> str:
         'while IFS= read -r -t 2 line <&3; do printf "%s\\n" "$line"; done; '
         "exec 3<&-; exec 3>&-"
     )
+
+
+# CU-CP refusals that need an explanation: what the CU-CP checks, and what to do.
+REFUSAL_HINTS = {
+    "no DRB configured": (
+        "the UE has no data radio bearer at the CU-CP: it registered but has no PDU session, and the target DU is "
+        "prepared only for a UE with at least one DRB (TS 38.473, 8.3.1.2). Hand over a UE with a PDU session: "
+        "nador.handover.oai.connected_ues() lists the UEs of the CU-CP and whether they have a DRB."
+    ),
+}
+
+
+def connected_ues(cucp_log: str) -> list[dict]:
+    """
+    UE contexts of the CU-CP log still present, in creation order: CU UE ID, RNTI, cell, and whether a DRB exists.
+
+    A UE without DRB registered but has no PDU session (no data): OAI refuses to hand it over. The CU UE ID of a UE that
+    attached again is reused, so the last context of an ID is the one kept.
+    """
+    ues: dict[int, dict] = {}
+    for line in cucp_log.splitlines():
+        if m := re.search(r"\(cellID (\d+), UE ID (\d+) RNTI ([0-9a-f]+)\) Create UE context", line):
+            ues[int(m.group(2))] = {"ue": int(m.group(2)), "rnti": m.group(3), "cell": int(m.group(1)), "drb": False}
+        elif m := re.search(r"removed UE CU UE ID (\d+)/", line):
+            ues.pop(int(m.group(1)), None)
+        elif (m := re.search(r"UE (\d+): created new DRB", line)) and int(m.group(1)) in ues:
+            ues[int(m.group(1))]["drb"] = True
+        elif (m := re.search(r"UE (\d+): update CU F1AP Context .* RNTI [0-9a-f]+ => ([0-9a-f]+)", line)) and int(
+            m.group(1)
+        ) in ues:
+            ues[int(m.group(1))]["rnti"] = m.group(2)
+    return list(ues.values())
 
 
 def _cucp(ue: int, lines: list[str]) -> dict:  # noqa: C901, PLR0912 (one branch per kind of log line)
@@ -184,7 +216,11 @@ def analyze_oai_handover(
         report.diagnosis = "The UE completed the handover on the target cell."
     elif "decision" not in cucp:
         refusal = f" It answered: {clean(cucp['refusal'])}" if "refusal" in cucp else ""
-        report.diagnosis = f"The CU-CP did not trigger the handover: check the CU UE ID and the telnet answer.{refusal}"
+        hints = [hint for key, hint in REFUSAL_HINTS.items() if key in cucp.get("refusal", "")]
+        report.diagnosis = (
+            f"The CU-CP did not trigger the handover: check the CU UE ID and the telnet answer.{refusal}"
+            + (f" Meaning: {hints[0]}" if hints else "")
+        )
     elif "preparation" not in du:
         report.diagnosis = f"{target} did not prepare the UE (no CFRA process): UE context setup failed on the target."
     elif "preamble_line" not in du:

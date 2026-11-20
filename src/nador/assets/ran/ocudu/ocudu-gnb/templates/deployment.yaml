@@ -166,6 +166,28 @@ spec:
             {{- end }}
           {{- end }}
 
+        {{- if and .Values.metricsExporter .Values.metricsExporter.enabled }}
+        # JSON metrics of the remote control server of the container (metrics_subscribe) exported for Prometheus on
+        # port 9090 (telegraf image of srsran-helm, as in 5g_ansible): ue_*, cell_*, ofh_* metrics
+        - name: metrics-exporter
+          image: {{ required "metricsExporter.image is required" .Values.metricsExporter.image | quote }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: WS_URL
+              value: {{ printf "127.0.0.1:%v" .Values.metricsExporter.port | quote }}
+          ports:
+            - name: metrics
+              containerPort: 9090
+          resources:
+            # requests equal to limits: the pod must stay Guaranteed for the static CPU manager
+            requests:
+              cpu: 100m
+              memory: 200Mi
+            limits:
+              cpu: 100m
+              memory: 200Mi
+        {{- end }}
+
         {{- if .Values.includeTcpDumpContainer }}
         - name: tcpdump
           image: "{{ .Values.tcpdumpimage.repository }}:{{ .Values.tcpdumpimage.version }}"
