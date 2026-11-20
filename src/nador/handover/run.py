@@ -104,7 +104,9 @@ async def _trigger_ocudu(
     pod: str,
 ) -> tuple[str, str, int]:
     """Send trigger_handover to the remote control server of the OCUDU CU-CP: (request, answer, target PCI)."""
-    remote_control = (ran.deployment_model.ran.components[cucp].advanced_config or {}).get("remote_control") or {}  # type: ignore[union-attr]
+    # advanced_config is the IFRAN model of the CU-CP (OCUDUAdvancedCUCPConfig), remote_control a dict
+    advanced_config = ran.deployment_model.ran.components[cucp].advanced_config
+    remote_control = getattr(advanced_config, "remote_control", None) or {}
     if not remote_control.get("enabled"):
         raise ValueError(
             f"remote control of {cucp} disabled: set advanced_config.remote_control "

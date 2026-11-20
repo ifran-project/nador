@@ -42,10 +42,10 @@ After a failure: ``"Intra CU Handover Routine" failed ...`` (the CU-CP gave up: 
 reconfiguration not sent), ``UEContextReleaseCommand`` to the target DU for the target UE (handover cancelled or
 timed out), ``CCCH UL rrcReestablishmentRequest`` (re-establishment), ``CCCH UL rrcSetupRequest`` (new attachment).
 
-The F1AP, RRC and UE removal lines were checked against OCUDU logs (image 920f88c7), the remote command against the
-OCUDU source (``main``, November 2026); the other log lines come from the source of the srsRAN Project gNB
-(``main``, February 2026), from which OCUDU derives: adapt the patterns below if a step is reported missing while its
-line is in the logs.
+The lines of a successful handover (decision, preparation, command, PRACH of the target DU, completion, release) and
+of the UE attachments were checked against R2Lab logs (OCUDU image 920f88c7, 2026-11-20), the remote command against
+the OCUDU source (``main``, November 2026); the failure lines come from the source of the srsRAN Project gNB
+(``main``, February 2026), from which OCUDU derives: adapt their patterns if a failure is not recognised.
 """
 
 import re
@@ -161,7 +161,9 @@ def _cucp(lines: list[str], answer: str) -> dict:  # noqa: C901, PLR0912 (one br
         elif "CCCH UL rrcReestablishmentRequest" in line and "decision" in found:
             found["events"].append("a UE requested an RRC re-establishment (rrcReestablishmentRequest)")
         elif "CCCH UL rrcSetupRequest" in line and "decision" in found:
-            found["events"].append("a UE attached (rrcSetupRequest): the UE may have lost the link and attached again")
+            found["events"].append(
+                "a UE attached (rrcSetupRequest): another UE, or this one after losing the link (see the ping)"
+            )
     return found
 
 
@@ -250,10 +252,6 @@ def analyze_ocudu_handover(
         step.evidence = clean(step.evidence)
     report.aftermath = cucp["events"]
     report.success = completed
-    report.notes.append(
-        "OCUDU log lines taken from the srsRAN Project source: if a step is missing while its line is in the logs, "
-        "adapt the patterns of nador.handover.ocudu.",
-    )
 
     if report.success:
         report.diagnosis = "The UE completed the handover on the target cell."
