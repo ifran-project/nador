@@ -1,6 +1,8 @@
 targets: {{ targets | tojson }}
+{# OCUDU (srsRAN Project fork; IFRAN has no srsRAN implementation): srsRAN dashboard, with the ue_* metrics of the #}
+{# metrics-exporter sidecar of the OCUDU gNB or DU #}
 dashboards:
-  variant: {{ ('srsran' if model.ran.implementation | string == 'srsRAN' else 'oai') | tojson }}
+  variant: {{ ('srsran' if model.ran.implementation | string == 'ocudu' else 'oai') | tojson }}
 lokiEnabled: {{ monitoring.loki | tojson }}
 throughputEnabled: {{ monitoring.throughput | tojson }}
 observability: {{ monitoring.observability.model_dump() | tojson }}
