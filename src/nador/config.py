@@ -649,7 +649,7 @@ def validate_deployment[M: MonitoringDeployment](
     try:
         config = model.model_validate(data)
     except ValidationError as exc:
-        errors.extend(f"{'.'.join(map(str, error['loc'])) or 'profile'}: {error['msg']}" for error in exc.errors())
+        errors.extend(_error_line(error) for error in exc.errors())
         raise ValueError(_report(source, errors)) from None
     if errors:
         raise ValueError(_report(source, errors))
@@ -695,6 +695,16 @@ def _flow(value: Any) -> str:
     if isinstance(value, dict):
         return "{" + ", ".join(f"{k}: {_flow(v)}" for k, v in value.items()) + "}"
     return str(value)
+
+
+def _error_line(error: Any) -> str:
+    """One pydantic error as ``where: what``, with metrics named by their place in the profile."""
+    loc = [str(part) for part in error["loc"]]
+    if len(loc) > 1 and loc[0] == "metrics" and loc[1] in GROUP_OF:
+        loc = [metric_path(loc[1]), *loc[2:]]
+    where = ".".join(loc) or "profile"
+    message = error["msg"].removeprefix("Value error, ")
+    return message if message.startswith((f"{where}.", f"{where}:")) else f"{where}: {message}"
 
 
 def _report(source: str, errors: list[str]) -> str:
