@@ -12,6 +12,7 @@ reached over SSH when it is a ``ProvisioningManagement`` (physical UEs, such as 
 
 import ipaddress
 import json
+import shlex
 from itertools import count
 from pathlib import Path
 from typing import Any, Literal
@@ -114,12 +115,18 @@ class Iperf:
         """
         if direction not in ("uplink", "downlink"):
             raise ValueError("direction must be 'uplink' or 'downlink'")
-        command = [
+        iperf = [
             *("iperf3", "-c", self.server_ip, "-B", self.ue_ips[client], "--bind-dev", self.interface),
             *("-p", str(port), "-t", str(duration), "--connect-timeout", "10000", "-J", "--get-server-output"),
             *(["-R"] if direction == "downlink" else []),
         ]
-        return json.loads((await self._run(command, [client]))[client])
+        # iperf3 exits non-zero when a test fails, and the UE manager then drops the output with
+        # iperf's own error in it; succeeding regardless keeps the report.
+        output = (await self._run(["sh", "-c", shlex.join(iperf) + " || true"], [client]))[client]
+        try:
+            return json.loads(output)
+        except json.JSONDecodeError:
+            return {"error": f"iperf3 printed no report: {output.strip()[-500:] or 'no output'}"}
 
     async def run(self, client: str, direction: Literal["uplink", "downlink"], duration: int) -> dict[str, Any]:
         """Start a server on a fresh port, then run the client against it."""
