@@ -14,11 +14,16 @@ from nador.csi.live import CsiLiveView
 from nador.csi.rfsim import RFSIM_CHANNELS, enable_rfsim_channel_model, set_rfsim_channel
 from nador.csi.storage import prepare_csi_storage
 
-# Upstream default OAI gNB repository -> CSI logger image built from the same OAI tag.
+# OAI gNB repository -> CSI logger image built from the same OAI tag: upstream default images, and the r2labuser
+# images built by the R2Lab OAI CI (same OAI tag with the R2Lab patches) with and without CSI logger.
+# The r2labuser entries come last: select_csi_images takes the reverse of this table, and a "-csi" image without
+# CSI logging then goes back to the r2labuser image of the same build.
 CSI_IMAGE_REPOSITORIES = {
     "docker.io/oaisoftwarealliance/oai-gnb": "docker.io/r2labuser/oai-gnb-csi",
     # O-RAN 7.2 (Benetel RUs)
     "docker.io/oaisoftwarealliance/oai-gnb-fhi72": "docker.io/r2labuser/oai-gnb-fhi72-csi",
+    "docker.io/r2labuser/oai-gnb": "docker.io/r2labuser/oai-gnb-csi",
+    "docker.io/r2labuser/oai-gnb-fhi72": "docker.io/r2labuser/oai-gnb-fhi72-csi",
 }
 
 # OCUDU gNB and DU: one CSI image per component type and radio variant (ocudu-csi-logging build_image.sh -c gnb|du),
