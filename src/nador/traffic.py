@@ -8,11 +8,15 @@ report = await iperf.client("sim_ue", "downlink", 20, 5201)
 
 ``clients`` are UE containers when the manager is an IFRAN ``UEManagement``, or UE machines
 reached over SSH when it is a ``ProvisioningManagement`` (physical UEs, such as USB modems).
+
+Commands sent to UEs are plain argument lists with no spaces inside an argument and no shell:
+IFRAN runs container commands through ``kubectl exec`` as one space-joined string, so
+``sh -c "<script>"`` would be split apart.
 """
 
 import ipaddress
 import json
-import shlex
+from contextlib import suppress
 from itertools import count
 from pathlib import Path
 from typing import Any, Literal
@@ -20,12 +24,9 @@ from typing import Any, Literal
 from ifran.deployment import ProvisioningManagement
 from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_command, run_ansible_playbook
 
-# Install on the UEs only when missing, so repeated setups are quick and offline UEs that have it work.
-INSTALL = [
-    "sh",
-    "-c",
-    "command -v iperf3 >/dev/null || (apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y iperf3)",
-]
+# Finds an installed iperf3 without a shell; prints nothing when it is missing.
+FIND = ["find", "/usr", "-name", "iperf3", "-type", "f"]
+INSTALL = (["apt-get", "update"], ["env", "DEBIAN_FRONTEND=noninteractive", "apt-get", "install", "-y", "iperf3"])
 
 
 class Iperf:
@@ -66,7 +67,10 @@ class Iperf:
             runner_path=iperf._runner,
             quiet=True,
         )
-        await iperf._run(INSTALL, clients)
+        # Install only where missing, so repeated setups are quick and UEs without internet that have it work.
+        missing = [name for name, found in (await iperf._run(FIND, clients)).items() if not found.strip()]
+        for command in INSTALL if missing else ():
+            await iperf._run(command, missing)
         iperf.ue_ips = await iperf._addresses(clients)
         return iperf
 
@@ -115,18 +119,25 @@ class Iperf:
         """
         if direction not in ("uplink", "downlink"):
             raise ValueError("direction must be 'uplink' or 'downlink'")
-        iperf = [
-            *("iperf3", "-c", self.server_ip, "-B", self.ue_ips[client], "--bind-dev", self.interface),
-            *("-p", str(port), "-t", str(duration), "--connect-timeout", "10000", "-J", "--get-server-output"),
-            *(["-R"] if direction == "downlink" else []),
-        ]
-        # iperf3 exits non-zero when a test fails, and the UE manager then drops the output with
-        # iperf's own error in it; succeeding regardless keeps the report.
-        output = (await self._run(["sh", "-c", shlex.join(iperf) + " || true"], [client]))[client]
+        # iperf3 exits non-zero when a test fails and the UE manager then drops its output, so the
+        # report goes to a file (iperf3 appends to it, hence the rm) and is read back either way.
+        report = f"/tmp/nador-iperf-{port}.json"  # noqa: S108 - on the UE, rewritten by each test
+        await self._run(["rm", "-f", report], [client])
+        with suppress(RuntimeError):  # a failed test: its report says why
+            await self._run(
+                [
+                    *("iperf3", "-c", self.server_ip, "-B", self.ue_ips[client], "--bind-dev", self.interface),
+                    *("-p", str(port), "-t", str(duration), "--connect-timeout", "10000"),
+                    *("-J", "--get-server-output", "--logfile", report),
+                    *(["-R"] if direction == "downlink" else []),
+                ],
+                [client],
+            )
         try:
+            output = (await self._run(["cat", report], [client]))[client]
             return json.loads(output)
-        except json.JSONDecodeError:
-            return {"error": f"iperf3 printed no report: {output.strip()[-500:] or 'no output'}"}
+        except (RuntimeError, json.JSONDecodeError) as exc:
+            return {"error": f"iperf3 left no report: {exc}"}
 
     async def run(self, client: str, direction: Literal["uplink", "downlink"], duration: int) -> dict[str, Any]:
         """Start a server on a fresh port, then run the client against it."""
