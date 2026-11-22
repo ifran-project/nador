@@ -3,8 +3,7 @@
 
 **Network Analytics, Diagnostics, Observability, and Reporting for Mobile Networks.**
 
-Named after Nador, a city in northeastern Morocco associated with the idea of a
-lookout, NADOR helps teams monitor mobile network performance, investigate issues,
+Named after Nador, a city in northeastern Morocco associated with the idea of an observatory, NADOR helps teams monitor mobile network performance, investigate issues,
 and report their findings.
 
 NADOR extends [IFRAN](https://github.com/ifran-project/ifran), the Interoperable
