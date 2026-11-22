@@ -28,6 +28,7 @@ docs/_build/
 docs/reference/
 docs/examples/markdown/
 
-# Test coverage reports.
+# Test coverage reports and local SonarCloud scans.
 .coverage
 coverage.xml
+.scannerwork/
