@@ -34,6 +34,32 @@ jobs:
       # Unit and integration tests together; neither needs a cluster.
       - name: Test
         run: pytest -m "" --cov --cov-report=term --cov-report=xml
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage
+          path: coverage.xml
+
+  sonarqube:
+    # Secrets are not given to pull requests from forks.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: coverage
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   build:
     needs: test
@@ -96,7 +122,7 @@ jobs:
   # Trusted publishing: no token, PyPI trusts this workflow and the `pypi` environment.
   publish:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build, docs]
+    needs: [build, docs, sonarqube]
     runs-on: ubuntu-latest
     environment:
       name: pypi
