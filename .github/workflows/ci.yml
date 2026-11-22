@@ -12,10 +12,11 @@ on:
 permissions:
   contents: read
 
-# A newer push cancels the run it replaces; a release run is never cancelled.
+# A newer push to a pull request cancels its previous run. Runs on main, develop and tags always
+# finish: every commit there must pass its required checks.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
