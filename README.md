@@ -41,10 +41,16 @@ It integrates Prometheus, Grafana and Loki, correlates UE/slice/tunnel/session
 information, deploys latency, throughput and host probes, and exports experiment
 timelines and metrics. Network deployment remains handled by upstream managers.
 
-Install from GitHub. NADOR installs the supported IFRAN release from PyPI:
+Install the latest release from PyPI; it brings the supported IFRAN release with it:
 
 ```bash
-python -m pip install --upgrade "git+https://github.com/ifran-project/nador.git@main"
+python -m pip install --upgrade nador
+```
+
+To try changes that are not released yet, install the `develop` branch instead:
+
+```bash
+python -m pip install --upgrade "git+https://github.com/ifran-project/nador.git@develop"
 ```
 
 ```python
