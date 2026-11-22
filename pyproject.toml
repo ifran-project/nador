@@ -47,7 +47,7 @@ asyncio_default_fixture_loop_scope = "function"
 filterwarnings = ["error"]
 
 [tool.coverage.run]
-source = ["nador"]
+source_dirs = ["src/nador"]
 branch = true
 relative_files = true
 

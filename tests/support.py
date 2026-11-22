@@ -8,6 +8,10 @@ validation, planning, the manager's decisions) runs exactly as in production.
 from __future__ import annotations
 
 import copy
+import http.server
+import json
+import threading
+import urllib.parse
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -157,3 +161,51 @@ class Ansible:
 
     def clear(self) -> None:
         self.calls.clear()
+
+
+class HttpStub:
+    """A local HTTP server answering JSON from canned routes, standing in for Prometheus, Loki or the mapper.
+
+    ``routes`` maps a path to a function of the query parameters that returns the JSON body, or
+    ``(status, body)`` for an HTTP error. Every request is recorded in ``requests``.
+    """
+
+    def __init__(self) -> None:
+        self.routes: dict[str, Any] = {}
+        self.requests: list[tuple[str, dict[str, str]]] = []
+        stub = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self) -> None:  # noqa: N802 - http.server's naming
+                url = urllib.parse.urlsplit(self.path)
+                query = dict(urllib.parse.parse_qsl(url.query))
+                stub.requests.append((url.path, query))
+                route = stub.routes.get(url.path)
+                status, body = (404, {"error": "no route"}) if route is None else (200, route(query))
+                if isinstance(body, tuple):
+                    status, body = body
+                data = json.dumps(body).encode()
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def log_message(self, *_: Any) -> None:
+                pass
+
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.url = f"http://127.0.0.1:{self.server.server_port}"
+        self.thread = threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": 0.05}, daemon=True)
+        self.thread.start()
+
+    def close(self) -> None:
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join()
+
+
+def matrix(*series: tuple[dict[str, str], list[tuple[float, str]]]) -> dict:
+    """A successful Prometheus range-query response with the given series."""
+    result = [{"metric": labels, "values": [[t, v] for t, v in values]} for labels, values in series]
+    return {"status": "success", "data": {"resultType": "matrix", "result": result}}
