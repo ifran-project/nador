@@ -1,10 +1,13 @@
 name: CI
 
+# Tests, SonarCloud, docs and the package build run on every push to main and develop and on every
+# pull request into them. Pages publish from main only; PyPI and the GitHub release from v* tags.
 on:
   push:
     branches: [main, develop]
     tags: ["v*"]
   pull_request:
+    branches: [main, develop]
 
 permissions:
   contents: read
