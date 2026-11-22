@@ -45,6 +45,12 @@ recorder. Everything else (validation, planning, the manager's decisions) runs f
 Name a test after the behaviour it checks, build the profile it needs inside the test, and
 assert on what NADOR asks for, not on how it is implemented.
 
+## Dependencies in CI
+
+CI installs locked versions, checked by hash, from `requirements/ci.txt`. After changing a
+dependency in `pyproject.toml`, regenerate that file with the command at the top of
+`requirements/ci.in` and commit both.
+
 ## Documentation
 
 The documentation is built from `docs/` and the notebooks in `examples/`, on every pull request

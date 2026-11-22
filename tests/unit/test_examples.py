@@ -11,7 +11,8 @@ import pytest
 from nador.config import MonitoringDeployment
 
 EXAMPLES = Path(__file__).resolve().parents[2] / "examples"
-PROFILES = sorted(EXAMPLES.rglob("monitoring*.yaml"))
+# Profiles are named monitoring.yaml; notebooks save their deployment state beside them.
+PROFILES = sorted(EXAMPLES.rglob("monitoring.yaml"))
 
 
 def test_the_examples_ship_profiles():
