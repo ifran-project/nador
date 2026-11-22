@@ -1,3 +1,4 @@
+<!-- docs-start -->
 # NADOR
 
 **Network Analytics, Diagnostics, Observability, and Reporting for Mobile Networks.**
@@ -23,6 +24,10 @@ python -m pip install --upgrade "git+https://github.com/ifran-project/nador.git@
 ```python
 from nador import MonitoringManagement, MonitoringDeployment
 ```
+<!-- docs-end -->
+
+Documentation: <https://ifran-project.github.io/nador/> (guides, the quickstart, every example and
+the API reference).
 
 Start with the [minimal tutorial](examples/quickstart/tutorial.ipynb): installation,
 imports, monitoring deployment and one experiment with artifact collection.
@@ -31,13 +36,11 @@ Every container image NADOR deploys is pinned in [`assets/images.json`](src/nado
 A profile's `images:` section overrides individual entries by key. After merging an
 image update, reinstall Nador, restart the notebook kernel, and redeploy.
 
-## Development
+## Contributing
 
-```bash
-python -m pip install -e ".[dev]"
-ruff check src && ruff format --check src
-pyright src
-```
+Contributions are welcome: see
+[CONTRIBUTING.md](https://github.com/ifran-project/nador/blob/main/CONTRIBUTING.md) for how
+to set up, run the checks and open a pull request.
 
 ## Monitoring
 
@@ -159,7 +162,7 @@ Other examples are under [examples/monitoring](examples/monitoring):
 - [OCUDU ZMQ](examples/monitoring/ocudu-zmq) and [R2lab](examples/monitoring/r2lab):
   additional deployment configurations.
 
-Copyright (c) 2026 Yassir Amami. The extension is licensed under the
+Copyright (c) 2026 Yassir Amami and the NADOR contributors. The extension is licensed under the
 [BSD 3-Clause Clear License](LICENSE). Reused/adapted upstream example and chart
 material retains the [IFRAN license notice](LICENSES/IFRAN.txt).
 External dependencies and container images retain their own licenses.

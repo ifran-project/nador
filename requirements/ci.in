@@ -1,0 +1,8 @@
+# Tools CI installs besides the dev and doc extras. CI installs the locked, hashed versions in
+# requirements/ci.txt; after changing dependencies, regenerate it from the repository root with:
+#   uv pip compile pyproject.toml requirements/ci.in --extra dev --extra doc --generate-hashes \
+#     --only-binary :all: --python-version 3.12 --python-platform x86_64-unknown-linux-gnu \
+#     -o requirements/ci.txt
+build
+twine
+poetry-core>=2.0.0,<3.0.0

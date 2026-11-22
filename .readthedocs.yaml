@@ -1,0 +1,22 @@
+# Read the Docs configuration: https://docs.readthedocs.io/en/stable/config-file/v2.html
+version: 2
+
+build:
+  os: ubuntu-24.04
+  tools:
+    python: "3.13"
+  jobs:
+    pre_build:
+      # Turn the example notebooks into Markdown pages before Sphinx runs.
+      - /bin/sh ./docs/convert.sh
+
+sphinx:
+  configuration: docs/conf.py
+  builder: html
+
+python:
+  install:
+    - method: pip
+      path: .
+      extra_requirements:
+        - doc

@@ -34,7 +34,7 @@ from nador.ran_kpis import ocudu_sources
 
 ASSETS = Path(__file__).resolve().parent / "assets"
 CHARTS = ASSETS / "charts"
-REMOTE_CHARTS = "/tmp/monitoring-charts"  # noqa: S108 - written as root on the control node by the prepare role
+REMOTE_CHARTS = "/var/lib/nador/charts"  # root-owned on the control node, unlike a shared /tmp
 VALUES_TEMPLATES = Environment(  # noqa: S701 - renders YAML, not HTML; values go through tojson
     loader=FileSystemLoader(ASSETS / "templates"),
     undefined=StrictUndefined,
