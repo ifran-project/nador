@@ -5,7 +5,7 @@
     state: directory
     owner: root
     group: root
-    mode: "0755"
+    mode: "0700"
   when: component.chart_version | default('', true) | length == 0
 
 - name: Copy local monitoring chart
@@ -13,7 +13,7 @@
     src: "{{ role_path }}/../../../charts/{{ component.chart_ref | basename }}/"
     dest: "{{ component.chart_ref }}/"
     mode: preserve
-    directory_mode: "0755"
+    directory_mode: "0700"
   when: component.chart_version | default('', true) | length == 0
 
 - name: Copy shared monitoring templates
