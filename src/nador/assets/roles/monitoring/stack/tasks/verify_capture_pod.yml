@@ -31,14 +31,14 @@
       - >-
         metrics_enabled != 'true' or
         (item.env | default([]) | selectattr('name', 'equalto', metrics_prefix ~ '_PENDING_TIMEOUT_SECONDS')
-        | map(attribute='value') | first | default('')) == (monitoring_config.observability.pending_timeout_seconds | string)
+        | map(attribute='value') | first | default('')) == (sniffers.pending_timeout_seconds | string)
     fail_msg: "Active sniffer has different settings. Remove monitoring before switching sniffer images or collectors."
   vars:
     terminated: "{{ current_capture.resources[0].status.ephemeralContainerStatuses | default([]) | selectattr('state.terminated', 'defined') | map(attribute='name') | list }}"
     metrics_flag: "{{ 'AMF_NGAP' if capture_target.role == 'amf' else 'SMF_PFCP' }}_METRICS_ENABLED"
     metrics_prefix: "{{ 'AMF_NGAP' if capture_target.role == 'amf' else 'SMF_PFCP' }}"
-    metrics_port: "{{ (monitoring_config.observability.ngap_port if capture_target.role == 'amf' else monitoring_config.observability.pfcp_port) | string }}"
-    metrics_enabled: "{{ (monitoring_config.observability.ngap if capture_target.role == 'amf' else monitoring_config.observability.pfcp) | string | lower }}"
+    metrics_port: "{{ sniffers[capture_target.role].metrics_port | string }}"
+    metrics_enabled: "{{ sniffers[capture_target.role].metrics_enabled | string | lower }}"
   loop: "{{ current_capture.resources[0].spec.ephemeralContainers | default([]) }}"
   when:
     - item.name is match('^' ~ capture_target.role ~ '-sniffer-')

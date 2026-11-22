@@ -1,4 +1,4 @@
-{{- if .Values.probeControllerImage }}
+{{- if .Values.controllerImage }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -24,7 +24,7 @@ spec:
       serviceAccountName: monitoring
       containers:
         - name: latency-controller
-          image: {{ .Values.probeControllerImage | quote }}
+          image: {{ .Values.controllerImage | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             - name: MONITORING_NS
@@ -50,7 +50,7 @@ spec:
               mountPath: /controller-tls
               readOnly: true
           {{- end }}
-          {{- if get (.Values.rttRequest | default dict) "pairer_image" }}
+          {{- if get (.Values.rtt | default dict) "pairer_image" }}
           # Older images ignore pairer_image. Fail startup rather than silently falling back to unpaired RTT.
           startupProbe:
             exec:

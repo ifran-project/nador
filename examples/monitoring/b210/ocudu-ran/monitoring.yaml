@@ -2,11 +2,32 @@
 # eth0 carries core/N3 traffic in this example; retain RU-only Multus interfaces.
 # Override a target interface here if you attach N2/N3/N4 to a different pod interface.
 namespace: monitoring
-latency: true
-packet_pairing: false
-loki: true
-core_kpis: false
-ran_kpis: true
+metrics:
+  ran:
+    ran_kpis: {ocudu_port: 8001}
+    split_signaling: false
+    logs: true
+  core:
+    ngap: false
+    pfcp: false
+    throughput: {on_demand: false}
+    upf_transit: false
+    ue_mapper_coverage: false
+    logs: true
+  e2e:
+    rtt: {on_demand: false, at: [gnb, upf], packet_pairing: false, imsis: [], slices: []}
+    n3_one_way: false
+    user_plane_paths: false
+  host:
+    node_metrics: false
+    logs: true
+    scheduler_wait: false
+    kernel_drops: false
+    attributed_drops: false
+    network_queues: false
+    socket_counters: false
+    tcp_flows: false
+    measurement_quality: false
 targets:
 - category: core
   component: amf
@@ -31,25 +52,3 @@ targets:
   role: gnb
   container: gnb
   interface: eth0
-throughput: true
-observability:
-  ngap: false
-  pfcp: false
-  mapper_coverage: false
-  user_plane_paths: false
-  node_metrics: false
-extended:
-  scheduler_wait: false
-  kernel_drops: false
-  network_queues: false
-  socket_counters: false
-  split_signaling: false
-  quality: false
-  attributed_drops: false
-  tcp_flows: false
-one_way:
-  n3:
-    enabled: false
-    log_samples: false
-  upf_transit:
-    enabled: false

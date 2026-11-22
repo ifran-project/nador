@@ -1,0 +1,12 @@
+# Inputs: sampler_dir, sampler_job_id (may be empty).
+---
+- name: Forget the background job
+  ansible.builtin.async_status:
+    jid: "{{ sampler_job_id }}"
+    mode: cleanup
+  when: sampler_job_id | default('', true) | length > 0
+
+- name: Remove the sampler directory
+  ansible.builtin.file:
+    path: "{{ sampler_dir }}"
+    state: absent

@@ -1,0 +1,26 @@
+# Inputs: sampler_script (path on the controller), sampler_dir, sampler_argv, sampler_async_seconds.
+---
+- name: Create the sampler directory
+  ansible.builtin.file:
+    path: "{{ sampler_dir }}"
+    state: directory
+    mode: "0700"
+
+- name: Copy the UE context sampler
+  ansible.builtin.copy:
+    src: "{{ sampler_script }}"
+    dest: "{{ sampler_dir }}/probe.py"
+    mode: "0700"
+
+- name: Start bounded UE context sampling
+  ansible.builtin.command:
+    argv: "{{ sampler_argv }}"
+  async: "{{ sampler_async_seconds }}"
+  poll: 0
+  register: sampler
+  changed_when: true
+
+- name: Return the background job id
+  ansible.builtin.set_stats:
+    data:
+      job_id: "{{ sampler.ansible_job_id }}"

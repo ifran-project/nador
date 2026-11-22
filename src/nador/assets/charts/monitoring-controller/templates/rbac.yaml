@@ -29,23 +29,21 @@ rules:
     resourceNames: [monitoring-controller]
     verbs: [patch]
   {{- end }}
-  {{- if and $.Values.probeControllerImage (eq . $.Release.Namespace) }}
+  {{- if and $.Values.controllerImage (eq . $.Release.Namespace) }}
   - apiGroups: [""]
     resources: [pods]
     verbs: [create, delete]
   - apiGroups: [""]
     resources: [configmaps]
-    resourceNames: [nador-one-way]
+    resourceNames: [nador-controller-settings]
     verbs: [get, patch]
-  {{- if $.Values.extendedProbeStates }}
+  {{- if $.Values.hostProbeStates }}
+  {{- range $.Values.hostProbeWorkloads }}
   - apiGroups: [apps]
-    resources: [daemonsets]
-    resourceNames: [probe-cpu-extended-node, probe-drops-extended-node, probe-queueing-extended-node, probe-tcp-extended-node, probe-split-signaling-extended-node]
+    resources: [{{ .resource }}]
+    resourceNames: [{{ .name }}]
     verbs: [get, patch]
-  - apiGroups: [apps]
-    resources: [deployments]
-    resourceNames: [probe-measurement-quality-extended-service]
-    verbs: [get, patch]
+  {{- end }}
   {{- end }}
   {{- end }}
 ---

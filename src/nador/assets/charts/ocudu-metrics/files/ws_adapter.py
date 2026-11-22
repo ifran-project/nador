@@ -7,6 +7,8 @@ import time
 
 import websocket
 
+logger = logging.getLogger(__name__)
+
 
 def emit(value):
     """Keep stdout exclusively for newline-delimited JSON."""
@@ -31,12 +33,16 @@ def run():
     last_message = 0
 
     def health(connected):
-        emit({"internal_": {
-            "connected": int(connected),
-            "messages_total": received,
-            "decode_errors_total": errors,
-            "last_message_timestamp_seconds": last_message,
-        }})
+        emit(
+            {
+                "internal_": {
+                    "connected": int(connected),
+                    "messages_total": received,
+                    "decode_errors_total": errors,
+                    "last_message_timestamp_seconds": last_message,
+                }
+            }
+        )
 
     while True:
         connection = None
@@ -60,7 +66,7 @@ def run():
                     errors += 1
                 health(True)
         except (OSError, websocket.WebSocketException) as exc:
-            logging.warning("OCUDU metrics connection failed: %s", exc)
+            logger.warning("OCUDU metrics connection failed: %s", exc)
         finally:
             if connection is not None:
                 connection.close()

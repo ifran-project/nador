@@ -3,9 +3,9 @@ dashboards:
   enabled: true
   logs: true
   variant: oai
-lokiEnabled: true
-latencyEnabled: false
+logsEnabled: true
+rttEnabled: false
 throughputEnabled: false
-observability:
+sniffers:
   ngap: false
   pfcp: false

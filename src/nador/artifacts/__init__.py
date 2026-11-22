@@ -1,7 +1,7 @@
-"""Experiment artifacts with the develop result schema."""
+"""Experiment windows and the evidence collected for them."""
 
-from .connection import prometheus_connection
-from .run import ExperimentRun
-from .observability import ObservabilityRun
+from .collectors import Collector, LokiExport, PrometheusExport, RunOptions
+from .experiment_run import ExperimentRun
+from .ssh_tunnel import prometheus_connection
 
-__all__ = ["ExperimentRun", "ObservabilityRun", "prometheus_connection"]
+__all__ = ["Collector", "ExperimentRun", "LokiExport", "PrometheusExport", "RunOptions", "prometheus_connection"]

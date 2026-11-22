@@ -17,7 +17,9 @@ build/
 **/monitoring_*model.yaml
 **/merged.yaml
 
-# Private validation belongs in the development repository.
-/tests/
+# Private trials stay out of the public repository.
 /examples/monitoring-trials/
 /.local/
+
+# Local only: tests and design notes stay on the developer's machine.
+/tests/
