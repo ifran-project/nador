@@ -1,3 +1,4 @@
+<!-- docs-start -->
 # NADOR
 
 **Network Analytics, Diagnostics, Observability, and Reporting for Mobile Networks.**
@@ -23,6 +24,10 @@ python -m pip install --upgrade "git+https://github.com/ifran-project/nador.git@
 ```python
 from nador import MonitoringManagement, MonitoringDeployment
 ```
+<!-- docs-end -->
+
+Documentation: <https://ifran-project.github.io/nador/> (guides, the quickstart, every example and
+the API reference).
 
 Start with the [minimal tutorial](examples/quickstart/tutorial.ipynb): installation,
 imports, monitoring deployment and one experiment with artifact collection.
@@ -37,6 +42,14 @@ image update, reinstall Nador, restart the notebook kernel, and redeploy.
 python -m pip install -e ".[dev]"
 ruff check src && ruff format --check src
 pyright src
+```
+
+Build the documentation locally (it is also built on every pull request and published from `main`):
+
+```bash
+python -m pip install -e ".[doc]"
+sh docs/convert.sh
+sphinx-build -b html docs docs/_build/html
 ```
 
 ## Monitoring
