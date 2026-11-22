@@ -1,6 +1,33 @@
 <!-- docs-start -->
 # NADOR
 
+<p align="center">
+  <a href="https://pypi.org/project/nador/">
+    <img src="https://img.shields.io/pypi/v/nador" alt="Latest PyPI version" />
+  </a>
+  <a href="https://ifran-project.github.io/nador/">
+    <img src="https://img.shields.io/badge/docs-GitHub%20Pages-blue?logo=github" alt="Documentation" />
+  </a>
+  <a href="https://github.com/ifran-project/nador/actions/workflows/ci.yml">
+    <img src="https://github.com/ifran-project/nador/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status" />
+  </a>
+  <a href="https://sonarcloud.io/summary/new_code?id=ifran-project_nador">
+    <img src="https://sonarcloud.io/api/project_badges/measure?project=ifran-project_nador&metric=alert_status" alt="Quality gate status" />
+  </a>
+  <a href="https://sonarcloud.io/component_measures?id=ifran-project_nador&metric=coverage">
+    <img src="https://sonarcloud.io/api/project_badges/measure?project=ifran-project_nador&metric=coverage" alt="Test coverage" />
+  </a>
+  <a href="https://github.com/ifran-project/nador/blob/main/LICENSE">
+    <img src="https://img.shields.io/badge/License-BSD--3--Clause--Clear-blue.svg" alt="BSD 3-Clause Clear license" />
+  </a>
+  <a href="https://github.com/ifran-project/nador/releases">
+    <img src="https://img.shields.io/github/v/release/ifran-project/nador?color=orange" alt="Latest release" />
+  </a>
+  <a href="https://github.com/ifran-project/nador/blob/main/CONTRIBUTING.md">
+    <img src="https://img.shields.io/badge/PRs-Welcome-brightgreen" alt="Pull requests welcome" />
+  </a>
+</p>
+
 **Network Analytics, Diagnostics, Observability, and Reporting for Mobile Networks.**
 
 Named after Nador, a city in northeastern Morocco associated with the idea of an observatory, NADOR helps teams monitor mobile network performance, investigate issues,
