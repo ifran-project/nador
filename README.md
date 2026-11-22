@@ -162,7 +162,7 @@ Other examples are under [examples/monitoring](examples/monitoring):
 - [OCUDU ZMQ](examples/monitoring/ocudu-zmq) and [R2lab](examples/monitoring/r2lab):
   additional deployment configurations.
 
-Copyright (c) 2026 Yassir Amami. The extension is licensed under the
+Copyright (c) 2026 Yassir Amami and the NADOR contributors. The extension is licensed under the
 [BSD 3-Clause Clear License](LICENSE). Reused/adapted upstream example and chart
 material retains the [IFRAN license notice](LICENSES/IFRAN.txt).
 External dependencies and container images retain their own licenses.
