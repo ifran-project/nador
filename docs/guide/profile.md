@@ -85,9 +85,10 @@ metrics:
 
 Notes:
 
-- **`rtt` measures TCP only**: run a TCP workload (iperf, HTTP, SSH) to get samples; `ping` gives
-  none. `at` chooses the measuring points; `packet_pairing` matches the same packet at both to
-  split the latency into segments, so it needs `at: [gnb, upf]` and `on_demand: false`.
+- **`rtt` needs traffic to measure**: it times TCP data against its ACK (iperf, HTTP, SSH) and a
+  ping request against its reply; samples carry `kind="tcp_ack"` or `kind="icmp_echo"`. `at`
+  chooses the measuring points; `packet_pairing` matches the same packet at both to split the
+  latency into segments, so it needs `at: [gnb, upf]` and `on_demand: false`.
 - **`on_demand: true`** deploys a probe stopped; start it later with `monitoring.start(...)`
   (see [Controlling probes](probes.md)).
 - **Host probes that share a row run in one probe**, so they start and stop together.

@@ -50,8 +50,8 @@ per-group `logs` metrics are called `ran_logs`, `core_logs` and `host_logs`.
 | --- | --- | --- |
 | Helm release | kept | uninstalled / installed |
 | Running pods | removed / recreated | removed / created |
-| Time | seconds | up to Helm's timeout |
-| Use | switching during experiments | changing what is deployed |
+| How long it takes | a few seconds | as long as Helm needs, at most its timeout |
+| When to use it | turning a metric on and off during experiments | adding, reconfiguring or removing a metric |
 
 ## Saving and restoring the handle
 
