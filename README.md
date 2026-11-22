@@ -36,21 +36,11 @@ Every container image NADOR deploys is pinned in [`assets/images.json`](src/nado
 A profile's `images:` section overrides individual entries by key. After merging an
 image update, reinstall Nador, restart the notebook kernel, and redeploy.
 
-## Development
+## Contributing
 
-```bash
-python -m pip install -e ".[dev]"
-ruff check src && ruff format --check src
-pyright src
-```
-
-Build the documentation locally (it is also built on every pull request and published from `main`):
-
-```bash
-python -m pip install -e ".[doc]"
-sh docs/convert.sh
-sphinx-build -b html docs docs/_build/html
-```
+Contributions are welcome: see
+[CONTRIBUTING.md](https://github.com/ifran-project/nador/blob/main/CONTRIBUTING.md) for how
+to set up, run the checks and open a pull request.
 
 ## Monitoring
 
