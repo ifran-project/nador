@@ -1,4 +1,13 @@
 ---
+- name: Create the chart directory
+  ansible.builtin.file:
+    path: "{{ component.chart_ref | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: component.chart_version | default('', true) | length == 0
+
 - name: Copy local monitoring chart
   ansible.builtin.copy:
     src: "{{ role_path }}/../../../charts/{{ component.chart_ref | basename }}/"
