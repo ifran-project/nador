@@ -1,8 +1,7 @@
-"""Monitoring and experiment artifacts for the unmodified 5G orchestrator."""
+"""NADOR: monitoring and experiment artifacts for IFRAN-deployed 5G networks."""
 
+from .config import Metrics, MonitoringDeployment
 from .deployment import MonitoringManagement
-from .models import MonitoringDeployment
-from .observability import ObservabilitySettings
-from .ran_metrics import configure_ran_kpis
+from .ran_kpis import configure_ran_kpis
 
-__all__ = ["MonitoringDeployment", "MonitoringManagement", "ObservabilitySettings", "configure_ran_kpis"]
+__all__ = ["Metrics", "MonitoringDeployment", "MonitoringManagement", "configure_ran_kpis"]

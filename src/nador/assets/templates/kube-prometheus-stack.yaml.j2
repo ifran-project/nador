@@ -57,7 +57,7 @@ prometheus:
           - __meta_kubernetes_service_name
           target_label: service
         scrape_interval: '{{ monitoring.prometheus_scrape_interval }}'
-      - job_name: observability-endpoints
+      - job_name: sniffer-endpoints
         kubernetes_sd_configs:
         - namespaces:
             names: {{ target_namespaces | tojson }}
@@ -67,7 +67,7 @@ prometheus:
           regex: endpoints
           source_labels: [__meta_kubernetes_service_annotation_monitoring_blueprint_scrape_mode]
         - action: keep
-          regex: observability
+          regex: sniffer
           source_labels: [__meta_kubernetes_endpoint_port_name]
         - source_labels: [__meta_kubernetes_namespace]
           target_label: namespace
@@ -78,56 +78,6 @@ prometheus:
         - source_labels: [__meta_kubernetes_service_name]
           target_label: service
         scrape_interval: '{{ monitoring.prometheus_scrape_interval }}'
-      - job_name: latency-probes
-        kubernetes_sd_configs:
-        - namespaces:
-            names: {{ target_namespaces | tojson }}
-          role: pod
-        metrics_path: /latency
-        relabel_configs:
-        - action: keep
-          regex: '{{ monitoring.namespace }}'
-          source_labels:
-          - __meta_kubernetes_pod_annotation_monitoring_blueprint_latency_owner
-        - regex: (.+);([0-9]+)
-          replacement: $1:$2
-          source_labels:
-          - __meta_kubernetes_pod_ip
-          - __meta_kubernetes_pod_annotation_monitoring_blueprint_latency_port
-          target_label: __address__
-        - source_labels:
-          - __meta_kubernetes_namespace
-          target_label: namespace
-        - source_labels:
-          - __meta_kubernetes_pod_name
-          target_label: pod
-        scrape_interval: '{{ monitoring.prometheus_scrape_interval }}'
-{% if monitoring.throughput %}
-      - job_name: throughput-probes
-        kubernetes_sd_configs:
-        - namespaces:
-            names: {{ target_namespaces | tojson }}
-          role: pod
-        metrics_path: /metrics
-        relabel_configs:
-        - action: keep
-          regex: '{{ monitoring.namespace }}'
-          source_labels:
-          - __meta_kubernetes_pod_annotation_monitoring_blueprint_throughput_owner
-        - regex: (.+);([0-9]+)
-          replacement: $1:$2
-          source_labels:
-          - __meta_kubernetes_pod_ip
-          - __meta_kubernetes_pod_annotation_monitoring_blueprint_throughput_port
-          target_label: __address__
-        - source_labels:
-          - __meta_kubernetes_namespace
-          target_label: namespace
-        - source_labels:
-          - __meta_kubernetes_pod_name
-          target_label: pod
-        scrape_interval: '{{ monitoring.prometheus_scrape_interval }}'
-{% endif %}
       - job_name: kubernetes-annotated-pods
         kubernetes_sd_configs:
         - namespaces:
@@ -161,7 +111,7 @@ prometheus:
           - __meta_kubernetes_pod_name
           target_label: pod
         scrape_interval: '{{ monitoring.prometheus_scrape_interval }}'
-{% if monitoring.observability.node_metrics %}
+{% if monitoring.metrics.node_metrics %}
 nodeExporter:
   enabled: true
 prometheus-node-exporter:

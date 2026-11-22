@@ -1,7 +1,12 @@
 targets: {{ targets | tojson }}
 dashboards:
   variant: {{ ('srsran' if model.ran.implementation | string in ['srsRAN', 'ocudu'] else 'oai') | tojson }}
-lokiEnabled: {{ monitoring.loki | tojson }}
-latencyEnabled: {{ monitoring.latency | tojson }}
-throughputEnabled: {{ (monitoring.throughput or (monitoring.probe_controller_image is not none and monitoring.external_throughput_image is not none)) | tojson }}
-observability: {{ monitoring.observability.model_dump() | tojson }}
+{% set metrics = monitoring.metrics %}
+logsEnabled: {{ (metrics.log_groups | length > 0) | tojson }}
+rttEnabled: {{ metrics.running('rtt') | tojson }}
+throughputEnabled: {{ (metrics.throughput is not none) | tojson }}
+sniffers:
+  ngap: {{ metrics.running('ngap') | tojson }}
+  pfcp: {{ metrics.running('pfcp') | tojson }}
+  ngap_port: {{ (metrics.ngap.port if metrics.ngap else 9102) | tojson }}
+  pfcp_port: {{ (metrics.pfcp.port if metrics.pfcp else 9104) | tojson }}

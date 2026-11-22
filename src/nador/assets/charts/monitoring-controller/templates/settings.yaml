@@ -1,0 +1,64 @@
+{{- if .Values.controllerImage }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nador-controller-settings
+data:
+  settings.json: {{ merge (dict "rtt" .Values.rtt "throughput" .Values.throughput "user_plane_paths" .Values.userPlanePaths "host_probes" (.Values.hostProbeStates | default dict)) .Values.oneWay | toJson | quote }}
+  targets.json: {{ .Values.anchors | toJson | quote }}
+{{- if get (.Values.rtt | default dict) "pairer_image" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: packet-pairer
+spec:
+  selector:
+    nador-probe-managed: "true"
+    nador-probe-role: rtt-pairer
+  ports:
+    - name: metrics
+      port: 9200
+    - name: samples
+      port: 9201
+      protocol: UDP
+{{- end }}
+---
+{{ $existing := lookup "v1" "Secret" .Release.Namespace "nador-one-way-token" -}}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nador-one-way-token
+stringData:
+  token: {{ if $existing }}{{ index $existing.data "token" | b64dec | quote }}{{ else }}{{ randAlphaNum 64 | sha256sum | quote }}{{ end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nador-one-way-collector
+spec:
+  selector:
+    nador-probe-role: collector
+  ports:
+    - name: observations
+      port: 55393
+    - name: clock
+      port: 55393
+      protocol: UDP
+{{- if .Values.probeApiTlsSecret }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nador-controller-api
+spec:
+  type: LoadBalancer
+  selector:
+    app: monitoring-controller
+    monitoring.blueprint/owner: {{ .Release.Namespace | quote }}
+  ports:
+    - name: https
+      port: 443
+      targetPort: 8787
+{{- end }}
+{{- end }}

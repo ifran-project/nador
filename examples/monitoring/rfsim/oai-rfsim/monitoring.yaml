@@ -4,60 +4,57 @@
 namespace: monitoring
 node_name: node4
 kubeconfig: /etc/kubernetes/admin.conf
-
-latency: true
-throughput: true
-packet_pairing: false
-loki: true
-core_kpis: false
-# The default notebook enables the OAI statistics parser before RAN deployment.
-ran_kpis: true
-
+metrics:
+  ran:
+    # The default notebook enables the OAI statistics parser before RAN deployment.
+    ran_kpis: {ocudu_port: 8001}
+    split_signaling: false
+    logs: true
+  core:
+    ngap: false
+    pfcp: false
+    throughput: {on_demand: false}
+    upf_transit: false
+    ue_mapper_coverage: false
+    logs: true
+  e2e:
+    rtt: {on_demand: false, at: [gnb, upf], packet_pairing: false, imsis: [], slices: []}
+    n3_one_way: false
+    user_plane_paths: false
+  host:
+    node_metrics: false
+    logs: true
+    scheduler_wait: false
+    kernel_drops: false
+    attributed_drops: false
+    network_queues: false
+    socket_counters: false
+    tcp_flows: false
+    measurement_quality: false
 # Namespace and pod selectors are resolved from the deployment model.
 # Open5GS built-in metrics and the gNB parser listen on port 9090.
 targets:
-  - category: core
-    component: amf
-    role: amf
-    container: amf
-    interface: eth0
-    metrics_port: 9090
-  - category: core
-    component: smf
-    role: smf
-    container: smf
-    interface: eth0
-    metrics_port: 9090
-  - category: core
-    component: upf
-    role: upf
-    container: upf
-    interface: eth0
-    metrics_port: 9090
-  - category: ran
-    component: gnb
-    role: gnb
-    container: gnb
-    interface: eth0
-    metrics_port: 9090
-observability:
-  ngap: false
-  pfcp: false
-  mapper_coverage: false
-  user_plane_paths: false
-  node_metrics: false
-extended:
-  scheduler_wait: false
-  kernel_drops: false
-  network_queues: false
-  socket_counters: false
-  split_signaling: false
-  quality: false
-  attributed_drops: false
-  tcp_flows: false
-one_way:
-  n3:
-    enabled: false
-    log_samples: false
-  upf_transit:
-    enabled: false
+- category: core
+  component: amf
+  role: amf
+  container: amf
+  interface: eth0
+  metrics_port: 9090
+- category: core
+  component: smf
+  role: smf
+  container: smf
+  interface: eth0
+  metrics_port: 9090
+- category: core
+  component: upf
+  role: upf
+  container: upf
+  interface: eth0
+  metrics_port: 9090
+- category: ran
+  component: gnb
+  role: gnb
+  container: gnb
+  interface: eth0
+  metrics_port: 9090

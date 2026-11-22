@@ -34,11 +34,11 @@
         - name: MONITORING_SNIFFER_OWNER
           value: "{{ monitoring_owner }}"
         - name: "{{ 'AMF_NGAP' if capture_target.role == 'amf' else 'SMF_PFCP' }}_METRICS_ENABLED"
-          value: "{{ (monitoring_config.observability.ngap if capture_target.role == 'amf' else monitoring_config.observability.pfcp) | string | lower }}"
+          value: "{{ sniffers[capture_target.role].metrics_enabled | string | lower }}"
         - name: "{{ 'AMF_NGAP' if capture_target.role == 'amf' else 'SMF_PFCP' }}_METRICS_PORT"
-          value: "{{ (monitoring_config.observability.ngap_port if capture_target.role == 'amf' else monitoring_config.observability.pfcp_port) | string }}"
+          value: "{{ sniffers[capture_target.role].metrics_port | string }}"
         - name: "{{ 'AMF_NGAP' if capture_target.role == 'amf' else 'SMF_PFCP' }}_PENDING_TIMEOUT_SECONDS"
-          value: "{{ monitoring_config.observability.pending_timeout_seconds | string }}"
+          value: "{{ sniffers.pending_timeout_seconds | string }}"
       securityContext:
         privileged: true
         runAsUser: 0
