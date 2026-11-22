@@ -23,7 +23,7 @@ await monitoring.stop("rtt")
 The change is written to the controller's settings and applied within a few seconds. `stop` keeps
 everything installed and removes only the probe's running pods: controller-created pods are
 deleted, host-probe DaemonSets are paused with a node selector no node matches, and the
-measurement-quality Deployment is scaled to zero. `start` brings them back in seconds.
+measurement-quality Deployment is scaled to zero. `start` brings them back in a few seconds.
 
 Bad requests are refused before anything changes: an unknown or undeployed metric, an option the
 metric does not take, an invalid IMSI or slice, a measuring point with no target, a probe this RAN

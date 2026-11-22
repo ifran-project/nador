@@ -19,15 +19,31 @@ Open an issue with:
    python -m pip install -e ".[dev]"
    ```
 
-3. Make your change.
+3. Make your change, with a test for any behaviour it adds or changes.
 4. Run the same checks as CI:
 
    ```bash
-   ruff check src && ruff format --check src
+   ruff check src tests && ruff format --check src tests
    pyright src
+   pytest -m ""
    ```
 
 5. Open a pull request into `develop` that says what changed and why.
+
+## Tests
+
+The tests need no cluster. `tests/support.py` builds monitoring profiles and IFRAN networks, and
+the `ansible` fixture replaces `run_ansible_role`, the one place NADOR reaches a cluster, with a
+recorder. Everything else (validation, planning, the manager's decisions) runs for real.
+
+- `tests/unit/` checks one rule per test, such as "RTT runs only where `at` says" or "removing the
+  last session metric removes the session stack". `pytest` runs these, in a few seconds.
+- `tests/integration/` starts real processes: an Ansible playbook against your machine and the
+  UE sampler against a local HTTP server. Run them with `pytest -m integration`, or everything
+  with `pytest -m ""` as CI does.
+
+Name a test after the behaviour it checks, build the profile it needs inside the test, and
+assert on what NADOR asks for, not on how it is implemented.
 
 ## Documentation
 

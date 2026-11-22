@@ -27,10 +27,13 @@ jobs:
         run: python -m pip install -e ".[dev]"
       - name: Lint
         run: |
-          ruff check src
-          ruff format --check src
+          ruff check src tests
+          ruff format --check src tests
       - name: Type check
         run: pyright src
+      # Unit and integration tests together; neither needs a cluster.
+      - name: Test
+        run: pytest -m "" --cov --cov-report=term --cov-report=xml
 
   build:
     needs: test
