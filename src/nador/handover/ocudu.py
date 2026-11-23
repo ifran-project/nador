@@ -29,8 +29,8 @@ accepted, ``error`` with the reason when it is refused). The handover command::
   cell..."``). An accepted command only means that the handover started; only the logs tell whether it succeeded.
 
 The same server serves the metrics: with ``metrics: enable_json: true``, a client that sends ``{"cmd":
-"metrics_subscribe"}`` then receives the JSON metrics of the application; NADOR's ``ocudu-metrics`` exporter (``ran_kpis``) uses
-it for Prometheus. The server has no authentication: keep it on the cluster network.
+"metrics_subscribe"}`` then receives the JSON metrics of the application; NADOR's ``ocudu-metrics`` exporter
+(``ran_kpis``) uses it for Prometheus. The server has no authentication: keep it on the cluster network.
 
 Why not the console: the CU-CP console accepts ``ho <serving PCI> <C-RNTI> <target PCI> <PLMN> <TAC>``, which
 reaches the same trigger. The CU-CP runs the trigger on its own executor and waits at most 5 s for it
@@ -121,7 +121,7 @@ def connected_ues(cucp_log: str) -> list[dict]:
     by the UEContextSetupRequest of a handover to its DU. It is removed by ``ue=<ue>: "UE Removal Routine" finished``,
     which follows every release: the CU-CP releases an inactive UE after cu_cp inactivity_timer (120 s by default), and
     the UE attaches again with a new UE index and C-RNTI when it has data to send. The C-RNTI is the one to give to
-    run_handover for a UE served by the source DU.
+    the CU-CP trigger_handover command for a UE served by the source DU.
     """
     ues: dict[int, dict] = {}
     initial_du = None

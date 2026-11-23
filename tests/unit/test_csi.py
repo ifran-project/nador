@@ -1,16 +1,20 @@
-"""CSI: the ``csi`` profile metric, how ``configure_csi`` applies it to the RAN, and the gNB configuration it renders."""
+"""CSI: the ``csi`` profile metric, how ``configure_csi`` applies it, the configuration it renders, its collection."""
 
+import json
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import jinja2
 import pytest
 from ansible.plugins.filter.core import FilterModule
 from ansible.plugins.test.core import TestModule as AnsibleTests
-from support import manager, network, options, profile
+from support import manager, matrix, network, options, profile
 
 import ansible
 from nador import configure_csi
+from nador.artifacts import ExperimentRun, collectors
 from nador.config import validate_deployment
+from nador.csi import collection
 
 CSI = {"csi": options("csi")}
 NADOR_ASSETS = Path(__file__).resolve().parents[2] / "src" / "nador" / "assets"
@@ -23,6 +27,17 @@ def ran(net=None, **metrics):
     """The RAN manager as a notebook holds it before ``ran.deploy()``, and the validated profile."""
     config = validate_deployment(profile(metrics=metrics or CSI), explicit=True)
     return manager(profile(), net or network()), config
+
+
+NO_HOSTS = {"collect_setup": False, "collect_ue_context": False}
+
+
+def through(url):
+    @asynccontextmanager
+    async def connection(monitoring):
+        yield url
+
+    return connection
 
 
 def env(component):
@@ -145,3 +160,67 @@ def test_csi_adds_periodic_srs_to_the_ocudu_cell():
     assert render("ran/ocudu/config.yaml.j2", OCUDU_CONFIG) == OCUDU_CONFIG.strip()
     rendered = render("ran/ocudu/config.yaml.j2", OCUDU_CONFIG, CSI_LOGGING_ENABLED="1", CSI_SRS_PERIOD_MS="20")
     assert rendered.startswith("gnb_id: 1\ncell_cfg:\n  srs:\n    type_enabled: periodic\n    period_ms: 20\n")
+
+
+# Collecting the CSI file with a run
+
+
+@pytest.fixture
+def csi_node(monkeypatch, http):
+    """A gNB node whose clock is ``offset`` seconds ahead, and the Ansible role that cuts the CSI file on it."""
+    node = {"offsets": [2.0, 2.0], "fetches": []}
+
+    async def measure_clock(self, samples=5):
+        return {"offset_s": node["offsets"].pop(0), "rtt_s": 0.01, "uncertainty_s": 0.005, "node": self.node_name}
+
+    async def run_ansible_role(*, role, inputs, **_):
+        node["fetches"].append((role, json.loads(Path(inputs["csi_windows_json"]).read_text())))
+        return {"csi_summary": {"rows": 10, "dropped_rows": node.get("dropped", 0)}}
+
+    monkeypatch.setattr(collection.CsiCollector, "measure_clock", measure_clock)
+    monkeypatch.setattr(collection, "run_ansible_role", run_ansible_role)
+    http.routes["/api/v1/query_range"] = lambda q: matrix(({}, [(float(q["start"]), "1")]))
+    monkeypatch.setattr(collectors, "prometheus_connection", through(http.url))
+    return node
+
+
+async def csi_run(directory, **metrics):
+    config = validate_deployment(profile(metrics=metrics or CSI), explicit=True)
+    monitoring = manager(config)
+    configure_csi(monitoring, config)
+    async with ExperimentRun(directory, timezone="UTC", monitoring=monitoring, **NO_HOSTS) as run:
+        with run.section("work"):
+            pass
+    return json.loads((directory / "experiment_metadata.json").read_text())
+
+
+async def test_the_csi_file_is_cut_by_the_run_windows_on_the_gnb_clock(tmp_path, csi_node):
+    metadata = await csi_run(tmp_path / "run")
+    ((role, windows),) = csi_node["fetches"]
+    assert role == "csi/collect"
+    section = next(w for w in windows["windows"] if w["level"] == "section")
+    assert section["ran_start_epoch"] == section["start_epoch"] + 2.0
+    assert metadata["csi"]["gnb"]["offset_applied_s"] == 2.0
+    assert metadata["csi"]["gnb"]["summary"]["rows"] == 10
+    assert metadata["csi"]["gnb"]["warnings"] == []
+    assert (tmp_path / "run" / "csi" / "gnb" / "csi_collection.json").exists()
+
+
+async def test_a_small_clock_offset_is_not_applied(tmp_path, csi_node):
+    csi_node["offsets"] = [0.2, 0.2]
+    metadata = await csi_run(tmp_path / "run")
+    assert metadata["csi"]["gnb"]["offset_applied_s"] == 0.0
+
+
+async def test_a_clock_that_moved_and_dropped_rows_are_warned_about(tmp_path, csi_node):
+    csi_node["offsets"] = [2.0, 3.0]
+    csi_node["dropped"] = 5
+    metadata = await csi_run(tmp_path / "run")
+    first, second = metadata["csi"]["gnb"]["warnings"]
+    assert "clock offset changed by +1.000 s" in first
+    assert second == "the logger dropped 5 rows (buffer full)"
+
+
+async def test_without_csi_nothing_is_collected(tmp_path, csi_node):
+    await csi_run(tmp_path / "run", scheduler_wait=options("scheduler_wait"))
+    assert csi_node["fetches"] == []

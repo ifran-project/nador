@@ -36,7 +36,7 @@ async def prepare_csi_storage(
             raise ValueError(f"{name}: node_name must name a deployment node to prepare its CSI directory")
         directories.setdefault(component.node_name, set()).add(env.get("CSI_OUTPUT_DIR", "/data/csi"))
     if not directories:
-        raise ValueError("No CSI-enabled component (see nador.csi.enable_csi)")
+        raise ValueError("No CSI-enabled component (set metrics.ran.csi and call nador.configure_csi)")
     storage = storage or {}
     unknown = set(storage) - directories.keys()
     if unknown:

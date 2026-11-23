@@ -7,16 +7,24 @@ import tarfile
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ifran.deployment.base import BaseManagement
 from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_role
 
+from nador.artifacts.collectors import Collector
+
+if TYPE_CHECKING:
+    from nador.artifacts.experiment_run import ExperimentRun
+
 ROLES = Path(__file__).resolve().parent.parent / "assets" / "roles"
 CSI_FILE_NAME = "csi_per_rb.csv"
+# The clock offset of the gNB node is applied to the windows only beyond this bound: below it, the SSH measurement
+# error (half the round trip) is of the same order as the offset itself. The CSI batches are ~5 s long.
+CLOCK_THRESHOLD_S = 0.5
 
 
-class CsiCollector:
+class CsiCollector(Collector):
     """
     CSI log of one gNB component, read on the node it is pinned to (component.node_name).
 
@@ -43,11 +51,14 @@ class CsiCollector:
         deployed = model.ran.components[component]
         env = deployed.extra_env_vars or {}
         if str(env.get("CSI_LOGGING_ENABLED")) != "1":
-            raise ValueError(f"{component}: CSI logging is not enabled (see nador.csi.enable_csi)")
+            raise ValueError(
+                f"{component}: CSI logging is not enabled (set metrics.ran.csi and call nador.configure_csi)"
+            )
         if not deployed.node_name or deployed.node_name not in model.nodes:
             # The hostPath file lives on the pod's node: it must be known from the deployment model.
             raise ValueError(f"{component}: node_name must name a deployment node to locate the CSI file")
         self.component = component
+        self.label = f"csi {component}"
         self.node_name = deployed.node_name
         self.node = model.nodes[deployed.node_name].model_copy(deep=True)
         self.ansible = model.params.ansible.model_copy(deep=True)
@@ -99,9 +110,58 @@ class CsiCollector:
         # The remote read happened somewhere inside the round trip: half of it bounds the error.
         return best | {"uncertainty_s": best["rtt_s"] / 2, "samples": samples, "node": self.node_name}
 
-    async def collect(
-        self, dest_dir: str | Path, windows_json: str | Path | None = None, *, quiet: bool = True
-    ) -> dict:
+    async def start(self, run: "ExperimentRun") -> None:
+        """Measure the gNB node clock before the workload, to put the run's windows on that clock."""
+        clock = await self.measure_clock()
+        offset = clock["offset_s"] if abs(clock["offset_s"]) > CLOCK_THRESHOLD_S else 0.0
+        run.metadata.setdefault("csi", {})[self.component] = {
+            "node": self.node_name,
+            "clock_start": clock,
+            "offset_applied_s": offset,
+            "warnings": [],
+        }
+
+    async def collect(self, run: "ExperimentRun", start: float, end: float) -> None:
+        """Cut the CSI file by the run's windows on the gNB node and fetch the cuts under csi/<component>/."""
+        del start, end  # the windows come from timeline_summary.json, which covers the run's range
+        record = run.metadata.setdefault("csi", {}).setdefault(
+            self.component, {"node": self.node_name, "offset_applied_s": 0.0, "warnings": []}
+        )
+        try:
+            clock_end = await self.measure_clock()
+            record["clock_end"] = clock_end
+            if "clock_start" in record:
+                # Offset change over the run (clock drift or step), compared with the ~5 s CSI batches
+                drift = clock_end["offset_s"] - record["clock_start"]["offset_s"]
+                record["clock_drift_s"] = drift
+                if abs(drift) > CLOCK_THRESHOLD_S:
+                    record["warnings"].append(
+                        f"{self.node_name} clock offset changed by {drift:+.3f} s during the run "
+                        f"(threshold {CLOCK_THRESHOLD_S} s): CSI windows may be shifted"
+                    )
+        except Exception as exc:
+            run.error(f"{self.label} clock", exc)
+        destination = run.directory / "csi" / self.component
+        summary = await self.fetch(destination, self._windows(run, destination, record["offset_applied_s"]))
+        record["summary"] = summary
+        if summary.get("dropped_rows"):
+            record["warnings"].append(f"the logger dropped {summary['dropped_rows']} rows (buffer full)")
+
+    def _windows(self, run: "ExperimentRun", destination: Path, offset: float) -> Path | None:
+        """The run's timeline windows on the gNB node clock: csi/<component>/csi_windows.json."""
+        timeline = run.directory / "timeline_summary.json"
+        if not timeline.is_file():
+            return None
+        windows = [
+            window | {"ran_start_epoch": window["start_epoch"] + offset, "ran_end_epoch": window["end_epoch"] + offset}
+            for window in json.loads(timeline.read_text())["windows"]
+        ]
+        destination.mkdir(parents=True, exist_ok=True)
+        path = destination / "csi_windows.json"
+        path.write_text(json.dumps({"node": self.node_name, "offset_applied_s": offset, "windows": windows}))
+        return path
+
+    async def fetch(self, dest_dir: str | Path, windows_json: str | Path | None = None, *, quiet: bool = True) -> dict:
         """Read the CSI file on the gNB node and fetch csi_per_rb.csv.gz and per-window files to dest_dir."""
         dest = Path(dest_dir).resolve()  # noqa: ASYNC240 (local metadata, no I/O wait)
         dest.mkdir(parents=True, exist_ok=True)

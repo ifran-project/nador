@@ -30,7 +30,7 @@
 
 - name: CSI - stop when there is nothing to collect
   ansible.builtin.fail:
-    msg: "No {{ csi_src_file }} on {{ inventory_hostname }} (was the gNB deployed with enable_csi?)"
+    msg: "No {{ csi_src_file }} on {{ inventory_hostname }} (was the RAN deployed with metrics.ran.csi and nador.configure_csi?)"
   when: not csi_host_file.stat.exists
 
 - name: CSI - create work directory
