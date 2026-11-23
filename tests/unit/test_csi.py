@@ -371,18 +371,17 @@ def test_a_component_without_csi_cannot_be_collected():
 class Ssh:
     """The ssh process of the tunnel: running, or exited with its error in the log."""
 
+    pid = 0
+
     def __init__(self, argv, stderr, exit_code=None):
-        self.argv, self.exit_code, self.terminated = argv, exit_code, False
+        self.argv, self.returncode, self.terminated = argv, exit_code, False
         if exit_code is not None:
             stderr.write("Permission denied (publickey)")
-
-    def poll(self):
-        return self.exit_code
 
     def terminate(self):
         self.terminated = True
 
-    def wait(self, timeout=None):
+    async def wait(self):
         return 0
 
 
@@ -392,12 +391,12 @@ def tunnel(monkeypatch, tmp_path):
     view.tunnel_log = tmp_path / "tunnel.log"
     started = []
 
-    def popen(argv, *, stdout, stderr, exit_code=None):
+    async def popen(*argv, stdout, stderr, exit_code=None):
         started.append(Ssh(argv, stderr, exit_code))
         return started[-1]
 
-    monkeypatch.setattr(live.subprocess, "Popen", popen)
-    monkeypatch.setattr(live.atexit, "register", lambda _: None)
+    monkeypatch.setattr(live.asyncio, "create_subprocess_exec", popen)
+    monkeypatch.setattr(live.atexit, "register", lambda *_: None)
     return view, started, popen
 
 
@@ -417,7 +416,7 @@ async def test_the_tunnel_is_ready_when_its_local_port_answers(tunnel, monkeypat
 
 async def test_a_tunnel_that_ssh_refuses_reports_why(tunnel, monkeypatch):
     view, _, popen = tunnel
-    monkeypatch.setattr(live.subprocess, "Popen", lambda argv, **kw: popen(argv, **kw, exit_code=255))
+    monkeypatch.setattr(live.asyncio, "create_subprocess_exec", lambda *argv, **kw: popen(*argv, **kw, exit_code=255))
     with pytest.raises(RuntimeError, match="CSI live tunnel failed: Permission denied"):
         await view.open_tunnel(timeout_s=2)
 

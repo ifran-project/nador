@@ -33,23 +33,34 @@
     msg: "No {{ csi_src_file }} on {{ inventory_hostname }} (was the RAN deployed with metrics.ran.csi and nador.configure_csi?)"
   when: not csi_host_file.stat.exists
 
+# The work directory belongs to the SSH login user, who fetches the results without become (below); only root,
+# which runs the script, and that user can enter it.
+- name: CSI - SSH login user
+  ansible.builtin.command: id -un
+  become: false
+  register: csi_login_user
+  changed_when: false
+
 - name: CSI - create work directory
   ansible.builtin.file:
     path: "{{ csi_workdir }}"
     state: directory
-    mode: "0755"
+    owner: "{{ csi_login_user.stdout }}"
+    mode: "0700"
 
 - name: CSI - copy helper script
   ansible.builtin.copy:
     src: csi_tools.py
     dest: "{{ csi_workdir }}/csi_tools.py"
-    mode: "0755"
+    owner: "{{ csi_login_user.stdout }}"
+    mode: "0600"
 
 - name: CSI - copy timeline windows
   ansible.builtin.copy:
     src: "{{ csi_windows_json }}"
     dest: "{{ csi_workdir }}/windows.json"
-    mode: "0644"
+    owner: "{{ csi_login_user.stdout }}"
+    mode: "0600"
   when: csi_windows_json | length > 0
 
 # Single read of the source file: full .gz, per-window .gz and summary in one pass
@@ -72,7 +83,7 @@
 
 # Without become: with become, fetch reads the file through the slurp module (whole file base64-encoded in memory,
 # then sent in the module result), which takes minutes and GBs of memory for the hundreds of MB of a 4T4R 273 PRB
-# capture; without become, the file is copied over SFTP/SCP. The work directory and its files are world-readable.
+# capture; without become, the file is copied over SFTP/SCP. The login user owns the work directory (above).
 - name: CSI - fetch the full file
   ansible.builtin.fetch:
     src: "{{ csi_workdir }}/out/{{ csi_src_file | basename }}.gz"

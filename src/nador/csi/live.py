@@ -2,9 +2,12 @@
 
 import asyncio
 import atexit
+import os
 import shlex
+import signal
 import socket
 import subprocess
+from contextlib import suppress
 from pathlib import Path
 
 from ifran.deployment.base import BaseManagement
@@ -22,6 +25,12 @@ def _local_port_free(port: int) -> bool:
         except OSError:
             return False
     return True
+
+
+def _terminate(pid: int) -> None:
+    """Stop the tunnel when the notebook kernel exits, if it still runs."""
+    with suppress(ProcessLookupError):
+        os.kill(pid, signal.SIGTERM)
 
 
 def _free_local_port() -> int:
@@ -70,7 +79,7 @@ class CsiLiveView:
         ran_ssh = source.node.ssh_info
         output_dir, file_name = source.src_file.rsplit("/", 1)
         self.port = port
-        self.tunnel: subprocess.Popen | None = None
+        self.tunnel: asyncio.subprocess.Process | None = None
         # Tunnel stderr goes to a file, not a pipe: nobody reads a pipe of a tunnel open for hours.
         self.tunnel_log = Path(self.ansible.runner_path).expanduser() / "csi" / "live" / component / "tunnel.log"
         self.inputs = {
@@ -167,14 +176,14 @@ class CsiLiveView:
         log = self.tunnel_log
         log.parent.mkdir(parents=True, exist_ok=True)
         with log.open("w") as stderr:  # noqa: ASYNC230 (opened once, inherited by ssh)
-            process = subprocess.Popen(  # noqa: ASYNC220, S603 (argv from the deployment model, no shell)
-                self._tunnel_argv(local_port), stdout=subprocess.DEVNULL, stderr=stderr
+            process = await asyncio.create_subprocess_exec(  # argv from the deployment model, no shell
+                *self._tunnel_argv(local_port), stdout=subprocess.DEVNULL, stderr=stderr
             )
-        atexit.register(process.terminate)  # close it when the kernel exits normally
+        atexit.register(_terminate, process.pid)  # close it when the kernel exits normally
         self.tunnel = process
         async with asyncio.timeout(timeout_s):
             while True:
-                if process.poll() is not None:
+                if process.returncode is not None:
                     self.tunnel = None
                     error = log.read_text(errors="replace").strip()  # noqa: ASYNC240
                     raise RuntimeError(f"CSI live tunnel failed: {error}")
@@ -189,7 +198,8 @@ class CsiLiveView:
 
     async def close_tunnel(self) -> None:
         """Close the tunnel opened by open_tunnel(), if any."""
-        if self.tunnel is not None and self.tunnel.poll() is None:
+        if self.tunnel is not None and self.tunnel.returncode is None:
             self.tunnel.terminate()
-            await asyncio.to_thread(self.tunnel.wait, 5)
+            with suppress(TimeoutError):
+                await asyncio.wait_for(self.tunnel.wait(), 5)
         self.tunnel = None
