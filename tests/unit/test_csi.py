@@ -396,7 +396,7 @@ def tunnel(monkeypatch, tmp_path):
         started.append(Ssh(argv, stderr, exit_code))
         return started[-1]
 
-    monkeypatch.setattr(live.asyncio, "create_subprocess_exec", popen)
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", popen)
     monkeypatch.setattr(live.atexit, "register", lambda *_: None)
     return view, started, popen
 
@@ -417,8 +417,8 @@ async def test_the_tunnel_is_ready_when_its_local_port_answers(tunnel, monkeypat
 
 async def test_a_tunnel_that_ssh_refuses_reports_why(tunnel, monkeypatch):
     view, _, popen = tunnel
-    monkeypatch.setattr(live.asyncio, "create_subprocess_exec", lambda *argv, **kw: popen(*argv, **kw, exit_code=255))
-    with pytest.raises(RuntimeError, match="CSI live tunnel failed: Permission denied"):
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", lambda *argv, **kw: popen(*argv, **kw, exit_code=255))
+    with pytest.raises(RuntimeError, match="CSI live SSH tunnel failed: Permission denied"):
         await view.open_tunnel(timeout_s=2)
 
 
