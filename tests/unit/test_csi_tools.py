@@ -1,10 +1,12 @@
-"""The script that cuts the CSI file on the gNB node, run as the collection role runs it."""
+"""The script that cuts the CSI file on the gNB node, run with the arguments the collection role gives it."""
 
 import gzip
+import importlib.util
 import json
-import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 SCRIPT = Path(__file__).resolve().parents[2] / "src" / "nador" / "assets" / "roles" / "csi" / "collect" / "files"
 T0 = 1767225600  # 2026-01-01 00:00:00 UTC
@@ -18,25 +20,40 @@ CSI = HEADER + (
 )
 
 
-def collect(tmp_path, *windows, full=True):
-    source = tmp_path / "csi_per_rb.csv"
-    source.write_bytes(CSI)
-    command = [sys.executable, str(SCRIPT / "csi_tools.py"), "collect", "--src", str(source), "--out-dir", "out"]
-    if full:
-        command.append("--full")
-    if windows:
-        (tmp_path / "windows.json").write_text(json.dumps({"windows": list(windows)}))
-        command += ["--windows-json", "windows.json"]
-    result = subprocess.run(command, cwd=tmp_path, capture_output=True, check=True)  # noqa: S603 - our script
-    return json.loads(result.stdout)
+def load_script():
+    spec = importlib.util.spec_from_file_location("csi_tools", SCRIPT / "csi_tools.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.fixture
+def collect(tmp_path, monkeypatch, capsys):
+    """Run the script in tmp_path, as ``csi_tools.py collect ...``, and return the summary it prints."""
+    monkeypatch.chdir(tmp_path)
+    script = load_script()
+
+    def run(*windows, full=True):
+        (tmp_path / "csi_per_rb.csv").write_bytes(CSI)
+        argv = ["csi_tools.py", "collect", "--src", "csi_per_rb.csv", "--out-dir", "out"]
+        if full:
+            argv.append("--full")
+        if windows:
+            (tmp_path / "windows.json").write_text(json.dumps({"windows": list(windows)}))
+            argv += ["--windows-json", "windows.json"]
+        monkeypatch.setattr(sys, "argv", argv)
+        assert script.main() == 0
+        return json.loads(capsys.readouterr().out)
+
+    return run
 
 
 def section(name, start, end):
     return {"level": "section", "window_id": name, "ran_start_epoch": T0 + start, "ran_end_epoch": T0 + end}
 
 
-def test_the_whole_file_up_to_the_last_complete_line(tmp_path):
-    summary = collect(tmp_path)
+def test_the_whole_file_up_to_the_last_complete_line(tmp_path, collect):
+    summary = collect()
     assert summary["rows"] == 5
     assert summary["rows_before_first_marker"] == 1
     assert summary["markers"] == 3
@@ -49,8 +66,8 @@ def test_the_whole_file_up_to_the_last_complete_line(tmp_path):
     assert gzip.decompress((tmp_path / "out" / "csi_per_rb.csv.gz").read_bytes()) == CSI[: CSI.rindex(b"\n") + 1]
 
 
-def test_each_window_gets_the_batches_acquired_during_it(tmp_path):
-    summary = collect(tmp_path, section("idle", 6, 8), section("load", 12, 30), section("later", 40, 50), full=False)
+def test_each_window_gets_the_batches_acquired_during_it(tmp_path, collect):
+    summary = collect(section("idle", 6, 8), section("load", 12, 30), section("later", 40, 50), full=False)
     assert not (tmp_path / "out" / "csi_per_rb.csv.gz").exists()
     assert (summary["windows_written"], summary["windows_empty"]) == (2, 1)
     by_window = tmp_path / "out" / "by_window"
@@ -62,6 +79,12 @@ def test_each_window_gets_the_batches_acquired_during_it(tmp_path):
     assert (load["first_batch_start"], load["last_batch_end"]) == (T0 + 10, T0 + 20)
 
 
-def test_windows_without_node_times_are_skipped(tmp_path):
-    summary = collect(tmp_path, {"level": "section", "window_id": "x", "start_epoch": T0}, full=False)
+def test_windows_without_node_times_are_skipped(collect):
+    summary = collect({"level": "section", "window_id": "x", "start_epoch": T0}, full=False)
     assert summary["windows_skipped"] == 1
+
+
+def test_without_a_command_it_shows_its_usage(monkeypatch, capsys):
+    monkeypatch.setattr(sys, "argv", ["csi_tools.py"])
+    assert load_script().main() == 2
+    assert "collect" in capsys.readouterr().out

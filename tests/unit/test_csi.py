@@ -1,6 +1,8 @@
 """CSI: the ``csi`` profile metric, how ``configure_csi`` applies it, the configuration it renders, its collection."""
 
+import asyncio
 import json
+import socket
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -16,7 +18,7 @@ import ansible
 from nador import configure_csi, configure_ran_monitoring
 from nador.artifacts import ExperimentRun, collectors
 from nador.config import validate_deployment
-from nador.csi import CsiLiveView, collection, live, prepare_csi_storage, storage
+from nador.csi import CsiLiveView, collection, enable_csi, live, prepare_csi_storage, select_csi_images, storage
 
 CSI = {"csi": options("csi")}
 NADOR_ASSETS = Path(__file__).resolve().parents[2] / "src" / "nador" / "assets"
@@ -364,3 +366,113 @@ def test_a_component_without_csi_cannot_be_collected():
         collection.CsiCollector(ran()[0], "gnb")
     with pytest.raises(ValueError, match="Unknown RAN component 'du9'"):
         collection.CsiCollector(csi_ran(), "du9")
+
+
+class Ssh:
+    """The ssh process of the tunnel: running, or exited with its error in the log."""
+
+    def __init__(self, argv, stderr, exit_code=None):
+        self.argv, self.exit_code, self.terminated = argv, exit_code, False
+        if exit_code is not None:
+            stderr.write("Permission denied (publickey)")
+
+    def poll(self):
+        return self.exit_code
+
+    def terminate(self):
+        self.terminated = True
+
+    def wait(self, timeout=None):
+        return 0
+
+
+@pytest.fixture
+def tunnel(monkeypatch, tmp_path):
+    view = CsiLiveView(two_nodes(csi_ran()), "node2")
+    view.tunnel_log = tmp_path / "tunnel.log"
+    started = []
+
+    def popen(argv, *, stdout, stderr, exit_code=None):
+        started.append(Ssh(argv, stderr, exit_code))
+        return started[-1]
+
+    monkeypatch.setattr(live.subprocess, "Popen", popen)
+    monkeypatch.setattr(live.atexit, "register", lambda _: None)
+    return view, started, popen
+
+
+async def test_the_tunnel_is_ready_when_its_local_port_answers(tunnel, monkeypatch):
+    view, started, _ = tunnel
+    server = await asyncio.start_server(lambda reader, writer: writer.close(), "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    async with server:
+        view.port = port  # the forwarded port is already served locally: only its readiness is tested here
+        monkeypatch.setattr(live, "_local_port_free", lambda _: True)
+        assert await view.open_tunnel() == f"http://127.0.0.1:{port}"
+        assert f"127.0.0.1:{port}:127.0.0.1:{port}" in started[0].argv
+        await view.close_tunnel()
+    assert started[0].terminated
+    assert view.tunnel is None
+
+
+async def test_a_tunnel_that_ssh_refuses_reports_why(tunnel, monkeypatch):
+    view, _, popen = tunnel
+    monkeypatch.setattr(live.subprocess, "Popen", lambda argv, **kw: popen(argv, **kw, exit_code=255))
+    with pytest.raises(RuntimeError, match="CSI live tunnel failed: Permission denied"):
+        await view.open_tunnel(timeout_s=2)
+
+
+async def test_a_busy_local_port(tunnel):
+    view, _, _ = tunnel
+    with socket.socket() as busy:
+        busy.bind(("127.0.0.1", 0))
+        port = busy.getsockname()[1]
+        with pytest.raises(RuntimeError, match=f"Local port {port} is already in use"):
+            await view.open_tunnel(port)
+
+
+# Several loggers, and images without CSI
+
+
+def second_gnb(managed, node="node1"):
+    components = managed.deployment_model.ran.components
+    components["gnb2"] = components["gnb"].model_copy(deep=True, update={"node_name": node})
+    return managed
+
+
+def test_two_loggers_cannot_write_the_same_file():
+    managed, config = ran()
+    second_gnb(managed)
+    with pytest.raises(ValueError, match="write /data/csi/csi_per_rb.csv on the same node"):
+        configure_csi(managed, config)
+    second_gnb(managed, node=None)
+    with pytest.raises(ValueError, match="share /data/csi: set node_name on each"):
+        configure_csi(managed, config)
+    second_gnb(managed, node="node2")
+    configure_csi(managed, config)
+
+
+def test_the_logger_options_are_checked():
+    managed = ran()[0]
+    with pytest.raises(ValueError, match="Unknown RAN components: \\['du9'\\]"):
+        enable_csi(managed, components=["du9"])
+    with pytest.raises(ValueError, match="srs_period_ms must be an OCUDU SRS period"):
+        enable_csi(managed, srs_period_ms=3)
+
+
+def test_components_without_csi_get_the_image_without_logger():
+    managed = ran(network(layout="cu-du"))[0]
+    components = managed.deployment_model.ran.components
+    components["du"].image = image("docker.io/r2labuser/oai-gnb-csi:2026.w42")
+    components["cu"].image = image("docker.io/r2labuser/oai-gnb-aw2s-csi:2026.w42")
+    select_csi_images(managed)
+    assert components["du"].image == image("docker.io/r2labuser/oai-gnb:2026.w42")
+    assert components["cu"].image == image("docker.io/r2labuser/oai-gnb-aw2s:2026.w42")
+
+
+def test_an_ocudu_du_without_csi_goes_back_to_its_upstream_image():
+    managed = ran(network(ran="ocudu", layout="cu-du"))[0]
+    du = managed.deployment_model.ran.components["du"]
+    du.image = image("docker.io/r2labuser/ocudu-du-csi:release_26_10-uhd")
+    select_csi_images(managed)
+    assert du.image.repository == "registry.gitlab.com/ocudu/ocudu/images/du-uhd"
