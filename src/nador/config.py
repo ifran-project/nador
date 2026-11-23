@@ -38,6 +38,7 @@ COMPONENT_IMAGES = {
     "monitoring-controller": "controller",
     "ue-mapper-api": "ue_mapper",
     "kpi-calculator-oai": "kpi_calculator_oai",
+    "rnti-mapper": "rnti_mapper",
 }
 
 

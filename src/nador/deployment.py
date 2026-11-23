@@ -24,7 +24,7 @@ from nador.config import (
     profile_key,
     validate_deployment,
 )
-from nador.planner import ASSETS, resolve_components, resolve_targets
+from nador.planner import ASSETS, resolve_components, resolve_targets, ue_names
 from nador.probes import HOST_PROBES, kind_of
 
 
@@ -84,7 +84,7 @@ class MonitoringManagement(HelmManagement):
         node_name, _ = self._get_deployment_node(None)
         model = self.deployment_model.model_copy(update={"monitoring": monitoring})
         targets = resolve_targets(model)
-        monitoring.components = resolve_components(model, targets)
+        monitoring.components = resolve_components(model, targets, ue_names(self.metamodel))
         self.deployment_model.monitoring = monitoring
         return Plan(control_node=node_name, targets=targets, components=monitoring.components)
 

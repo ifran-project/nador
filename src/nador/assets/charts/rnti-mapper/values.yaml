@@ -1,8 +1,8 @@
 # Rendered by nador (templates/rnti-mapper.yaml.j2): image, placement, RAN sources, core, UE names.
+# The image (nador-images rnti-mapper/) holds the mapper and kubectl; it reads the RAN and the core with the pod's
+# service account.
 port: 9101
 period: 10
-# kubectl of the node, mounted read-only in the busybox container (in-cluster credentials from the service account)
-kubectlPath: /usr/bin/kubectl
 # RAN components running the RRC: [{component, namespace, selector, type: oai|ocudu}]
 sources: []
 # AMF: {type: oai|open5gs, namespace, selector, container}

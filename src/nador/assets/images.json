@@ -15,7 +15,8 @@
     "queueing_probe": "ghcr.io/ifran-project/nador-probe-queueing@sha256:8323fba56ea9974eebe7ce34e7c5302650e85c9fd946526ae3e405f38872c42c",
     "tcp_probe": "ghcr.io/ifran-project/nador-probe-tcp@sha256:d39ccd2d3a65c41abfbb58142fc819ac89893dc6d7e3b80c656a1b1400a9979d",
     "split_signaling_probe": "ghcr.io/ifran-project/nador-probe-split-signaling@sha256:73fb389d527ea11f8c3fff4cdd1b8b188d3ebb57cbf7f22f62a7265719b645ff",
-    "measurement_quality_probe": "ghcr.io/ifran-project/nador-probe-measurement-quality@sha256:6b236865c8bd1c4da5b58e9a08cd7b07845a7a8b11901562396caa45ff09ae5e"
+    "measurement_quality_probe": "ghcr.io/ifran-project/nador-probe-measurement-quality@sha256:6b236865c8bd1c4da5b58e9a08cd7b07845a7a8b11901562396caa45ff09ae5e",
+    "rnti_mapper": "ghcr.io/ifran-project/nador-rnti-mapper:sha-ff614175b9a5a53477c34aefcce61b59638c37b0@sha256:a6bbb1f20154446517574044cd90b142af141f012679a37d36f9f8a232f6ecf0"
   },
   "builds": {
     "amf-sniffer": {
@@ -107,6 +108,12 @@
       "digest": "sha256:6b236865c8bd1c4da5b58e9a08cd7b07845a7a8b11901562396caa45ff09ae5e",
       "source_repository": "ifran-project/nador-images",
       "source_commit": "b98fe91553736024ed140cc6677da7d72a0e5715"
+    },
+    "rnti-mapper": {
+      "digest": "sha256:a6bbb1f20154446517574044cd90b142af141f012679a37d36f9f8a232f6ecf0",
+      "source_repository": "ifran-project/nador-images",
+      "source_commit": "ff614175b9a5a53477c34aefcce61b59638c37b0",
+      "source_change": "Merge pull request #8 from ifran-project/rnti-mapper"
     }
   }
 }

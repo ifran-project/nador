@@ -1,5 +1,5 @@
 {{- /* rnti-mapper: exports ran_ue_info{ran_node,ran_component,rnti,ran_ue_id,imsi,ue_name} 1 for the Grafana
-joins on rnti. Separate pod, nothing runs in the RAN containers; kubectl comes from the node (hostPath). */ -}}
+joins on rnti. Separate pod, nothing runs in the RAN containers; the mapper and kubectl come with its image. */ -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -18,10 +18,6 @@ data:
     {{- range .Values.ueNames }}
     {{ . }}
     {{- end }}
-  join.awk: |
-    {{- .Files.Get "files/join.awk" | nindent 4 }}
-  run.sh: |
-    {{- .Files.Get "files/run.sh" | nindent 4 }}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -92,7 +88,7 @@ spec:
         app: rnti-mapper
         {{- include "monitoring.labels" . | nindent 8 }}
       annotations:
-        # restart the pod when the sources, UE names or scripts change
+        # restart the pod when the sources or UE names change
         checksum/config: {{ toJson .Values | sha256sum }}
     spec:
       serviceAccountName: rnti-mapper
@@ -101,7 +97,6 @@ spec:
         - name: rnti-mapper
           image: {{ printf "%s:%s" .Values.image.repository .Values.image.tag | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: ["/bin/sh", "/rnti-mapper/run.sh"]
           env:
             - {name: PORT, value: {{ .Values.port | quote }}}
             - {name: PERIOD, value: {{ .Values.period | quote }}}
@@ -124,17 +119,11 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /rnti-mapper
-            - name: kubectl
-              mountPath: /usr/local/bin/kubectl
               readOnly: true
       volumes:
         - name: config
           configMap:
             name: rnti-mapper
-        - name: kubectl
-          hostPath:
-            path: {{ .Values.kubectlPath }}
-            type: File
 ---
 apiVersion: v1
 kind: Service
