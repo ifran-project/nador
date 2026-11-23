@@ -1,0 +1,252 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Chart.Name }}
+  labels:
+    app: {{ .Release.Name }}
+    {{- include "ocudu-du.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "ocudu-du.selectorLabels" . | nindent 6 }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        {{- include "ocudu-du.selectorLabels" . | nindent 8 }}
+        app: {{ .Release.Name }}
+    {{- if or .Values.staticPodIp (and .Values.multus.enabled .Values.multus.interfaces) }}
+      annotations:
+
+        {{- if .Values.staticPodIp }}
+        cni.projectcalico.org/ipAddrs: '["{{ .Values.staticPodIp }}"]'
+        {{- end }}
+
+        {{- if and .Values.multus.enabled .Values.multus.interfaces }}
+        k8s.v1.cni.cncf.io/networks: |-
+          [
+          {{- $first := true }}
+          {{- range .Values.multus.interfaces }}
+          {{- if .enabled }}
+            {{- if not $first }},{{- end }}
+            {
+              "name": "{{ $.Release.Name }}-{{ .name }}",
+              "interface": "{{ .name }}"
+              {{- if .mac }},
+              "mac": "{{ .mac }}"
+              {{- end }}
+              {{- if .defaultRoute }},
+              "default-route": ["{{ .defaultRoute }}"]
+              {{- end }}
+              {{- if .gateway }},
+              "gateway": "{{ .gateway }}"
+              {{- end }}
+            }
+            {{- $first = false }}
+          {{- end }}
+          {{- end }}
+          ]
+        {{- end }}
+    {{- end }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.imagePullSecrets | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: du
+          image: "{{ .Values.nfimage.repository }}:{{ .Values.nfimage.version }}"
+          imagePullPolicy: {{ .Values.nfimage.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: configuration
+              mountPath: /etc/config
+          {{- if eq .Values.config.radio "b2xx" }}
+            - name: radio
+              mountPath: /dev/bus/usb/
+          {{- end }}
+            - name: host-mount
+              mountPath: /mnt/
+          {{- if .Values.fhi72 }}
+            - name: hugepage
+              mountPath: /dev/hugepages
+          {{- end }}
+          {{- if .Values.resources.define }}
+          resources:
+            requests:
+              cpu: {{ .Values.resources.requests.nf.cpu | quote }}
+              memory: {{ .Values.resources.requests.nf.memory | quote }}
+              {{- if .Values.fhi72 }}
+              hugepages-1Gi: {{ .Values.fhi72.hugepages1Gi | quote }}
+              {{- range .Values.fhi72.sriovResources }}
+              {{ . }}: "1"
+              {{- end }}
+              {{- end }}
+            limits:
+              cpu: {{ .Values.resources.limits.nf.cpu | quote }}
+              memory: {{ .Values.resources.limits.nf.memory | quote }}
+              {{- if .Values.fhi72 }}
+              hugepages-1Gi: {{ .Values.fhi72.hugepages1Gi | quote }}
+              {{- range .Values.fhi72.sriovResources }}
+              {{ . }}: "1"
+              {{- end }}
+              {{- end }}
+          {{- end }}
+          {{- if .Values.readinessProbe}}
+          readinessProbe:
+            exec:
+              command: ["pgrep", "odu"]
+            initialDelaySeconds: 0
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 6
+            successThreshold: 1
+          {{- end}}
+          {{- if .Values.livenessProbe}}
+          livenessProbe:
+            exec:
+              command: ["pgrep", "odu"]
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            timeoutSeconds: 1
+            failureThreshold: 3
+            successThreshold: 1
+          {{- end}}
+          ports:
+          {{- range $name, $port := .Values.exposedPorts }}
+          - containerPort: {{ $port.port }}
+            name: {{ $name }}
+            {{- if $port.protocol }}
+            protocol: {{ $port.protocol }}
+            {{- end }}
+          {{- end }}
+          {{- if .Values.customEntrypointCommand}}
+          command:
+            {{- toYaml .Values.customEntrypointCommand | nindent 12 }}
+          {{- else if and .Values.start.du .Values.fhi72 }}
+          # O-RAN 7.2 fronthaul: the configuration names the VF allocated by the SR-IOV device plugin and the CPUs
+          # pinned by the static CPU manager with placeholders, replaced here: @FHI72_PCI@ (PCI address of the
+          # first VF), @FHI72_CPUS@ (allowed CPU list, e.g. 6-13) and @FHI72_CPU_<n>@ (n-th allowed CPU, from 0)
+          command: [ "/bin/sh", "-c" ]
+          args:
+            - |
+              set -e
+              PCI="${{ index .Values.fhi72.pciDeviceEnvVars 0 }}"
+              [ -n "$PCI" ] || { echo "ERROR: {{ index .Values.fhi72.pciDeviceEnvVars 0 }} is not set (no VF allocated)"; exit 1; }
+              CPU_LIST=$(awk '/^Cpus_allowed_list:/ {print $2}' /proc/self/status)
+              CPUS=$(echo "$CPU_LIST" | awk '/-/{for (i=$1; i<=$2; i++)printf "%s%s",i,ORS;next} 1' ORS=' ' RS=, FS=-)
+              echo "VF: $PCI, CPUs: $CPU_LIST"
+              cp /etc/config/config.yaml /tmp/config.yaml
+              sed -i -e "s|@FHI72_PCI@|$PCI|g" -e "s|@FHI72_CPUS@|$CPU_LIST|g" /tmp/config.yaml
+              n=0
+              for cpu in $CPUS; do
+                sed -i "s|@FHI72_CPU_$n@|$cpu|g" /tmp/config.yaml
+                n=$((n + 1))
+              done
+              if grep -n "@FHI72_" /tmp/config.yaml; then
+                echo "ERROR: placeholders left in the configuration (fewer CPUs than placeholders?)"
+                exit 1
+              fi
+              exec /usr/local/bin/odu -c /tmp/config.yaml
+          {{- else if .Values.start.du }}
+          command: [ "/usr/local/bin/odu", "-c", "/etc/config/config.yaml" ]
+          {{- else }}
+          command: [ "/bin/sleep", "infinity" ]
+          {{- end }}
+          {{- if .Values.extraEnvVars }}
+          env:
+            {{- range $key, $value := .Values.extraEnvVars }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- end }}
+
+        {{- if and .Values.metricsExporter .Values.metricsExporter.enabled }}
+        # JSON metrics of the remote control server of the container (metrics_subscribe) exported for Prometheus on
+        # port 9090 (telegraf image of srsran-helm, as in 5g_ansible): ue_*, cell_*, ofh_* metrics
+        - name: metrics-exporter
+          image: {{ required "metricsExporter.image is required" .Values.metricsExporter.image | quote }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: WS_URL
+              value: {{ printf "127.0.0.1:%v" .Values.metricsExporter.port | quote }}
+          ports:
+            - name: metrics
+              containerPort: 9090
+          resources:
+            # requests equal to limits: the pod must stay Guaranteed for the static CPU manager
+            requests:
+              cpu: 100m
+              memory: 200Mi
+            limits:
+              cpu: 100m
+              memory: 200Mi
+        {{- end }}
+
+        {{- if .Values.includeTcpDumpContainer }}
+        - name: tcpdump
+          image: "{{ .Values.tcpdumpimage.repository }}:{{ .Values.tcpdumpimage.version }}"
+          imagePullPolicy: {{ .Values.tcpdumpimage.pullPolicy }}
+          securityContext:
+            capabilities:
+              add: [ "NET_ADMIN", "NET_RAW" ]
+              drop: [ "ALL" ]
+          {{- if .Values.resources.define }}
+          resources:
+            requests:
+              cpu: {{ .Values.resources.requests.tcpdump.cpu | quote }}
+              memory: {{ .Values.resources.requests.tcpdump.memory | quote }}
+            limits:
+              cpu: {{ .Values.resources.limits.tcpdump.cpu | quote }}
+              memory: {{ .Values.resources.limits.tcpdump.memory | quote }}
+          {{- end }}
+          {{- if .Values.start.tcpdump }}
+          command: [ "/bin/sh", "-c", "/usr/bin/tcpdump -i any -w /tmp/pcap/{{ .Chart.Name }}_$(date +%Y-%m-%d_%H_%M-%S-%Z).pcap" ]
+          {{- else }}
+          command: [ "/bin/sleep", "infinity" ]
+          {{- end }}
+        {{- end }}
+      volumes:
+        - name: configuration
+          configMap:
+            name: {{ .Chart.Name }}-configmap
+        - name: host-mount
+          hostPath:
+            path: /mnt/
+            type: Directory
+        {{- if .Values.fhi72 }}
+        - name: hugepage
+          emptyDir:
+            medium: HugePages
+        {{- end }}
+        {{- if eq .Values.config.radio "b2xx" }}
+        - name: radio
+          hostPath:
+            path: /dev/bus/usb/
+        {{- end }}
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      serviceAccountName: {{ .Chart.Name }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- if .Values.nodeSelector }}
+      nodeSelector:
+         {{- toYaml .Values.nodeSelector | nindent 12 }}
+      {{- end }}
+      {{- if .Values.affinity }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 12 }}
+      {{- end }}
+      {{- if .Values.tolerations }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 12 }}
+      {{- end }}
+      {{- if .Values.nodeName }}
+      nodeName: {{ .Values.nodeName }}
+      {{- end }}
+

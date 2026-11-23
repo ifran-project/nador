@@ -1,0 +1,11 @@
+---
+# R2Lab netplan of the RAN nodes, taken from 5g_ansible (roles/setup/netplan): DHCP on the PTP interface
+# gives access to the RU management network (benetel1: 192.168.233.101 from sopnode-f3,
+# benetel2: 192.168.233.102 from sopnode-f4), as with 5g_ansible.
+# The 5g_ansible NIC and CPU tuning roles are not applied: K8SManagement.setup_fhi72 handles them for O-RAN 7.2.
+- name: Apply the R2Lab netplan on RAN nodes
+  # the O-RAN 7.2 nodes only: the VM node2 also has the ran role, for the CUs
+  hosts: sopnode-f3:sopnode-f4
+  gather_facts: false
+  roles:
+    - role: tuning/netplan
