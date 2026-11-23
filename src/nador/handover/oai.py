@@ -1,5 +1,5 @@
 """
-Analysis of an OAI F1 handover: how to trigger it, and which CU-CP and DU log lines prove each step.
+Analysis of an OAI F1 handover: how it is triggered, and which CU-CP and DU log lines prove each step.
 
 The steps of the handover and their numbering are explained in the package documentation (:mod:`nador.handover`).
 This module only says how OAI implements them and how to recognise them in the OAI logs.
@@ -80,7 +80,7 @@ import re
 
 from nador.handover.report import HandoverReport, Step, after_last, clean
 
-__all__ = ["CONTAINERS", "analyze_oai_handover", "connected_ues", "trigger_command"]
+__all__ = ["CONTAINERS", "analyze_oai_handover", "connected_ues"]
 
 # Container running the gNB, CU-CP or DU in each pod of the OAI charts (the others are sidecars).
 CONTAINERS = ("gnb", "cu", "cucp", "cuup", "du")
@@ -97,21 +97,6 @@ REFUSALS = (
     "cannot find UE context for UE ID",
     "cannot get source cell for UE",
 )
-
-
-def trigger_command(ue_id: int, telnet_port: int) -> str:
-    """
-    Shell command, run in the CU-CP container, that sends ``ci trigger_f1_ho <ue_id>`` to the telnet server.
-
-    The answer is read in full before closing: with OAI f80a883, closing earlier reset the connection and the
-    telnet server aborted the CU-CP ("buffer overflow detected").
-    """
-    return (
-        f"exec 3<>/dev/tcp/127.0.0.1/{telnet_port}; "
-        f'printf "ci trigger_f1_ho {ue_id}\\n" >&3; '
-        'while IFS= read -r -t 2 line <&3; do printf "%s\\n" "$line"; done; '
-        "exec 3<&-; exec 3>&-"
-    )
 
 
 # CU-CP refusals that need an explanation: what the CU-CP checks, and what to do.

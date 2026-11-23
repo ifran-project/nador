@@ -1,5 +1,5 @@
 """
-Analysis of an OCUDU F1 handover: how to trigger it, and which CU-CP and DU log lines prove each step.
+Analysis of an OCUDU F1 handover: how it is triggered, and which CU-CP and DU log lines prove each step.
 
 The steps of the handover and their numbering are explained in the package documentation (:mod:`nador.handover`).
 This module only says how OCUDU implements them and how to recognise them in the OCUDU logs.
@@ -17,7 +17,7 @@ CU-CP application, enabled in the CU-CP configuration::
 
 A client opens a WebSocket connection to ``ws://<CU-CP pod IP>:8001`` and sends JSON messages; each message names a
 command in its ``cmd`` field, and the server answers each one with a JSON object (``timestamp`` when the command is
-accepted, ``error`` with the reason when it is refused). The handover command (built by :func:`trigger_request`)::
+accepted, ``error`` with the reason when it is refused). The handover command::
 
     {"cmd": "trigger_handover", "serving_pci": 1, "rnti": 17930, "target_pci": 2, "plmn": "00101", "tac": 1}
 
@@ -29,8 +29,8 @@ accepted, ``error`` with the reason when it is refused). The handover command (b
   cell..."``). An accepted command only means that the handover started; only the logs tell whether it succeeded.
 
 The same server serves the metrics: with ``metrics: enable_json: true``, a client that sends ``{"cmd":
-"metrics_subscribe"}`` then receives the JSON metrics of the application. The metrics-exporter sidecar of the nador
-charts uses it for Prometheus. The server has no authentication: keep it on the cluster network.
+"metrics_subscribe"}`` then receives the JSON metrics of the application; NADOR's ``ocudu-metrics`` exporter (``ran_kpis``) uses
+it for Prometheus. The server has no authentication: keep it on the cluster network.
 
 Why not the console: the CU-CP console accepts ``ho <serving PCI> <C-RNTI> <target PCI> <PLMN> <TAC>``, which
 reaches the same trigger. The CU-CP runs the trigger on its own executor and waits at most 5 s for it
@@ -94,7 +94,7 @@ import re
 
 from nador.handover.report import HandoverReport, Step, after_last, clean
 
-__all__ = ["CONTAINERS", "analyze_ocudu_handover", "connected_ues", "format_rnti", "trigger_request"]
+__all__ = ["CONTAINERS", "analyze_ocudu_handover", "connected_ues", "format_rnti"]
 
 # Container running the gNB, CU, CU-CP or DU in each pod of the OCUDU charts (the others are sidecars).
 CONTAINERS = ("gnb", "cu", "cucp", "cuup", "du")
@@ -110,22 +110,6 @@ REFUSALS = (
 def format_rnti(rnti: int | str) -> str:
     """C-RNTI as OCUDU prints it: '0x4601' (from 0x4601, '4601' or '0x4601')."""
     return f"{int(rnti, 16) if isinstance(rnti, str) else rnti:#x}"
-
-
-def trigger_request(serving_pci: int, rnti: int | str, target_pci: int, target_plmn: str, target_tac: int) -> dict:
-    """
-    Remote command of the OCUDU CU-CP that hands the UE of C-RNTI rnti over from serving_pci to target_pci.
-
-    target_plmn (5 or 6 digits, 00101) and target_tac are those of the target cell.
-    """
-    return {
-        "cmd": "trigger_handover",
-        "serving_pci": serving_pci,
-        "rnti": int(format_rnti(rnti), 16),
-        "target_pci": target_pci,
-        "plmn": target_plmn,
-        "tac": target_tac,
-    }
 
 
 def connected_ues(cucp_log: str) -> list[dict]:

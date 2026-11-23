@@ -1,5 +1,5 @@
 """
-Trigger an F1 handover between two DUs of the same CU-CP and check it, step by step, in the CU-CP and DU logs.
+Check an F1 handover between two DUs of the same CU-CP, step by step, in the CU-CP and DU logs.
 
 The F1 handover (intra-CU, inter-DU mobility, 3GPP TS 38.401 section 8.2.1.1)
 ==============================================================================
@@ -58,18 +58,19 @@ to a new attachment. The CU-CP may also cancel the handover and keep the UE on t
 How this module checks it
 =========================
 
-:func:`run_handover` sends the manual command to the CU-CP, waits, reads the logs of the CU-CP and of both DUs (and
-the previous logs of a DU container that restarted meanwhile), and gives them to the analysis of the RAN
-implementation of the CU-CP (:mod:`nador.handover.oai` or :mod:`nador.handover.ocudu`). The analysis looks, for each
-step above, for the log line that proves it, and returns a :class:`HandoverReport`: each step with what it means, the
-log line found (or why it is missing), a diagnosis of the first missing step, what followed a failure, and where the
-UE is served afterwards. :meth:`HandoverReport.to_text` prints it.
+NADOR observes the handover, it does not trigger it. :class:`HandoverWatch` records the RAN containers before the
+handover; once it has been triggered (manual command on the CU-CP, or a measurement report), it reads the logs of the
+CU-CP and of both DUs (and the previous log of a DU container that restarted meanwhile), and gives them to the
+analysis of the RAN implementation of the CU-CP (:mod:`nador.handover.oai` or :mod:`nador.handover.ocudu`). The
+analysis looks, for each step above, for the log line that proves it, and returns a :class:`HandoverReport`: each
+step with what it means, the log line found (or why it is missing), a diagnosis of the first missing step, what
+followed a failure, and where the UE is served afterwards. :meth:`HandoverReport.to_text` prints it.
 """
 
 from nador.handover.oai import analyze_oai_handover
 from nador.handover.ocudu import analyze_ocudu_handover
 from nador.handover.report import PROCEDURE, HandoverReport, Step
-from nador.handover.run import run_handover
+from nador.handover.watch import HandoverWatch
 
 # Former name of the OAI analysis, kept for the notebooks and scripts that use it.
 analyze_handover = analyze_oai_handover
@@ -77,9 +78,9 @@ analyze_handover = analyze_oai_handover
 __all__ = [
     "PROCEDURE",
     "HandoverReport",
+    "HandoverWatch",
     "Step",
     "analyze_handover",
     "analyze_oai_handover",
     "analyze_ocudu_handover",
-    "run_handover",
 ]

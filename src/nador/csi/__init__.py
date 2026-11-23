@@ -11,7 +11,6 @@ from metamodel_3gpp.models.ran import RANComponentType
 
 from nador.csi.collection import CsiCollector
 from nador.csi.live import CsiLiveView
-from nador.csi.rfsim import RFSIM_CHANNELS, enable_rfsim_channel_model, set_rfsim_channel
 from nador.csi.storage import prepare_csi_storage
 
 # OAI gNB repository -> CSI logger image built from the same OAI tag: upstream default images, and the r2labuser
@@ -20,10 +19,7 @@ from nador.csi.storage import prepare_csi_storage
 # CSI logging then goes back to the r2labuser image of the same build.
 CSI_IMAGE_REPOSITORIES = {
     "docker.io/oaisoftwarealliance/oai-gnb": "docker.io/r2labuser/oai-gnb-csi",
-    # O-RAN 7.2 (Benetel RUs)
-    "docker.io/oaisoftwarealliance/oai-gnb-fhi72": "docker.io/r2labuser/oai-gnb-fhi72-csi",
     "docker.io/r2labuser/oai-gnb": "docker.io/r2labuser/oai-gnb-csi",
-    "docker.io/r2labuser/oai-gnb-fhi72": "docker.io/r2labuser/oai-gnb-fhi72-csi",
 }
 
 # OCUDU gNB and DU: one CSI image per component type and radio variant (ocudu-csi-logging build_image.sh -c gnb|du),
@@ -45,9 +41,6 @@ __all__ = [
     "CsiCollector",
     "CsiLiveView",
     "enable_csi",
-    "enable_rfsim_channel_model",
-    "set_rfsim_channel",
-    "RFSIM_CHANNELS",
     "prepare_csi_storage",
     "select_csi_images",
 ]
