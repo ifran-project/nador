@@ -203,3 +203,13 @@ class CsiCollector(Collector):
             )
         )
         return summary
+
+
+def csi_collectors(manager: BaseManagement) -> list[CsiCollector]:
+    """A collector for each RAN component that logs CSI."""
+    components = manager.deployment_model.ran.components
+    return [
+        CsiCollector(manager, name)
+        for name, component in components.items()
+        if str((component.extra_env_vars or {}).get("CSI_LOGGING_ENABLED")) == "1"
+    ]
