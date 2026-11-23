@@ -107,7 +107,7 @@ class ExperimentRun:
             collectors.append(UEContext(options, hosts))
         if monitoring is not None or prometheus_url is not None:
             collectors.append(PrometheusExport(url=prometheus_url, queries_file=self.queries_file, step=step))
-        if profile is not None and profile.metrics.csi is not None:
+        if monitoring is not None and profile is not None and profile.metrics.csi is not None:
             from nador.csi.collection import CsiCollector  # noqa: PLC0415 - nador.csi imports the collectors
 
             ran = monitoring.deployment_model.ran.components

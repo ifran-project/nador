@@ -65,7 +65,7 @@ def local_monitoring(runner_path: Path) -> SimpleNamespace:
             kubeconfig="/dev/null",
             namespace="monitoring",
             needs_session_stack=True,
-            metrics=SimpleNamespace(log_groups=[]),
+            metrics=SimpleNamespace(log_groups=[], csi=None),
         ),
     )
     return SimpleNamespace(deployment_model=model)

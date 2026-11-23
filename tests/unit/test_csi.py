@@ -1,6 +1,7 @@
 """CSI: the ``csi`` profile metric, how ``configure_csi`` applies it, the configuration it renders, its collection."""
 
 import json
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -8,13 +9,14 @@ import jinja2
 import pytest
 from ansible.plugins.filter.core import FilterModule
 from ansible.plugins.test.core import TestModule as AnsibleTests
+from ifran.models.k8s import ContainerImage
 from support import manager, matrix, network, options, profile
 
 import ansible
 from nador import configure_csi
 from nador.artifacts import ExperimentRun, collectors
 from nador.config import validate_deployment
-from nador.csi import collection
+from nador.csi import CsiLiveView, collection, live, prepare_csi_storage, storage
 
 CSI = {"csi": options("csi")}
 NADOR_ASSETS = Path(__file__).resolve().parents[2] / "src" / "nador" / "assets"
@@ -224,3 +226,126 @@ async def test_a_clock_that_moved_and_dropped_rows_are_warned_about(tmp_path, cs
 async def test_without_csi_nothing_is_collected(tmp_path, csi_node):
     await csi_run(tmp_path / "run", scheduler_wait=options("scheduler_wait"))
     assert csi_node["fetches"] == []
+
+
+# Images
+
+
+def image(reference):
+    repository, tag = reference.rsplit(":", 1)
+    return ContainerImage(repository=repository, image_tag=tag)
+
+
+def test_the_logger_image_is_built_from_the_same_oai_tag():
+    managed, config = ran(network(layout="cu-du"))
+    components = managed.deployment_model.ran.components
+    components["du"].image = image("docker.io/oaisoftwarealliance/oai-gnb:2026.w42")
+    components["cu"].image = image("docker.io/r2labuser/oai-gnb-csi:2026.w42")  # no PHY: back to the plain image
+    configure_csi(managed, config)
+    assert components["du"].image == image("docker.io/r2labuser/oai-gnb-csi:2026.w42")
+    assert components["cu"].image == image("docker.io/r2labuser/oai-gnb:2026.w42")
+
+
+def test_the_ocudu_logger_image_of_the_radio_variant():
+    managed, config = ran(network(ran="ocudu", layout="cu-du"))
+    du = managed.deployment_model.ran.components["du"]
+    du.image = image("registry.gitlab.com/ocudu/ocudu/images/du-uhd:ubuntu-24.04-avx2-20261001_920f88c7-stable")
+    configure_csi(managed, config)
+    assert du.image == image("docker.io/r2labuser/ocudu-du-csi:release_26_10-uhd")
+
+
+def test_an_image_without_a_logger_build_is_refused():
+    managed, config = ran()
+    managed.deployment_model.ran.components["gnb"].image = image("docker.io/someone/oai-gnb:dev")
+    with pytest.raises(ValueError, match="no CSI image known for 'docker.io/someone/oai-gnb'"):
+        configure_csi(managed, config)
+
+
+# Storage, live view and clock on the gNB node
+
+
+def csi_ran(net=None):
+    managed, config = ran(net)
+    configure_csi(managed, config)
+    return managed
+
+
+async def test_the_csi_directory_of_each_node_is_checked(monkeypatch):
+    calls = []
+
+    async def run_ansible_role(*, role, inputs, hosts, **_):
+        calls.append((role, hosts, inputs))
+        return {"csi_storage": {"before": "tmpfs", "after": "ext4"}}
+
+    monkeypatch.setattr(storage, "run_ansible_role", run_ansible_role)
+    report = await prepare_csi_storage(csi_ran(), {"node1": "/dev/sda1"})
+    assert report == {
+        "node1:/data/csi": {"before": "tmpfs", "after": "ext4", "node": "node1", "directory": "/data/csi"}
+    }
+    ((role, hosts, inputs),) = calls
+    assert (role, hosts, inputs["csi_storage_device"]) == ("csi/prepare_node", "node1", "sda1")
+
+
+async def test_storage_needs_a_csi_component_on_each_named_node():
+    with pytest.raises(ValueError, match="No CSI component on \\['node9'\\]"):
+        await prepare_csi_storage(csi_ran(), {"node9": "sda1"})
+    with pytest.raises(ValueError, match="No CSI-enabled component"):
+        await prepare_csi_storage(ran()[0])
+
+
+def two_nodes(managed):
+    nodes = managed.deployment_model.nodes
+    nodes["node2"] = nodes["node1"].model_copy(deep=True)
+    return managed
+
+
+async def test_the_live_view_runs_off_the_gnb_node(monkeypatch):
+    managed = two_nodes(csi_ran())
+    with pytest.raises(ValueError, match="must not run on the gNB node"):
+        CsiLiveView(managed, "node1")
+    actions = []
+
+    async def run_ansible_role(*, inputs, hosts, **_):
+        actions.append((inputs["csi_live_action"], hosts))
+        return {"csi_live_status": ["streamer running", "viewer running"]}
+
+    async def open_tunnel(self, local_port=None, timeout_s=20):
+        return "http://127.0.0.1:8501"
+
+    monkeypatch.setattr(live, "run_ansible_role", run_ansible_role)
+    monkeypatch.setattr(CsiLiveView, "open_tunnel", open_tunnel)
+    view = CsiLiveView(managed, "node2", window_s=60)
+    assert view.inputs["csi_output_dir"] == "/data/csi"
+    assert view.inputs["csi_live_window_s"] == 60
+    assert await view.start() == "http://127.0.0.1:8501"
+    assert await view.status() == "streamer running\nviewer running"
+    await view.stop()
+    assert actions == [("start", "node2"), ("status", "node2"), ("stop", "node2")]
+    assert "-L 127.0.0.1:9000:127.0.0.1:8501" in view.tunnel_command(9000)
+
+
+async def test_the_gnb_clock_is_read_with_the_smallest_round_trip(monkeypatch):
+    class Date:
+        returncode = 0
+
+        async def communicate(self):
+            return f"{time.time() + 3:.6f}\n".encode(), b""
+
+    commands = []
+
+    async def create_subprocess_exec(*command, **_):
+        commands.append(command)
+        return Date()
+
+    monkeypatch.setattr(collection.asyncio, "create_subprocess_exec", create_subprocess_exec)
+    clock = await collection.CsiCollector(csi_ran(), "gnb").measure_clock(samples=3)
+    assert clock["offset_s"] == pytest.approx(3, abs=0.1)
+    assert (clock["samples"], clock["node"]) == (3, "node1")
+    assert commands[0][-2:] == ("date", "+%s.%N")
+
+
+def test_a_component_without_csi_cannot_be_collected():
+    with pytest.raises(ValueError, match="gnb: CSI logging is not enabled"):
+        collection.CsiCollector(ran()[0], "gnb")
+    with pytest.raises(ValueError, match="Unknown RAN component 'du9'"):
+        collection.CsiCollector(csi_ran(), "du9")

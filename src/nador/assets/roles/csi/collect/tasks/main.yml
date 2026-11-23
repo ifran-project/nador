@@ -1,6 +1,6 @@
 # Collect the CSI log (csi_per_rb.csv, CSI CSV format v3.1) on the node running the gNB.
 # Adapted from 5g_ansible roles/5g/csi_logging/tasks/collect.yml (branch csi-ue-mapper, 1b5a0b30):
-# the file is read once, in place, at the lowest CPU/IO priority by csi_tools.py (copied verbatim);
+# the file is read once, in place, at the lowest CPU/IO priority by csi_tools.py;
 # only the results are fetched to the controller. Pod provenance is recorded by the Python caller
 # from the deployment model, so no kubectl is needed on the gNB node.
 #

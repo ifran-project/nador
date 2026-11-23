@@ -99,7 +99,7 @@ class CsiLiveView:
             get_ansible_inventory_line(name, node)
             for name, node in ((self.live_node, self.live), (self.source.node_name, self.source.node))
         )
-        return await run_ansible_role(
+        result = await run_ansible_role(
             role="csi/live",
             runner_path=str(Path(self.ansible.runner_path) / "csi" / "live" / self.source.component),
             inputs=self.inputs | {"csi_live_action": action},
@@ -110,6 +110,7 @@ class CsiLiveView:
             become=True,
             quiet=quiet,
         )
+        return result or {}
 
     async def start(self, *, quiet: bool = True) -> str:
         """(Re)start the streamer and the viewer, then open the tunnel; return the local URL."""

@@ -187,6 +187,8 @@ class CsiCollector(Collector):
             become=True,
             quiet=quiet,
         )
+        if result is None:
+            raise RuntimeError(f"CSI collection on {self.node_name} returned no summary")
         summary = result["csi_summary"]
         archive = dest / "by_window.tar"
         if archive.is_file():  # noqa: ASYNC240 (local file, no I/O wait)

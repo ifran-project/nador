@@ -60,6 +60,8 @@ async def prepare_csi_storage(
             become=True,
             quiet=quiet,
         )
+        if result is None:
+            raise RuntimeError(f"CSI storage check on {node_name} returned no result")
         return result["csi_storage"] | {"node": node_name, "directory": output_dir}
 
     jobs = [(node, directory) for node, dirs in directories.items() for directory in sorted(dirs)]

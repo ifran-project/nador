@@ -24,10 +24,11 @@ import argparse
 import calendar
 import gzip
 import json
-import os
 import re
 import sys
 import time
+from contextlib import ExitStack, suppress
+from pathlib import Path
 
 FLUSH_PERIOD_S = 5.0
 CHUNK = 8 << 20
@@ -37,6 +38,7 @@ NON_ROW = re.compile(rb"^(?:[^0-9\n][^\n]*)?\n", re.M)
 
 
 def parse_marker(line):
+    """Epoch of a time marker line, or None when it cannot be read."""
     # "# TIMESTAMP: YYYY-mm-dd HH:MM:SS" -> epoch; v3.1 writes UTC, v3 wrote pod local time
     try:
         return calendar.timegm(time.strptime(line[len(b"# TIMESTAMP:") :].strip().decode(), "%Y-%m-%d %H:%M:%S"))
@@ -45,27 +47,28 @@ def parse_marker(line):
 
 
 def safe_name(value):
+    """A window name usable as a directory name."""
     value = re.sub(r"[^A-Za-z0-9_.=-]+", "_", str(value).strip())
     return value.strip("_") or "window"
 
 
 def window_subdir(w):
-    # Same layout as scripts/artifacts/split_prometheus_by_timeline.py
+    """Directory of a window under by_window/, the layout of NADOR's Prometheus split."""
     level = w.get("level", "window")
     if level == "scenario":
-        return os.path.join("scenario", safe_name(w.get("scenario", "scenario")))
+        return Path("scenario", safe_name(w.get("scenario", "scenario")))
     if level == "step":
-        return os.path.join("step", safe_name("__".join([w.get("scenario", ""), w.get("step", "")])))
+        return Path("step", safe_name("__".join([w.get("scenario", ""), w.get("step", "")])))
     if level == "direction":
-        return os.path.join(
+        return Path(
             "direction", safe_name("__".join([w.get("scenario", ""), w.get("step", ""), w.get("direction", "")]))
         )
-    return os.path.join(level, safe_name(w.get("window_id", "window")))
+    return Path(level, safe_name(w.get("window_id", "window")))
 
 
 def load_windows(path, window_types, padding):
-    with open(path) as f:
-        data = json.load(f)
+    """Windows of the given levels with their node clock interval, and those without one."""
+    data = json.loads(Path(path).read_text())
     levels = {x.strip() for x in window_types.split(",") if x.strip()}
     windows, skipped = [], []
     for w in data.get("windows", []):
@@ -93,8 +96,10 @@ def load_windows(path, window_types, padding):
 
 
 class Collector:
-    def __init__(self, windows, split_dir):
-        self.windows, self.split_dir = windows, split_dir
+    """Splits the lines of the CSI file into per-window files, batch by batch, and counts what it sees."""
+
+    def __init__(self, windows, split_dir, open_gzip):
+        self.windows, self.split_dir, self.open_gzip = windows, split_dir, open_gzip
         self.json_hdr = self.col_hdr = None
         self.markers, self.batch_rows = [], []
         self.rows_before_first = self.dropped = 0
@@ -134,10 +139,8 @@ class Collector:
             if self.json_hdr is None:
                 self.json_hdr = line
         elif line.startswith(b"# DROPPED:"):
-            try:
+            with suppress(ValueError):
                 self.dropped += int(line.split(b":", 1)[1])
-            except ValueError:
-                pass
         elif line.startswith(b"frame") and self.col_hdr is None:
             self.col_hdr = line
 
@@ -151,9 +154,9 @@ class Collector:
             h = self.handles.get(i)
             if h is None:
                 w = self.windows[i]
-                path = os.path.join(self.split_dir, window_subdir(w["w"]), FILE_NAME + ".gz")
-                os.makedirs(os.path.dirname(path), exist_ok=True)
-                h = self.handles[i] = gzip.open(path, "wb", compresslevel=1)
+                path = Path(self.split_dir, window_subdir(w["w"]), FILE_NAME + ".gz")
+                path.parent.mkdir(parents=True, exist_ok=True)
+                h = self.handles[i] = self.open_gzip(path)
                 w["path"] = path
                 for hdr in (self.json_hdr, self.col_hdr):
                     if hdr:
@@ -169,23 +172,12 @@ class Collector:
             h.write(seg)
             self.windows[i]["rows"] += n
 
-    def close(self):
-        for h in self.handles.values():
-            h.close()
 
-
-def cmd_collect(args):
-    windows, skipped = ([], [])
-    if args.windows_json:
-        windows, skipped = load_windows(args.windows_json, args.window_types, args.padding_seconds)
-    os.makedirs(args.out_dir, exist_ok=True)
-    split_dir = os.path.join(args.out_dir, "by_window")
-    col = Collector(windows, split_dir)
-    full = gzip.open(os.path.join(args.out_dir, FILE_NAME + ".gz"), "wb", compresslevel=1) if args.full else None
-
-    size = os.path.getsize(args.src)  # snapshot: data appended after this point is ignored
+def read_once(src, collector, full):
+    """Feed the complete lines of src, up to its size now, to the collector (and full); return the reading state."""
+    size = Path(src).stat().st_size  # snapshot: data appended after this point is ignored
     remaining, carry, shrunk = size, b"", False
-    with open(args.src, "rb") as f:
+    with Path(src).open("rb") as f:
         while remaining > 0:
             buf = f.read(min(CHUNK, remaining))
             if not buf:  # file truncated while reading (gNB restart)
@@ -198,11 +190,12 @@ def cmd_collect(args):
             if block:
                 if full:
                     full.write(block)
-                col.feed(block)
-    if full:
-        full.close()
-    col.close()
+                collector.feed(block)
+    return size, len(carry), shrunk
 
+
+def summarize(src, col, size, carry, shrunk):
+    """Format, rows, markers, dropped rows and time span of the file read."""
     meta = {}
     if col.json_hdr:
         try:
@@ -210,11 +203,11 @@ def cmd_collect(args):
         except ValueError:
             meta = {"_error": "unparsable JSON header"}
     valid = [m for m in col.markers if m is not None]
-    gaps = [b - a for a, b in zip(valid, valid[1:])]
-    summary = {
-        "file": args.src,
+    gaps = [valid[i + 1] - valid[i] for i in range(len(valid) - 1)]
+    return {
+        "file": src,
         "source_bytes_at_start": size,
-        "incomplete_last_line_bytes": len(carry),
+        "incomplete_last_line_bytes": carry,
         "file_shrank_while_reading": shrunk,
         "format_version": meta.get("format_version", "3 (pre-3.1)" if col.json_hdr else "unknown"),
         "columns": meta.get("columns") or (col.col_hdr.decode().strip().split(",") if col.col_hdr else []),
@@ -229,45 +222,62 @@ def cmd_collect(args):
         "metadata": meta,
     }
 
+
+def write_split_summary(args, split_dir, windows, skipped):
+    """by_window/csi_split_summary.json: rows and batches of every window."""
+    out = [
+        {
+            "window_id": w["w"].get("window_id"),
+            "level": w["w"].get("level"),
+            "path": str(w["path"].relative_to(args.out_dir)) if "path" in w else None,
+            "ran_start_epoch": w["ran_start_epoch"],
+            "ran_end_epoch": w["ran_end_epoch"],
+            "batches": w["batches"],
+            "rows": w["rows"],
+            "first_batch_start": w["first_batch_start"],
+            "last_batch_end": w["last_batch_end"],
+        }
+        for w in windows
+    ]
+    split_dir.mkdir(parents=True, exist_ok=True)
+    summary = {
+        "csv": args.src,
+        "window_types": args.window_types,
+        "padding_seconds": args.padding_seconds,
+        "granularity": "flush batch (~5 s)",
+        "windows": out,
+        "skipped": skipped,
+    }
+    (split_dir / "csi_split_summary.json").write_text(json.dumps(summary, indent=2))
+
+
+def cmd_collect(args):
+    """Read the CSI file once, write the full and per-window files, and print the summary as JSON."""
+    windows, skipped = ([], [])
     if args.windows_json:
-        os.makedirs(split_dir, exist_ok=True)
-        out = []
-        for w in windows:
-            out.append(
-                {
-                    "window_id": w["w"].get("window_id"),
-                    "level": w["w"].get("level"),
-                    "path": os.path.relpath(w["path"], args.out_dir) if "path" in w else None,
-                    "ran_start_epoch": w["ran_start_epoch"],
-                    "ran_end_epoch": w["ran_end_epoch"],
-                    "batches": w["batches"],
-                    "rows": w["rows"],
-                    "first_batch_start": w["first_batch_start"],
-                    "last_batch_end": w["last_batch_end"],
-                }
-            )
-        with open(os.path.join(split_dir, "csi_split_summary.json"), "w") as f:
-            json.dump(
-                {
-                    "csv": args.src,
-                    "window_types": args.window_types,
-                    "padding_seconds": args.padding_seconds,
-                    "granularity": "flush batch (~5 s)",
-                    "windows": out,
-                    "skipped": skipped,
-                },
-                f,
-                indent=2,
-            )
+        windows, skipped = load_windows(args.windows_json, args.window_types, args.padding_seconds)
+    Path(args.out_dir).mkdir(parents=True, exist_ok=True)
+    split_dir = Path(args.out_dir, "by_window")
+    with ExitStack() as stack:
+
+        def open_gzip(path):
+            return stack.enter_context(gzip.open(path, "wb", compresslevel=1))
+
+        col = Collector(windows, split_dir, open_gzip)
+        full = open_gzip(Path(args.out_dir, FILE_NAME + ".gz")) if args.full else None
+        size, carry, shrunk = read_once(args.src, col, full)
+    summary = summarize(args.src, col, size, carry, shrunk)
+    if args.windows_json:
+        write_split_summary(args, split_dir, windows, skipped)
         summary["windows_written"] = len(col.handles)
         summary["windows_empty"] = len(windows) - len(col.handles)
         summary["windows_skipped"] = len(skipped)
-
-    print(json.dumps(summary, indent=2))
+    sys.stdout.write(json.dumps(summary, indent=2) + "\n")
     return 0
 
 
 def main():
+    """Command line entry point."""
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd")
     c = sub.add_parser("collect")

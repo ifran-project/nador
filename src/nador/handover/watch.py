@@ -46,8 +46,11 @@ class HandoverWatch:
         self.cucp, self.source, self.target = cucp, source, target
         self.implementation = implementation
         self.containers = (oai if implementation == "oai" else ocudu).CONTAINERS
-        self.master = model.params.k8s.master_node
-        self.namespace = model.ran.components[target].namespace
+        master, namespace = model.params.k8s.master_node, model.ran.components[target].namespace
+        if master is None or namespace is None:
+            raise ValueError("Deploy the RAN first: the Kubernetes master node and the RAN namespace are not known")
+        self.master: str = master
+        self.namespace: str = namespace
         self.nodes = ProvisioningManagement(preceding=ran)
         self.charts = {name: build_k8s_safe(f"{implementation}-{name}") for name in (cucp, source, target)}
         self._before: dict[str, dict[str, int]] | None = None
@@ -85,7 +88,13 @@ class HandoverWatch:
         else:
             target = self.ran.metamodel.ran.components[self.target].config  # type: ignore[union-attr]
             report = ocudu.analyze_ocudu_handover(
-                ue, self.source, self.target, cucp_log, du_logs, target_pci=target.physicalCellId, answer=answer
+                ue,
+                self.source,
+                self.target,
+                cucp_log,
+                du_logs,
+                target_pci=getattr(target, "physicalCellId", None),
+                answer=answer,
             )
         report.command_answer = answer
         report.restarts = restarts

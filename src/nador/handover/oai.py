@@ -224,10 +224,9 @@ def _ue_location(ue: int, rntis: set[str], du_logs: dict[str, str]) -> dict[str,
     location = {}
     for du, text in du_logs.items():
         tail = text.splitlines()[-STATS_TAIL_LINES:]
-        lines = [
-            line for line in tail if re.search(rf"UE RNTI ([0-9a-f]+)(?: PCI \d+ CellID \d+)? CU-UE-ID {ue}\b", line)
-        ]
-        lines = [line for line in lines if re.search(r"UE RNTI ([0-9a-f]+)", line).group(1) in rntis] or lines
+        pattern = re.compile(rf"UE RNTI ([0-9a-f]+)(?: PCI \d+ CellID \d+)? CU-UE-ID {ue}\b")
+        matches = [(line, match.group(1)) for line in tail if (match := pattern.search(line))]
+        lines = [line for line, rnti in matches if rnti in rntis] or [line for line, _ in matches]
         location[du] = clean(lines[-1].split(" F ", 1)[-1]) if lines else "not served"
     return location
 
@@ -244,7 +243,8 @@ def analyze_oai_handover(
     report.rntis = {
         k: v for k, v in (("source", cucp.get("source_rnti")), ("target", du.get("rnti"))) if v is not None
     } | {"chain": " ".join(cucp["rntis"])}
-    report.ue_location = _ue_location(ue_id, set(cucp["rntis"]) | {du.get("rnti")}, du_logs)
+    rntis = {rnti for rnti in [*cucp["rntis"], du.get("rnti")] if rnti is not None}
+    report.ue_location = _ue_location(ue_id, rntis, du_logs)
 
     completed = cucp["complete"] is not None and cucp["complete"] == report.target_cell
     cell = f" towards cell {report.target_cell}" if report.target_cell is not None else ""
