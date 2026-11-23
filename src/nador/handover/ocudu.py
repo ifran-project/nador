@@ -156,6 +156,11 @@ def _cucp(lines: list[str], answer: str) -> dict:  # noqa: C901, PLR0912 (one br
                 found.setdefault("release", line)
             elif target and direction == "Tx" and message == "UEContextReleaseCommand":
                 found["events"].append(f"CU-CP released the UE on the target DU (du={du}): handover cancelled")
+        elif (m := re.search(r"ue=(\d+) c-rnti=(0x[0-9a-f]+): UE created", line)) and int(m.group(1)) == found.get(
+            "target_ue"
+        ):
+            # C-RNTI of the UE in the target cell, allocated by the target DU
+            found.setdefault("target_rnti", m.group(2))
         elif "DCCH UL rrcReconfigurationComplete" in line and f"ue={found.get('target_ue')} " in line:
             found.setdefault("complete", line)
         elif "CCCH UL rrcReestablishmentRequest" in line and "decision" in found:
@@ -168,17 +173,28 @@ def _cucp(lines: list[str], answer: str) -> dict:  # noqa: C901, PLR0912 (one br
 
 
 def _target_du(lines: list[str], target_pci: int | None) -> dict:
-    """Target DU lines from the UE context setup on: new C-RNTI of the UE, PRACH detected on the target cell."""
+    """
+    Target DU lines (read from just before the trigger on): new C-RNTI of the UE, PRACH detected on the target cell.
+
+    The UE of a handover is created by the F1AP UE context setup, without a "UE Create" procedure line: its first
+    line is ``ue=<i> crnti=<rnti> proc="MAC UE Creation": finished successfully`` (OCUDU 920f88c7).
+    """
     found: dict = {"prach": []}
-    lines = after_last(lines, "UEContextSetupRequest")
+    lines = after_last(lines, "UEContextSetupRequest") or lines
     for line in lines:
-        if m := re.search(r'ue=\d+ rnti=(0x[0-9a-f]+) proc="UE Create": Procedure finished successfully', line):
+        if m := re.search(
+            r"ue=\d+ (?:c-?)?rnti=(0x[0-9a-f]+) "
+            r'proc="(?:UE Create": Procedure|MAC UE Creation":) finished successfully',
+            line,
+        ):
             found.setdefault("rnti", m.group(1))
             found.setdefault("created", line)
     pci = rf"pci={target_pci}\b" if target_pci is not None else r"pci=\d+"
     for line in lines:
         if re.search(rf"Processed slot events {pci}", line):
-            found["prach"] += [(line, int(p), r) for p, r in re.findall(r"preamble=(\d+) tc-rnti=(0x[0-9a-f]+)", line)]
+            found["prach"] += [
+                (line, int(p), r) for p, r in re.findall(r"preamble=(\d+)(?: ssb=\d+)? tc-rnti=(0x[0-9a-f]+)", line)
+            ]
     return found
 
 
@@ -221,7 +237,8 @@ def analyze_ocudu_handover(
     cucp = _cucp(cucp_log.splitlines(), answer)
     du = _target_du(du_logs.get(target, "").splitlines(), target_pci)
     report.target_cell = target_pci
-    new = du.get("rnti")
+    # C-RNTI in the target cell: CU-CP log (UE created after the UE context setup), else first UE created on the DU
+    new = cucp.get("target_rnti") or du.get("rnti")
     report.rntis = {"source": rnti} | ({"target": new} if new else {})
 
     cfra = [(line, preamble) for line, preamble, tc_rnti in du["prach"] if new is not None and tc_rnti == new]
