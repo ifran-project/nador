@@ -28,6 +28,7 @@ notebook cell marks it `cancelled` and still stops every collector.
 | `logs/` | Loki logs of the run's time span, when a `logs` metric is on |
 | `ue_context/` | UE, IP, slice and tunnels sampled during the run, when the UE mapper is deployed |
 | `setup/before/`, `setup/after/` | host and cluster snapshots |
+| `csi/<component>/` | the CSI file cut per section, when the `csi` metric is on ([CSI](csi.md)) |
 | anything you `save_json` | your own results, such as iperf reports |
 
 If a collector fails, the run records it under `collection_errors`, finishes the others, and raises
@@ -101,7 +102,8 @@ async with ExperimentRun("results/run3", monitoring=monitoring) as run:
 `iperf.run` starts a one-shot server on a fresh port and runs the UE side; `iperf.serve(port)` and
 `iperf.client(ue, direction, seconds, port)` do the two halves separately, for several UEs at once.
 Each returns iperf3's JSON report; a failed test returns the report with iperf's `error`, so it can
-be saved before acting on it.
+be saved before acting on it. `nador.artifacts.iperf_summary("results/run3")` prints one line per
+saved report: sent and received throughput and retransmissions, or the error.
 
 ## Checking that metrics arrive
 
