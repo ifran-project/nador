@@ -246,67 +246,75 @@ def analyze_oai_handover(
     rntis = {rnti for rnti in [*cucp["rntis"], du.get("rnti")] if rnti is not None}
     report.ue_location = _ue_location(ue_id, rntis, du_logs)
 
-    completed = cucp["complete"] is not None and cucp["complete"] == report.target_cell
+    report.success = cucp["complete"] is not None and cucp["complete"] == report.target_cell
+    report.steps = _steps(cucp, du, report)
+    for step in report.steps:
+        step.evidence = clean(step.evidence)
+    report.aftermath = cucp["events"] + du["events"]
+    if "ul_stats" in du:
+        report.aftermath.append(f"{target}: uplink of RNTI {du['rnti']}: {clean(du['ul_stats'])}")
+    report.diagnosis = _diagnosis(report, cucp, du, target)
+    return report
+
+
+def _steps(cucp: dict, du: dict, report: HandoverReport) -> list[Step]:
+    """The steps of the procedure, as the CU-CP and target DU logs show them."""
     cell = f" towards cell {report.target_cell}" if report.target_cell is not None else ""
+    prepared = f"new RNTI {du.get('rnti', '?')}, dedicated preamble {report.preamble}" if "preparation" in du else ""
     again = f"then the preamble came again {du['retransmissions']} time(s)" if du["retransmissions"] else ""
-    report.steps = [
+    completed = report.success
+    return [
         Step("decision", "decision" in cucp, f"RNTI {cucp.get('source_rnti', '?')}{cell}", cucp.get("decision", "")),
-        Step(
-            "preparation",
-            "preparation" in du,
-            f"new RNTI {du.get('rnti', '?')}, dedicated preamble {report.preamble}" if "preparation" in du else "",
-            du.get("preparation", ""),
-        ),
+        Step("preparation", "preparation" in du, prepared, du.get("preparation", "")),
         Step("command", "command" in cucp, "", cucp.get("command", "")),
         Step("preamble", "preamble_line" in du, "", du.get("preamble_line", "")),
         Step("response", "response" in du, again, du.get("response", "")),
         Step("completion", completed, "", cucp["complete_line"] if completed else ""),
         Step("release", "release" in cucp, "", cucp.get("release", "")),
     ]
-    for step in report.steps:
-        step.evidence = clean(step.evidence)
-    report.aftermath = cucp["events"] + du["events"]
-    if "ul_stats" in du:
-        report.aftermath.append(f"{target}: uplink of RNTI {du['rnti']}: {clean(du['ul_stats'])}")
-    report.success = completed
 
+
+def _diagnosis(report: HandoverReport, cucp: dict, du: dict, target: str) -> str:  # noqa: PLR0911 - one per step
+    """The first step that did not happen, and what it means."""
     if report.success:
-        report.diagnosis = "The UE completed the handover on the target cell."
-    elif "decision" not in cucp:
+        return "The UE completed the handover on the target cell."
+    if "decision" not in cucp:
         refusal = f" It answered: {clean(cucp['refusal'])}" if "refusal" in cucp else ""
         hints = [hint for key, hint in REFUSAL_HINTS.items() if key in cucp.get("refusal", "")]
-        report.diagnosis = (
-            f"The CU-CP did not trigger the handover: check the CU UE ID and the telnet answer.{refusal}"
-            + (f" Meaning: {hints[0]}" if hints else "")
-        )
-    elif "preparation" not in du:
-        report.diagnosis = f"{target} did not prepare the UE (no CFRA process): UE context setup failed on the target."
-    elif "preamble_line" not in du:
-        report.diagnosis = (
+        meaning = f" Meaning: {hints[0]}" if hints else ""
+        return f"The CU-CP did not trigger the handover: check the CU UE ID and the telnet answer.{refusal}{meaning}"
+    if "preparation" not in du:
+        return f"{target} did not prepare the UE (no CFRA process): UE context setup failed on the target."
+    if "preamble_line" not in du:
+        return (
             f"{target} never received the dedicated preamble {report.preamble}: the UE did not execute the "
             "handover command (not received from the source cell), or its preamble did not reach the target RU."
         )
-    elif du.get("c_rnti_ce"):
-        report.diagnosis = (
-            f"The UE reached the target cell: it sent its new C-RNTI {du['rnti']} to {target} in "
-            f"{du['c_rnti_ce']} contention-based random access(es), but {target} did not decode its uplink "
-            "afterwards, and its RRCReconfigurationComplete never reached the CU-CP."
-        )
-        before, after = du.get("srs_ports", (None, None))
-        if before is not None and before != after:
-            report.diagnosis += (
-                f" {target} prepared the UE with a CellGroup without its capabilities (SRS on {before} port(s)) and "
-                f"sent it a CellGroup with its capabilities (SRS on {after} port(s)): OAI keeps scheduling the UE with "
-                "the first one after the random access, so the UE and the DU do not use the same uplink configuration."
-            )
-    elif du["retransmissions"]:
-        report.diagnosis = (
+    if du.get("c_rnti_ce"):
+        return _uplink_lost(du, target)
+    if du["retransmissions"]:
+        return (
             "The UE did not decode the random access response of the target cell: it sent its dedicated "
             "preamble again (downlink of the target cell at the UE)."
         )
-    else:
-        report.diagnosis = (
-            "The UE accessed the target cell, but its RRCReconfigurationComplete never reached the CU-CP "
-            "(uplink of the target cell, or the UE lost the link right after the access)."
+    return (
+        "The UE accessed the target cell, but its RRCReconfigurationComplete never reached the CU-CP "
+        "(uplink of the target cell, or the UE lost the link right after the access)."
+    )
+
+
+def _uplink_lost(du: dict, target: str) -> str:
+    """The UE reached the target cell but the DU did not decode it: with OAI, often an SRS configuration mismatch."""
+    diagnosis = (
+        f"The UE reached the target cell: it sent its new C-RNTI {du['rnti']} to {target} in "
+        f"{du['c_rnti_ce']} contention-based random access(es), but {target} did not decode its uplink "
+        "afterwards, and its RRCReconfigurationComplete never reached the CU-CP."
+    )
+    before, after = du.get("srs_ports", (None, None))
+    if before is not None and before != after:
+        diagnosis += (
+            f" {target} prepared the UE with a CellGroup without its capabilities (SRS on {before} port(s)) and "
+            f"sent it a CellGroup with its capabilities (SRS on {after} port(s)): OAI keeps scheduling the UE with "
+            "the first one after the random access, so the UE and the DU do not use the same uplink configuration."
         )
-    return report
+    return diagnosis

@@ -264,3 +264,8 @@ async def test_a_watch_must_start_before_the_handover(two_dus):
         await HandoverWatch(ran, source="du1", target="du2").report(1)
     with pytest.raises(ValueError, match="Unknown RAN components: \\['du3'\\]"):
         HandoverWatch(ran, source="du1", target="du3")
+
+
+def test_an_ocudu_routine_that_fails_after_the_decision_is_reported():
+    cucp = OCUDU_PREPARED + '[CU-CP] ue=8: "Intra CU Handover Routine" failed: timeout\n'
+    assert 'CU-CP: 8: "Intra CU Handover Routine" failed: timeout' in ocudu_report(cucp, OCUDU_TARGET).aftermath
