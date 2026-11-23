@@ -1,82 +1,83 @@
 {
   "images": {
-    "controller": "ghcr.io/ifran-project/nador-controller:sha-68530af707b7016dab8dcad88799c44b2fc8de2b@sha256:7202a5b9855ce0e9a69c17443f65ab1cbdc07471299926467033aa4b595b8cfb",
-    "rtt_probe": "ghcr.io/ifran-project/ebpf-latency-probe:sha-68530af707b7016dab8dcad88799c44b2fc8de2b@sha256:f68c3905c4b98744cc6fb2c6fc631ffdaac7d97b39e51e2c24412c4a0efc0905",
-    "throughput_probe": "ghcr.io/ifran-project/nador-throughput-probe:sha-68530af707b7016dab8dcad88799c44b2fc8de2b@sha256:8e170dd37af2eef6ccb6e3ad6b83e7ab77e517b51ddb0e8efa2addfcff6e2cd3",
-    "path_probe": "ghcr.io/ifran-project/nador-user-plane-path:sha-68530af707b7016dab8dcad88799c44b2fc8de2b@sha256:431ade9a96f9c4c7099948cf9d56572bc58aa83053888ad9dbd29165dd8a3dd9",
-    "one_way_probe": "ghcr.io/ifran-project/nador-n3-oneway:sha-68530af707b7016dab8dcad88799c44b2fc8de2b@sha256:0a697a61e67263022913945ed8f8d7267812caa2c60ed80ecb9bc8d13641fbf9",
-    "amf_sniffer": "ghcr.io/ifran-project/amf-sniffer:sha-68530af707b7016dab8dcad88799c44b2fc8de2b@sha256:c7714a124caadf085c067cb89b2cd853109ec0b7c990cf02303d25cc8b3d4770",
-    "smf_sniffer": "ghcr.io/ifran-project/smf-sniffer:sha-68530af707b7016dab8dcad88799c44b2fc8de2b@sha256:b3bad7e50b81589a007dbab223bc4e65be7ba02521940836ba2236fbd569f804",
-    "ue_mapper": "ghcr.io/ifran-project/ue_mapper_api:sha-68530af707b7016dab8dcad88799c44b2fc8de2b@sha256:6e0f789601f8709bc1cf39b3a8b94ab8dc4d52224fa00104b8b4920a9750486e",
-    "packet_pairer": "ghcr.io/ifran-project/packet-pairer:sha-68530af707b7016dab8dcad88799c44b2fc8de2b@sha256:0b0b5e6357eaa7c9ece9da9b97ddfeaa950ec299f32b820d8da125c28458f737",
-    "kpi_calculator_oai": "ghcr.io/ifran-project/kpi-calculator-oai:sha-68530af707b7016dab8dcad88799c44b2fc8de2b@sha256:105a0dc51938aa2f98e63377dc574021ab0cbafed909949d1c60720fa91292fb",
+    "controller": "ghcr.io/ifran-project/nador-controller:sha-fb89cc563f7d2f4ba88bc652eab7b8b3d6f7bd96@sha256:9cc3b1d6e37c489fc3492749af34ee655789158e9cafa075c3338e32f1587944",
+    "rtt_probe": "ghcr.io/ifran-project/ebpf-latency-probe:sha-fb89cc563f7d2f4ba88bc652eab7b8b3d6f7bd96@sha256:2edcb3685e1ab4fabb94941c93f33ae84ac751edb24fdd92f9ac0ec715acb535",
+    "throughput_probe": "ghcr.io/ifran-project/nador-throughput-probe:sha-fb89cc563f7d2f4ba88bc652eab7b8b3d6f7bd96@sha256:ce8ea1ebd8d8cf924d298ca2150e32e2b9bee1d1f655f81eb7df4efad89a9569",
+    "path_probe": "ghcr.io/ifran-project/nador-user-plane-path:sha-fb89cc563f7d2f4ba88bc652eab7b8b3d6f7bd96@sha256:e269527ac6c7dd04fa6650f9049b459bfb2936932a3ff1e56d146886aeb022ef",
+    "one_way_probe": "ghcr.io/ifran-project/nador-n3-oneway:sha-fb89cc563f7d2f4ba88bc652eab7b8b3d6f7bd96@sha256:c2957569189d7dd72e9d4ff34d807017225919e390d6b79e084acb74c3468dbd",
+    "amf_sniffer": "ghcr.io/ifran-project/amf-sniffer:sha-fb89cc563f7d2f4ba88bc652eab7b8b3d6f7bd96@sha256:2337c23253700eb6083869a07e59539ed8c13d8bb1a8fda3cb56e1d78ec1dd56",
+    "smf_sniffer": "ghcr.io/ifran-project/smf-sniffer:sha-fb89cc563f7d2f4ba88bc652eab7b8b3d6f7bd96@sha256:a7b23b3a18981630ae5215121abaddd6b2d338a649fd10f95d7f32b608444fb3",
+    "ue_mapper": "ghcr.io/ifran-project/ue_mapper_api:sha-fb89cc563f7d2f4ba88bc652eab7b8b3d6f7bd96@sha256:544fe288609a8452172a98f6d33be8a7a043e50fd1156cc878232f82cbf23d89",
+    "packet_pairer": "ghcr.io/ifran-project/packet-pairer:sha-fb89cc563f7d2f4ba88bc652eab7b8b3d6f7bd96@sha256:bfcd6f6bae30e1f059945f25a23a607315b98b1b488544dfc1631ccd970b0d03",
+    "kpi_calculator_oai": "ghcr.io/ifran-project/kpi-calculator-oai:sha-fb89cc563f7d2f4ba88bc652eab7b8b3d6f7bd96@sha256:6972df1049c77ac2494a03945a8b4462c68692e4f55bbf63ed496d66e4113be6",
     "cpu_probe": "ghcr.io/ifran-project/nador-probe-cpu@sha256:d76b479f156f43c30f57012f8b8f9d42b6d6114cf03bcf4d99da3d3cae63c77d",
     "drops_probe": "ghcr.io/ifran-project/nador-probe-drops@sha256:1d0482292e38b9115fb8f3f2ca3f11ccdaa921256fceff6c716b2598d3f2d3ff",
     "queueing_probe": "ghcr.io/ifran-project/nador-probe-queueing@sha256:8323fba56ea9974eebe7ce34e7c5302650e85c9fd946526ae3e405f38872c42c",
     "tcp_probe": "ghcr.io/ifran-project/nador-probe-tcp@sha256:d39ccd2d3a65c41abfbb58142fc819ac89893dc6d7e3b80c656a1b1400a9979d",
     "split_signaling_probe": "ghcr.io/ifran-project/nador-probe-split-signaling@sha256:73fb389d527ea11f8c3fff4cdd1b8b188d3ebb57cbf7f22f62a7265719b645ff",
-    "measurement_quality_probe": "ghcr.io/ifran-project/nador-probe-measurement-quality@sha256:6b236865c8bd1c4da5b58e9a08cd7b07845a7a8b11901562396caa45ff09ae5e"
+    "measurement_quality_probe": "ghcr.io/ifran-project/nador-probe-measurement-quality@sha256:6b236865c8bd1c4da5b58e9a08cd7b07845a7a8b11901562396caa45ff09ae5e",
+    "rnti_mapper": "ghcr.io/ifran-project/nador-rnti-mapper:sha-fb89cc563f7d2f4ba88bc652eab7b8b3d6f7bd96@sha256:53e02195b27893e4b971ce41d8055c3d2dce29d83ad32d9015cd27f2ce550e99"
   },
   "builds": {
     "amf-sniffer": {
-      "digest": "sha256:c7714a124caadf085c067cb89b2cd853109ec0b7c990cf02303d25cc8b3d4770",
+      "digest": "sha256:2337c23253700eb6083869a07e59539ed8c13d8bb1a8fda3cb56e1d78ec1dd56",
       "source_repository": "ifran-project/nador-images",
-      "source_commit": "68530af707b7016dab8dcad88799c44b2fc8de2b",
-      "source_change": "Merge pull request #7 from ifran-project/rename-controller-names"
+      "source_commit": "fb89cc563f7d2f4ba88bc652eab7b8b3d6f7bd96",
+      "source_change": "Merge pull request #9 from ifran-project/nador-develop-updates"
     },
     "kpi-calculator-oai": {
-      "digest": "sha256:105a0dc51938aa2f98e63377dc574021ab0cbafed909949d1c60720fa91292fb",
+      "digest": "sha256:6972df1049c77ac2494a03945a8b4462c68692e4f55bbf63ed496d66e4113be6",
       "source_repository": "ifran-project/nador-images",
-      "source_commit": "68530af707b7016dab8dcad88799c44b2fc8de2b",
-      "source_change": "Merge pull request #7 from ifran-project/rename-controller-names"
+      "source_commit": "fb89cc563f7d2f4ba88bc652eab7b8b3d6f7bd96",
+      "source_change": "Merge pull request #9 from ifran-project/nador-develop-updates"
     },
     "latency-probe": {
-      "digest": "sha256:f68c3905c4b98744cc6fb2c6fc631ffdaac7d97b39e51e2c24412c4a0efc0905",
+      "digest": "sha256:2edcb3685e1ab4fabb94941c93f33ae84ac751edb24fdd92f9ac0ec715acb535",
       "source_repository": "ifran-project/nador-images",
-      "source_commit": "68530af707b7016dab8dcad88799c44b2fc8de2b",
-      "source_change": "Merge pull request #7 from ifran-project/rename-controller-names"
+      "source_commit": "fb89cc563f7d2f4ba88bc652eab7b8b3d6f7bd96",
+      "source_change": "Merge pull request #9 from ifran-project/nador-develop-updates"
     },
     "packet-pairer": {
-      "digest": "sha256:0b0b5e6357eaa7c9ece9da9b97ddfeaa950ec299f32b820d8da125c28458f737",
+      "digest": "sha256:bfcd6f6bae30e1f059945f25a23a607315b98b1b488544dfc1631ccd970b0d03",
       "source_repository": "ifran-project/nador-images",
-      "source_commit": "68530af707b7016dab8dcad88799c44b2fc8de2b",
-      "source_change": "Merge pull request #7 from ifran-project/rename-controller-names"
+      "source_commit": "fb89cc563f7d2f4ba88bc652eab7b8b3d6f7bd96",
+      "source_change": "Merge pull request #9 from ifran-project/nador-develop-updates"
     },
     "smf-sniffer": {
-      "digest": "sha256:b3bad7e50b81589a007dbab223bc4e65be7ba02521940836ba2236fbd569f804",
+      "digest": "sha256:a7b23b3a18981630ae5215121abaddd6b2d338a649fd10f95d7f32b608444fb3",
       "source_repository": "ifran-project/nador-images",
-      "source_commit": "68530af707b7016dab8dcad88799c44b2fc8de2b",
-      "source_change": "Merge pull request #7 from ifran-project/rename-controller-names"
+      "source_commit": "fb89cc563f7d2f4ba88bc652eab7b8b3d6f7bd96",
+      "source_change": "Merge pull request #9 from ifran-project/nador-develop-updates"
     },
     "throughput-probe": {
-      "digest": "sha256:8e170dd37af2eef6ccb6e3ad6b83e7ab77e517b51ddb0e8efa2addfcff6e2cd3",
+      "digest": "sha256:ce8ea1ebd8d8cf924d298ca2150e32e2b9bee1d1f655f81eb7df4efad89a9569",
       "source_repository": "ifran-project/nador-images",
-      "source_commit": "68530af707b7016dab8dcad88799c44b2fc8de2b",
-      "source_change": "Merge pull request #7 from ifran-project/rename-controller-names"
+      "source_commit": "fb89cc563f7d2f4ba88bc652eab7b8b3d6f7bd96",
+      "source_change": "Merge pull request #9 from ifran-project/nador-develop-updates"
     },
     "ue-mapper": {
-      "digest": "sha256:6e0f789601f8709bc1cf39b3a8b94ab8dc4d52224fa00104b8b4920a9750486e",
+      "digest": "sha256:544fe288609a8452172a98f6d33be8a7a043e50fd1156cc878232f82cbf23d89",
       "source_repository": "ifran-project/nador-images",
-      "source_commit": "68530af707b7016dab8dcad88799c44b2fc8de2b",
-      "source_change": "Merge pull request #7 from ifran-project/rename-controller-names"
+      "source_commit": "fb89cc563f7d2f4ba88bc652eab7b8b3d6f7bd96",
+      "source_change": "Merge pull request #9 from ifran-project/nador-develop-updates"
     },
     "external-controller": {
-      "digest": "sha256:7202a5b9855ce0e9a69c17443f65ab1cbdc07471299926467033aa4b595b8cfb",
+      "digest": "sha256:9cc3b1d6e37c489fc3492749af34ee655789158e9cafa075c3338e32f1587944",
       "source_repository": "ifran-project/nador-images",
-      "source_commit": "68530af707b7016dab8dcad88799c44b2fc8de2b",
-      "source_change": "Merge pull request #7 from ifran-project/rename-controller-names"
+      "source_commit": "fb89cc563f7d2f4ba88bc652eab7b8b3d6f7bd96",
+      "source_change": "Merge pull request #9 from ifran-project/nador-develop-updates"
     },
     "n3-oneway": {
-      "digest": "sha256:0a697a61e67263022913945ed8f8d7267812caa2c60ed80ecb9bc8d13641fbf9",
+      "digest": "sha256:c2957569189d7dd72e9d4ff34d807017225919e390d6b79e084acb74c3468dbd",
       "source_repository": "ifran-project/nador-images",
-      "source_commit": "68530af707b7016dab8dcad88799c44b2fc8de2b",
-      "source_change": "Merge pull request #7 from ifran-project/rename-controller-names"
+      "source_commit": "fb89cc563f7d2f4ba88bc652eab7b8b3d6f7bd96",
+      "source_change": "Merge pull request #9 from ifran-project/nador-develop-updates"
     },
     "user-plane-path": {
-      "digest": "sha256:431ade9a96f9c4c7099948cf9d56572bc58aa83053888ad9dbd29165dd8a3dd9",
+      "digest": "sha256:e269527ac6c7dd04fa6650f9049b459bfb2936932a3ff1e56d146886aeb022ef",
       "source_repository": "ifran-project/nador-images",
-      "source_commit": "68530af707b7016dab8dcad88799c44b2fc8de2b",
-      "source_change": "Merge pull request #7 from ifran-project/rename-controller-names"
+      "source_commit": "fb89cc563f7d2f4ba88bc652eab7b8b3d6f7bd96",
+      "source_change": "Merge pull request #9 from ifran-project/nador-develop-updates"
     },
     "probe-cpu": {
       "digest": "sha256:d76b479f156f43c30f57012f8b8f9d42b6d6114cf03bcf4d99da3d3cae63c77d",
@@ -107,6 +108,12 @@
       "digest": "sha256:6b236865c8bd1c4da5b58e9a08cd7b07845a7a8b11901562396caa45ff09ae5e",
       "source_repository": "ifran-project/nador-images",
       "source_commit": "b98fe91553736024ed140cc6677da7d72a0e5715"
+    },
+    "rnti-mapper": {
+      "digest": "sha256:53e02195b27893e4b971ce41d8055c3d2dce29d83ad32d9015cd27f2ce550e99",
+      "source_repository": "ifran-project/nador-images",
+      "source_commit": "fb89cc563f7d2f4ba88bc652eab7b8b3d6f7bd96",
+      "source_change": "Merge pull request #9 from ifran-project/nador-develop-updates"
     }
   }
 }
