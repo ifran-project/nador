@@ -31,8 +31,8 @@ procedure; the two DUs only prepare and release the lower layers (RLC, MAC, PHY)
 
 1. **Decision.** The CU-CP decides the handover, from a measurement report of the UE (event A3: a neighbour cell
    becomes better than the serving cell) or, in these experiments, from a manual command: ``ci trigger_f1_ho <CU UE
-   ID>`` on the OAI CU-CP telnet server, ``ho <serving PCI> <C-RNTI> <target PCI> <PLMN> <TAC>`` on the OCUDU CU-CP
-   console.
+   ID>`` on the OAI CU-CP telnet server (:mod:`nador.handover.oai`), a ``trigger_handover`` JSON command on the
+   remote control server of the OCUDU CU-CP (:mod:`nador.handover.ocudu`).
 2. **Preparation of the target DU.** F1AP UE CONTEXT SETUP REQUEST: the target DU creates the UE, allocates it a new
    C-RNTI and, with contention-free random access (CFRA), a dedicated preamble, and returns the radio configuration
    of the UE in its cell (CellGroupConfig). The CU-CP moves the F1-U tunnels of the PDU sessions to the target DU
