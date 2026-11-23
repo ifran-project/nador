@@ -182,6 +182,25 @@ def _target_du(lines: list[str], target_pci: int | None) -> dict:
     return found
 
 
+def _preamble_step(prach: list, cfra: list, target: str, completed: bool) -> Step:
+    """Random access step: dedicated preamble with the new C-RNTI, other PRACH, or none in the target DU log."""
+    if cfra:
+        return Step("preamble", True, f"dedicated preamble {cfra[0][1]} (contention-free)", cfra[0][0])
+    if prach:
+        return Step(
+            "preamble",
+            None,
+            f"{len(prach)} PRACH on the target cell, none with the new C-RNTI: contention-based access, the UE "
+            "gives its C-RNTI in Msg3 (logged at the debug level only)",
+            prach[0][0],
+        )
+    if completed:
+        # the UE did its random access on the target cell: the target DU log does not cover the handover (rotated
+        # by kubelet, or PRACH not logged at the configured level)
+        return Step("preamble", None, f"no PRACH line in the log of {target}, which does not cover the handover")
+    return Step("preamble", False, "no PRACH on the target cell after the preparation")
+
+
 def analyze_ocudu_handover(
     rnti: int | str,
     source: str,
@@ -208,20 +227,10 @@ def analyze_ocudu_handover(
     cfra = [(line, preamble) for line, preamble, tc_rnti in du["prach"] if new is not None and tc_rnti == new]
     if cfra:
         report.preamble = cfra[0][1]
-        preamble = Step("preamble", True, f"dedicated preamble {report.preamble} (contention-free)", cfra[0][0])
-    elif du["prach"]:
-        preamble = Step(
-            "preamble",
-            None,
-            f"{len(du['prach'])} PRACH on the target cell, none with the new C-RNTI: contention-based access, the UE "
-            "gives its C-RNTI in Msg3 (logged at the debug level only)",
-            du["prach"][0][0],
-        )
-    else:
-        preamble = Step("preamble", False, "no PRACH on the target cell after the preparation")
+    completed = "complete" in cucp or "ul_rrc" in cucp
+    preamble = _preamble_step(du["prach"], cfra, target, completed)
     again = len(cfra) - 1
     setup_ok = "UEContextSetupResponse" in cucp.get("setup_answer", "")
-    completed = "complete" in cucp or "ul_rrc" in cucp
     du_index = f"DU index {cucp['source_du']} -> {cucp['target_du']}, " if "decision" in cucp else ""
     report.steps = [
         Step(
