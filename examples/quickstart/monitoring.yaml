@@ -5,6 +5,7 @@ operation_timeout_seconds: 600
 metrics:
   ran:
     ran_kpis: false
+    csi: false
     split_signaling: false
     logs: false
   core:

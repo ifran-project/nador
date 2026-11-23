@@ -6,6 +6,7 @@ node_name: sopnode-f3
 metrics:
   ran:
     ran_kpis: false
+    csi: false
     split_signaling: false
     logs: true
   core:

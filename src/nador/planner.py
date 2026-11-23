@@ -11,6 +11,7 @@ import yaml
 from ifran.utils.k8s import build_k8s_safe
 from ifran.utils.utils import deep_merge
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
+from metamodel_3gpp.models.metamodel import MetaModel
 
 from nador.config import (
     DeployedMonitoringComponent,
@@ -237,6 +238,7 @@ def _render_chart_values(
     model: MonitoringModel,
     targets: list[ResolvedTarget],
     probe_states: dict[str, bool],
+    ue_names: dict[str, str],
 ) -> dict:
     """Render chart configuration before applying explicit user overrides."""
     chart = _chart_name(component)
@@ -250,6 +252,8 @@ def _render_chart_values(
         context = _host_probe_chart_context(model, targets, probe_name, probe_states)
     elif chart == "ocudu-metrics":
         context["ocudu_sources"] = ocudu_sources(model)
+    elif chart == "rnti-mapper":
+        context |= {"ue_names": ue_names, "components": _enabled_components(model), "build_k8s_safe": build_k8s_safe}
     elif chart == "promtail":
         context["log_namespaces"] = _log_namespaces(model)
     elif chart == "kube-prometheus-stack":
@@ -281,11 +285,34 @@ def _enabled_components(model: MonitoringModel) -> set[str]:
         enabled.update(("loki", "promtail"))
     if metrics.ran_kpis:
         enabled.add("ocudu-metrics" if ran == "ocudu" else "kpi-calculator-oai")
+    if (metrics.ran_kpis or metrics.csi is not None) and _has_rrc(model):
+        # RNTI -> UE for the dashboard panels per RNTI (RAN KPIs, CSI)
+        enabled.add("rnti-mapper")
     return enabled
 
 
-def resolve_components(model: MonitoringModel, targets: list[ResolvedTarget]) -> dict[str, DeployedMonitoringComponent]:
-    """Build enabled monitoring components and their Helm values in installation order."""
+def ue_names(metamodel: MetaModel | None) -> dict[str, str]:
+    """IMSI -> UE name, from the UEs of the meta model (their SUPI is the IMSI)."""
+    if metamodel is None:
+        return {}
+    return {ue.config.supi: name for name, ue in metamodel.ues.items() if ue.config is not None}
+
+
+def _has_rrc(model: MonitoringModel) -> bool:
+    """Whether an OAI or OCUDU gNB, CU or CU-CP runs the RRC: the rnti-mapper reads its UE contexts."""
+    return any(
+        str(ran.type) in ("gnb", "cu", "cu_cp") and str(ran.implementation) in ("oai", "ocudu")
+        for ran in model.ran.components.values()
+    )
+
+
+def resolve_components(
+    model: MonitoringModel, targets: list[ResolvedTarget], ue_names: dict[str, str] | None = None
+) -> dict[str, DeployedMonitoringComponent]:
+    """Build enabled monitoring components and their Helm values in installation order.
+
+    ``ue_names`` maps an IMSI to the UE's name, for the rnti-mapper.
+    """
     monitoring = model.monitoring
     catalog = yaml.safe_load((ASSETS / "components.yaml").read_text())
     enabled = _enabled_components(model)
@@ -313,7 +340,7 @@ def resolve_components(model: MonitoringModel, targets: list[ResolvedTarget]) ->
             )
         component = DeployedMonitoringComponent.model_validate(data)
         component.namespace = monitoring.namespace
-        component.chart_values = _render_chart_values(component, model, targets, probe_states)
+        component.chart_values = _render_chart_values(component, model, targets, probe_states, ue_names or {})
         if probe_kind(name) and component.chart_values.get("settings", {}).get("paused"):
             component.pod_selector = []
         if not component.chart_version:

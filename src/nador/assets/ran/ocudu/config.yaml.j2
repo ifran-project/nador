@@ -1,0 +1,15 @@
+{# The upstream OCUDU configuration, unchanged unless CSI logging is on (CSI_LOGGING_ENABLED=1, set by configure_csi). #}
+{# The CSI logger needs periodic SRS, which the upstream template does not expose (advanced_config.cell_cfg would #}
+{# replace the whole cell configuration): an srs section is inserted as text right after the single top-level #}
+{# cell_cfg line. An unexpected configuration fails the prepare step instead of logging no CSI. #}
+{% set csi_env = component.extra_env_vars or {} %}
+{% if csi_env.get('CSI_LOGGING_ENABLED') | string == '1' %}
+{% set config %}{% include 'ran/ocudu/ocudu-' ~ component.type ~ '/config.yaml.j2' %}{% endset %}
+{% if config is not search('(?m)^cell_cfg:$') or config is search('(?ms)^cell_cfg:$.*^cell_cfg:$') or config is search('(?m)^  srs:') %}
+{# Undefined variable on purpose: fail the prepare step instead of rendering a configuration without SRS. #}
+{{ csi_config_injection_failed_cell_cfg_not_found_twice_or_srs_already_set }}
+{% endif %}
+{{ config | regex_replace('^cell_cfg:$', 'cell_cfg:\n  srs:\n    type_enabled: periodic\n    period_ms: ' ~ csi_env.get('CSI_SRS_PERIOD_MS', '40'), multiline=True) }}
+{% else %}
+{% include 'ran/ocudu/ocudu-' ~ component.type ~ '/config.yaml.j2' %}
+{% endif %}

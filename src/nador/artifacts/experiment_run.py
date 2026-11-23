@@ -107,6 +107,14 @@ class ExperimentRun:
             collectors.append(UEContext(options, hosts))
         if monitoring is not None or prometheus_url is not None:
             collectors.append(PrometheusExport(url=prometheus_url, queries_file=self.queries_file, step=step))
+        if options.collect_csi and monitoring is not None and profile is not None and profile.metrics.csi is not None:
+            from nador.csi.collection import CsiCollector  # noqa: PLC0415 - nador.csi imports the collectors
+
+            ran = monitoring.deployment_model.ran.components
+            logging = [
+                name for name, c in ran.items() if str((c.extra_env_vars or {}).get("CSI_LOGGING_ENABLED")) == "1"
+            ]
+            collectors += [CsiCollector(monitoring, name) for name in logging]
         if options.loki_url or (profile is not None and profile.metrics.log_groups):
             collectors.append(
                 LokiExport(
