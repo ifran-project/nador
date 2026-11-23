@@ -105,7 +105,7 @@ metrics:
       output_dir: null         # default /data/csi (OAI), /mnt/csi (OCUDU)
 ```
 
-**Enabling the logger** (`nador.configure_csi(ran, config)`, before `ran.deploy()`):
+**Enabling the logger** (`nador.configure_ran_monitoring(ran, config)`, before `ran.deploy()`; it calls `nador.configure_csi`):
 
 - selects the CSI image built from the same OAI tag (or OCUDU release) for the chosen OAI and OCUDU `gnb`/`du`
   components only; the CU has no PHY, hence no SRS, and asking for it is an error. Every other component keeps its

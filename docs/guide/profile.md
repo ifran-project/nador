@@ -95,10 +95,10 @@ Notes:
   (see [Controlling probes](probes.md)).
 - **Host probes that share a row run in one probe**, so they start and stop together.
   `attributed_drops` and `tcp_flows` only collect when deployed running.
-- **`ran_kpis` with OCUDU**: call `nador.configure_ran_kpis(ran, config)` before `ran.deploy()`, so
-  the gNB publishes its metrics.
-- **`csi`**: call `nador.configure_csi(ran, config)` before `ran.deploy()`: the logger is part of the gNB
-  image, so turning it on or off means deploying the RAN again. A run collects it with
+- **`ran_kpis` and `csi` change the RAN**: call `nador.configure_ran_monitoring(ran, config)` before `ran.deploy()`.
+  It makes an OCUDU gNB publish its metrics (`ran_kpis`) and sets up the CSI logger (`csi`); with both off it
+  changes nothing. The CSI logger is part of the gNB image, so turning it on or off means deploying the RAN
+  again. A run collects it with
   `ExperimentRun(..., collect_csi=True)` (see [CSI](csi.md)).
 - **`ran_kpis` and `csi`** also deploy the RNTI mapper: it names the UE behind each RNTI in the dashboard
   panels, from the RRC of the OAI or OCUDU gNB, CU or CU-CP and the AMF.

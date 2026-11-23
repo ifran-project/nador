@@ -13,7 +13,7 @@ from ifran.models.k8s import ContainerImage
 from support import manager, matrix, network, options, profile
 
 import ansible
-from nador import configure_csi
+from nador import configure_csi, configure_ran_monitoring
 from nador.artifacts import ExperimentRun, collectors
 from nador.config import validate_deployment
 from nador.csi import CsiLiveView, collection, live, prepare_csi_storage, storage
@@ -127,6 +127,15 @@ def test_a_deployed_ran_must_be_configured_before_it_was_deployed():
     managed.deployment_model.ran.components["gnb"].is_installed = True
     with pytest.raises(ValueError, match="gnb: configure CSI before deploying the RAN"):
         configure_csi(managed, config)
+
+
+def test_one_call_prepares_the_ran_for_the_whole_profile():
+    metrics = {"csi": options("csi"), "ran_kpis": options("ran_kpis")}
+    managed, config = ran(network(ran="ocudu"), **metrics)
+    configure_ran_monitoring(managed, config)
+    gnb = managed.deployment_model.ran.components["gnb"]
+    assert env(gnb)["CSI_ENABLED"] == "1"
+    assert gnb.advanced_config.model_dump(exclude_none=True)["metrics"]["enable_json"] is True
 
 
 # The configuration the gNB is deployed with

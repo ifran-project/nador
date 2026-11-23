@@ -150,8 +150,8 @@ seconds; `remove_probe` uninstalls it.
 
 Rarely changed knobs (probe intervals, sniffer timeouts) live under `tuning:`.
 
-For OCUDU native KPIs, turn on `ran_kpis` and call
-`nador.configure_ran_kpis(ran, config)` **before** deploying the RAN.
+For OCUDU native KPIs (`ran_kpis`) and CSI (`csi`), call `nador.configure_ran_monitoring(ran, config)`
+**before** deploying the RAN; with both off it changes nothing.
 
 ### Experiments
 
