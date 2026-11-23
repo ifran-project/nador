@@ -71,7 +71,7 @@ preamble    target DU ``Processed slot events pci=<target PCI>: prach(ra-rnti=<r
                       tc-rnti=<new rnti>)``: with contention-free random access (``prach: cfra_enabled: true``), the
                       dedicated preamble comes with the new C-RNTI. With contention-based access, the UE gets a
                       temporary RNTI and gives its C-RNTI in Msg3, which the DU logs only at the ``debug`` level
-response    -         not logged at the ``info`` level
+response    (none)    not logged at the ``info`` level
 completion  CU-CP     ``ue=<target ue> c-rnti=<new rnti>: DCCH UL rrcReconfigurationComplete``, or
                       ``Rx PDU du=<target> ue=<target ue> ...: ULRRCMessageTransfer``
 release     CU-CP     ``Tx PDU du=<source> ue=<ue> ...: UEContextReleaseCommand``

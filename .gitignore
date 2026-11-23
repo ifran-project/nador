@@ -20,3 +20,8 @@ build/
 # Private validation belongs in the development repository.
 /tests/
 /examples/monitoring-trials/
+
+# Local secrets (R2Lab credentials loaded by python-dotenv in the notebooks)
+.env
+docs/_build/
+docs/reference/
