@@ -1,4 +1,5 @@
 {{- $parser := .Values.metricsParser | default dict -}}
+{{- $csi := .Values.csi | default dict -}}
 {{- $workdir := "/opt/oai-gnb" -}}
 {{- if eq .Values.config.radio "aw2s" -}}
 {{- $workdir = "/opt/oai-gnb-aw2s" -}}
@@ -62,8 +63,10 @@ spec:
       imagePullSecrets:
         {{- toYaml .Values.imagePullSecrets | nindent 8 }}
       {{- end }}
-      {{- if $parser.enabled }}
+      {{- if or $parser.enabled (eq .Values.config.radio "fhi72") }}
       initContainers:
+      {{- end }}
+      {{- if $parser.enabled }}
         - name: prepare-du-metrics
           image: "{{ .Values.nfimage.repository }}:{{ .Values.nfimage.version }}"
           imagePullPolicy: {{ .Values.nfimage.pullPolicy }}
@@ -75,11 +78,32 @@ spec:
                 touch /shared-logs/$file
                 ln -sf /shared-logs/$file /metrics-workdir/$file
               done
+          {{- if eq .Values.config.radio "fhi72" }}
+          # requests equal to limits: the pod must stay Guaranteed for the static CPU manager
+          resources:
+            requests: { cpu: "500m", memory: "200Mi" }
+            limits: { cpu: "500m", memory: "200Mi" }
+          {{- end }}
           volumeMounts:
             - name: metrics-workdir
               mountPath: /metrics-workdir
             - name: metrics-logs
               mountPath: /shared-logs
+      {{- end }}
+      {{- if eq .Values.config.radio "fhi72" }}
+        # the yq of the gNB image cannot patch the configuration (as in the upstream oai-gnb-fhi-72 chart)
+        - name: copy-yq
+          image: {{ .Values.fhi72.yqImage | quote }}
+          imagePullPolicy: IfNotPresent
+          command: [ "/bin/sh", "-c", "cp /usr/bin/yq /shared/yq && chmod +x /shared/yq" ]
+          # requests equal to limits: an init container with unequal values makes the pod Burstable,
+          # and the static CPU manager then stops pinning the DU CPUs
+          resources:
+            requests: { cpu: "1m", memory: "50Mi" }
+            limits: { cpu: "1m", memory: "50Mi" }
+          volumeMounts:
+            - name: shared-data
+              mountPath: /shared
       {{- end }}
       containers:
         - name: du
@@ -97,6 +121,10 @@ spec:
             - name: metrics-logs
               mountPath: /shared-logs
           {{- end }}
+          {{- if $csi.enabled }}
+            - name: csi-output
+              mountPath: {{ $csi.outputDir }}
+          {{- end }}
           {{- if eq .Values.config.radio "aw2s" }}
             - name: configuration
               mountPath: /opt/oai-gnb-aw2s/etc
@@ -108,7 +136,17 @@ spec:
             - name: radio
               mountPath: /dev/bus/usb/
           {{- end }}
+          {{- if eq .Values.config.radio "fhi72" }}
+            - name: hugepage
+              mountPath: /dev/hugepages
+            - name: shared-data
+              mountPath: /shared
+          {{- end }}
           env:
+          {{- if eq .Values.config.radio "fhi72" }}
+            - name: NF_CPUS
+              value: {{ .Values.resources.limits.nf.cpu | quote }}
+          {{- end }}
             - name: TZ
               value: {{ .Values.config.timeZone | quote }}
             - name: USE_ADDITIONAL_OPTIONS
@@ -136,9 +174,25 @@ spec:
             requests:
               cpu: {{ .Values.resources.requests.nf.cpu | quote }}
               memory: {{ .Values.resources.requests.nf.memory | quote }}
+              {{- if .Values.resources.requests.nf.hugepages1Gi }}
+              hugepages-1Gi: {{ .Values.resources.requests.nf.hugepages1Gi | quote }}
+              {{- end }}
+              {{- if eq .Values.config.radio "fhi72" }}
+              {{- range .Values.fhi72.sriovResources }}
+              {{ . }}: "1"
+              {{- end }}
+              {{- end }}
             limits:
               cpu: {{ .Values.resources.limits.nf.cpu | quote }}
               memory: {{ .Values.resources.limits.nf.memory | quote }}
+              {{- if .Values.resources.limits.nf.hugepages1Gi }}
+              hugepages-1Gi: {{ .Values.resources.limits.nf.hugepages1Gi | quote }}
+              {{- end }}
+              {{- if eq .Values.config.radio "fhi72" }}
+              {{- range .Values.fhi72.sriovResources }}
+              {{ . }}: "1"
+              {{- end }}
+              {{- end }}
           {{- end }}
           ports:
           {{- range $name, $port := .Values.exposedPorts }}
@@ -153,6 +207,72 @@ spec:
             {{- toYaml .Values.customEntrypointCommand | nindent 12 }}
           {{- else if not .Values.start.du }}
           command: [ "/bin/sleep", "infinity" ]
+          {{- else if eq .Values.config.radio "fhi72" }}
+          # adapted from the upstream oai-gnb-fhi-72 chart: set the VFs allocated by the SR-IOV device plugin
+          # and pin the DU threads on the CPUs allocated by the static CPU manager
+          command: [ "/bin/sh", "-c" ]
+          args:
+            - |
+              set -e
+              cp /shared/yq /usr/local/bin/yq
+              cp /opt/oai-gnb/etc/gnb.yaml /tmp/gnb.yaml
+              PCI_LIST=""
+              {{- range .Values.fhi72.pciDeviceEnvVars }}
+              [ -n "${{ . }}" ] || { echo "ERROR: {{ . }} is not set (no VF allocated)"; exit 1; }
+              PCI_LIST="${PCI_LIST:+$PCI_LIST }${{ . }}"
+              {{- end }}
+              export PCI_LIST
+              echo "Virtual PCI devices: $PCI_LIST"
+              # CPUs the container may run on (the cgroup cpuset file is not visible in every cgroup layout)
+              CPU_LIST=$(awk '/^Cpus_allowed_list:/ {print $2}' /proc/self/status)
+              CPUS=$(echo "$CPU_LIST" | awk '/-/{for (i=$1; i<=$2; i++)printf "%s%s",i,ORS;next} 1' ORS=' ' RS=, FS=-)
+              CPU_COUNT=$(echo "$CPUS" | wc -w)
+              echo "Available CPUs: $CPU_LIST (count=$CPU_COUNT)"
+              # with the static CPU manager, a Guaranteed pod only gets its exclusive CPUs
+              if [ "$CPU_COUNT" -ne "$NF_CPUS" ]; then
+                echo "ERROR: $CPU_COUNT CPUs instead of the $NF_CPUS exclusive CPUs (kubelet static CPU manager, Guaranteed pod)"
+                exit 1
+              fi
+              if [ "$CPU_COUNT" -lt 7 ]; then
+                echo "ERROR: only $CPU_COUNT CPUs: 6 needed for L1 RX/TX, RU, DPDK system/IO/worker, and 1 for the thread pool"
+                exit 1
+              fi
+              get_cpu() { echo "$CPUS" | awk -v n="$1" '{ if (NF>=n) print $n; }'; }
+              export L1_RX_CORE=$(get_cpu 1)
+              export L1_TX_CORE=$(get_cpu 2)
+              export RU_THREAD_CORE=$(get_cpu 3)
+              export SYSTEM_CORE=$(get_cpu 4)
+              export IO_CORE=$(get_cpu 5)
+              export WORKER_CORE=$(get_cpu 6)
+              THREAD_POOL_CPUS=$(echo "$CPUS" | cut -d' ' -f7-)
+              if [ "${CSI_LOGGING_ENABLED:-0}" = "1" ]; then
+                # CSI logger flush thread (continuous file I/O): on a CPU of the pod, out of the L1 thread pool
+                # (the last CPU, unless CSI_FLUSH_CORE is one of the pod CPUs), as in the upstream fhi72 chart
+                case " $CPUS " in
+                  *" ${CSI_FLUSH_CORE:-auto} "*) ;;
+                  *) export CSI_FLUSH_CORE=$(echo "$CPUS" | awk '{print $NF}') ;;
+                esac
+                THREAD_POOL_CPUS=$(echo "$THREAD_POOL_CPUS" | tr ' ' '\n' | grep -vx -e "$CSI_FLUSH_CORE" -e '' | tr '\n' ' ')
+                echo "CSI flush core: $CSI_FLUSH_CORE"
+              fi
+              export THREAD_POOL=$(echo "$THREAD_POOL_CPUS" | sed 's/ *$//; s/ /,/g')
+              if [ -z "$THREAD_POOL" ]; then
+                echo "ERROR: no CPU left for the L1 thread pool"
+                exit 1
+              fi
+              echo "CPU allocation: L1 RX $L1_RX_CORE, L1 TX $L1_TX_CORE, RU $RU_THREAD_CORE, system $SYSTEM_CORE, IO $IO_CORE, worker $WORKER_CORE, thread pool $THREAD_POOL"
+              yq -i '
+                .L1s[0].L1_rx_thread_core = strenv(L1_RX_CORE) |
+                .L1s[0].L1_tx_thread_core = strenv(L1_TX_CORE) |
+                .RUs[0].ru_thread_core = strenv(RU_THREAD_CORE) |
+                .fhi_72.system_core = strenv(SYSTEM_CORE) |
+                .fhi_72.io_core = strenv(IO_CORE) |
+                .fhi_72.worker_cores = [strenv(WORKER_CORE)] |
+                .thread-pool = strenv(THREAD_POOL) |
+                .fhi_72.dpdk_devices = (strenv(PCI_LIST) | split(" "))
+              ' /tmp/gnb.yaml
+              cat /tmp/gnb.yaml
+              exec stdbuf -o0 /opt/oai-gnb/bin/nr-softmodem -O /tmp/gnb.yaml $USE_ADDITIONAL_OPTIONS
           {{- end }}
 
         {{- if $parser.enabled }}
@@ -173,9 +293,16 @@ spec:
             initialDelaySeconds: 2
             periodSeconds: 5
           resources:
+            {{- if eq .Values.config.radio "fhi72" }}
+            # requests equal to limits: the pod must stay Guaranteed for the static CPU manager
+            requests:
+              cpu: 100m
+              memory: 100Mi
+            {{- else }}
             requests:
               cpu: 50m
               memory: 50Mi
+            {{- end }}
             limits:
               cpu: 100m
               memory: 100Mi
@@ -210,11 +337,23 @@ spec:
         - name: metrics-logs
           emptyDir: {}
         {{- end }}
+        {{- if $csi.enabled }}
+        # hostPath: csi_per_rb.csv outlives the pod and is read on the DU node by the collection role
+        - name: csi-output
+          hostPath:
+            path: {{ $csi.outputDir }}
+            type: DirectoryOrCreate
+        {{- end }}
         - name: configuration
           configMap:
             name: {{ .Chart.Name }}-configmap
         - name: shared-data
           emptyDir: {}
+        {{- if eq .Values.config.radio "fhi72" }}
+        - name: hugepage
+          emptyDir:
+            medium: HugePages
+        {{- end }}
         {{- if eq .Values.config.radio "b2xx" }}
         - name: radio
           hostPath:

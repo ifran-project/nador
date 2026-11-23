@@ -1,0 +1,10 @@
+{{- if not .Values.global }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Chart.Name }}-configmap
+  labels:
+    app: {{ .Release.Name }}
+data:
+  {{ (.Files.Glob "config.yaml").AsConfig | indent 2 | trim }}
+{{- end }}

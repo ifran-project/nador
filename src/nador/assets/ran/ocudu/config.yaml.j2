@@ -1,0 +1,43 @@
+{# nador edits of the upstream OCUDU configuration, applied as text (a YAML round trip would rewrite it); the upstream #}
+{# rendering is printed unchanged when none applies. #}
+{# - CSI logger (ocudu-csi-logging): SRS channel estimates need periodic SRS, which the upstream template does not #}
+{#   expose (advanced_config.cell_cfg would replace the whole cell configuration). #}
+{# - O-RAN 7.2 fronthaul (advanced_config.ru_ofh on a Benetel RU): the upstream template always writes an ru_sdr #}
+{#   section, removed here (one radio unit section only), and a DPDK hal section is added unless advanced_config.hal #}
+{#   is given: EAL on the CPUs and the VF of the pod (placeholders replaced by the nador chart at start). #}
+{#   The SSB power signalled to the UEs is set to -28 dBm (ssb_block_power_dbm, value of the 5g_ansible OCUDU Benetel #}
+{#   setup): it sets their pathloss estimate, so the open-loop power of PRACH, Msg3, PUCCH and PUSCH; with the OCUDU #}
+{#   default (-16 dBm), the UEs near the R2Lab Benetel RAN550 saturate its input (PUSCH 64QAM CRC KO at 27 dB SINR). #}
+{% set csi_env = component.extra_env_vars or {} %}
+{% set csi = csi_env.get('CSI_LOGGING_ENABLED') | string == '1' %}
+{% set ofh = component.advanced_config is mapping and component.advanced_config.get('ru_ofh') %}
+{% if csi or ofh %}
+{% set upstream_config %}{% include 'ran/ocudu/ocudu-' ~ component.type ~ '/config.yaml.j2' %}{% endset %}
+{% set config = upstream_config %}
+{% if csi %}
+{# Text insertion right after the single top-level cell_cfg line. #}
+{% if config is not search('(?m)^cell_cfg:$') or config is search('(?m)^cell_cfg:$[\s\S]*^cell_cfg:$') or config is search('(?m)^  srs:') %}
+{# Undefined variable on purpose: fail the prepare step instead of rendering a configuration without SRS. #}
+{{ csi_config_injection_failed_cell_cfg_not_found_twice_or_srs_already_set }}
+{% endif %}
+{% set config = config | regex_replace('^cell_cfg:$', 'cell_cfg:\n  srs:\n    type_enabled: periodic\n    period_ms: ' ~ csi_env.get('CSI_SRS_PERIOD_MS', '40'), multiline=True) %}
+{% endif %}
+{% if ofh %}
+{% if config is not search('(?m)^ru_ofh:$') or config is not search('(?m)^ru_sdr:$') %}
+{# Undefined variable on purpose: fail the prepare step if the upstream sections are not where they are expected. #}
+{{ ofh_config_edit_failed_ru_ofh_or_ru_sdr_section_not_found }}
+{% endif %}
+{% set config = config | regex_replace('^ru_sdr:\n(?:[ \t]+.*\n|[ \t]*\n)*', '', multiline=True) %}
+{% if config is not search('(?m)^  ssb:\n    ssb_period: .*$') or config is search('ssb_block_power_dbm') %}
+{# Undefined variable on purpose: fail the prepare step instead of keeping the default SSB power. #}
+{{ ssb_power_edit_failed_ssb_section_not_found_or_power_already_set }}
+{% endif %}
+{% set config = config | regex_replace('^(  ssb:\n    ssb_period: .*)$', '\\1\n    ssb_block_power_dbm: -28', multiline=True) %}
+{% if not component.advanced_config.get('hal') %}
+{% set config = config ~ '\nhal:\n  eal_args: "-l @FHI72_CPUS@ --main-lcore @FHI72_CPU_0@ --force-max-simd-bitwidth 64 -a @FHI72_PCI@"\n' %}
+{% endif %}
+{% endif %}
+{{ config }}
+{% else %}
+{% include 'ran/ocudu/ocudu-' ~ component.type ~ '/config.yaml.j2' %}
+{% endif %}
