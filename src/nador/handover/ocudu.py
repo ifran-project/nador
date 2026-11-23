@@ -147,55 +147,79 @@ def _f1ap(line: str) -> tuple[str, int, int | None, str] | None:
     return None
 
 
-def _cucp(lines: list[str], answer: str) -> dict:  # noqa: C901, PLR0912 (one branch per kind of log line)
+# F1AP message of the CU-CP -> step of the handover: (UE of the source or target DU, direction, message) -> key.
+# The first line of each is kept, but the last UE context setup request (the target DU may be asked again).
+F1AP_STEPS: dict[tuple[str | None, str, str], str] = {
+    ("target", "Tx", "UEContextSetupRequest"): "setup_request",
+    ("target", "Rx", "UEContextSetupResponse"): "setup_answer",
+    ("target", "Rx", "UEContextSetupFailure"): "setup_answer",
+    ("source", "Tx", "UEContextModificationRequest"): "command",
+    ("target", "Rx", "ULRRCMessageTransfer"): "ul_rrc",
+    ("source", "Tx", "UEContextReleaseCommand"): "release",
+}
+INTER_DU = re.compile(r"ue=(\d+): Trigger intra-CU \(inter-DU\) handover from source_du=(\d+) to target_du=(\d+)")
+UE_CREATED = re.compile(r"ue=(\d+) c-rnti=(0x[0-9a-f]+): UE created")
+
+
+def _cucp(lines: list[str], answer: str) -> dict:
     """CU-CP lines from the trigger on and answer to the remote command: decision, preparation... failures."""
     found: dict = {"events": []}
     if '"error"' in answer:
         found["refusal"] = answer
-    inter_du = r"ue=(\d+): Trigger intra-CU \(inter-DU\) handover from source_du=(\d+) to target_du=(\d+)"
     for line in lines:
-        pdu = _f1ap(line)
-        if m := re.search(inter_du, line):
+        if m := INTER_DU.search(line):
             found["decision"] = line
             found["ue"], found["source_du"], found["target_du"] = (int(g) for g in m.groups())
-        elif "Trigger intra-CU (intra-DU) handover" in line:
-            found["events"].append("the CU-CP started an intra-DU handover: the target PCI is a cell of the source DU")
-        elif any(refusal in line for refusal in REFUSALS):
-            found.setdefault("refusal", line)
-        elif '"Intra CU Handover Routine"' in line and ("failed" in line or "Failed" in line):
-            found["events"].append(f"CU-CP: {clean(line.split('ue=', 1)[-1])}")
-        elif pdu and "decision" in found:
-            # F1AP lines give the gNB-DU ID (du=), the decision line the DU index of the CU-CP: match on UE indexes
-            direction, du, ue, message = pdu
-            if direction == "Tx" and message == "UEContextSetupRequest" and ue != found["ue"]:
-                found.setdefault("target_ue", ue)
-            source, target = ue == found["ue"], ue == found.get("target_ue")
-            if target and direction == "Tx" and message == "UEContextSetupRequest":
-                found["setup_request"] = line
-            elif target and direction == "Rx" and message in ("UEContextSetupResponse", "UEContextSetupFailure"):
-                found.setdefault("setup_answer", line)
-            elif source and direction == "Tx" and message == "UEContextModificationRequest":
-                found.setdefault("command", line)
-            elif target and direction == "Rx" and message == "ULRRCMessageTransfer":
-                found.setdefault("ul_rrc", line)
-            elif source and direction == "Tx" and message == "UEContextReleaseCommand":
-                found.setdefault("release", line)
-            elif target and direction == "Tx" and message == "UEContextReleaseCommand":
-                found["events"].append(f"CU-CP released the UE on the target DU (du={du}): handover cancelled")
-        elif (m := re.search(r"ue=(\d+) c-rnti=(0x[0-9a-f]+): UE created", line)) and int(m.group(1)) == found.get(
-            "target_ue"
-        ):
-            # C-RNTI of the UE in the target cell, allocated by the target DU
-            found.setdefault("target_rnti", m.group(2))
-        elif "DCCH UL rrcReconfigurationComplete" in line and f"ue={found.get('target_ue')} " in line:
-            found.setdefault("complete", line)
-        elif "CCCH UL rrcReestablishmentRequest" in line and "decision" in found:
-            found["events"].append("a UE requested an RRC re-establishment (rrcReestablishmentRequest)")
-        elif "CCCH UL rrcSetupRequest" in line and "decision" in found:
-            found["events"].append(
-                "a UE attached (rrcSetupRequest): another UE, or this one after losing the link (see the ping)"
-            )
+        elif _cucp_event(found, line) or "decision" not in found:
+            continue
+        elif pdu := _f1ap(line):
+            _f1ap_step(found, pdu, line)
+        else:
+            _after_decision(found, line)
     return found
+
+
+def _cucp_event(found: dict, line: str) -> bool:
+    """A refusal, an intra-DU handover or a failed handover routine of the CU-CP; whether the line was one."""
+    if "Trigger intra-CU (intra-DU) handover" in line:
+        found["events"].append("the CU-CP started an intra-DU handover: the target PCI is a cell of the source DU")
+    elif any(refusal in line for refusal in REFUSALS):
+        found.setdefault("refusal", line)
+    elif '"Intra CU Handover Routine"' in line and "failed" in line.lower():
+        found["events"].append(f"CU-CP: {clean(line.split('ue=', 1)[-1])}")
+    else:
+        return False
+    return True
+
+
+def _f1ap_step(found: dict, pdu: tuple[str, int, int | None, str], line: str) -> None:
+    """F1AP lines give the gNB-DU ID (du=), the decision line the DU index of the CU-CP: match on UE indexes."""
+    direction, du, ue, message = pdu
+    if direction == "Tx" and message == "UEContextSetupRequest" and ue != found["ue"]:
+        found.setdefault("target_ue", ue)
+    side = "source" if ue == found["ue"] else "target" if ue == found.get("target_ue") else None
+    key = F1AP_STEPS.get((side, direction, message))
+    if key == "setup_request":
+        found[key] = line
+    elif key:
+        found.setdefault(key, line)
+    elif (side, direction, message) == ("target", "Tx", "UEContextReleaseCommand"):
+        found["events"].append(f"CU-CP released the UE on the target DU (du={du}): handover cancelled")
+
+
+def _after_decision(found: dict, line: str) -> None:
+    """RRC lines after the decision: the new C-RNTI, the completion, and what a failure led to."""
+    if (m := UE_CREATED.search(line)) and int(m.group(1)) == found.get("target_ue"):
+        # C-RNTI of the UE in the target cell, allocated by the target DU
+        found.setdefault("target_rnti", m.group(2))
+    elif "DCCH UL rrcReconfigurationComplete" in line and f"ue={found.get('target_ue')} " in line:
+        found.setdefault("complete", line)
+    elif "CCCH UL rrcReestablishmentRequest" in line:
+        found["events"].append("a UE requested an RRC re-establishment (rrcReestablishmentRequest)")
+    elif "CCCH UL rrcSetupRequest" in line:
+        found["events"].append(
+            "a UE attached (rrcSetupRequest): another UE, or this one after losing the link (see the ping)"
+        )
 
 
 def _target_du(lines: list[str], target_pci: int | None) -> dict:
@@ -266,72 +290,64 @@ def analyze_ocudu_handover(
     # C-RNTI in the target cell: CU-CP log (UE created after the UE context setup), else first UE created on the DU
     new = cucp.get("target_rnti") or du.get("rnti")
     report.rntis = {"source": rnti} | ({"target": new} if new else {})
-
     cfra = [(line, preamble) for line, preamble, tc_rnti in du["prach"] if new is not None and tc_rnti == new]
     if cfra:
         report.preamble = cfra[0][1]
-    completed = "complete" in cucp or "ul_rrc" in cucp
-    preamble = _preamble_step(du["prach"], cfra, target, completed)
-    again = len(cfra) - 1
-    setup_ok = "UEContextSetupResponse" in cucp.get("setup_answer", "")
-    du_index = f"DU index {cucp['source_du']} -> {cucp['target_du']}, " if "decision" in cucp else ""
-    report.steps = [
-        Step(
-            "decision",
-            "decision" in cucp,
-            f"{du_index}UE ue={cucp['ue']} on the CU-CP" if "decision" in cucp else "",
-            cucp.get("decision", ""),
-        ),
-        Step(
-            "preparation",
-            setup_ok,
-            (f"target UE ue={cucp.get('target_ue')}" + (f", new C-RNTI {new}" if new else "")) if setup_ok else "",
-            du.get("created", cucp.get("setup_answer", "")),
-        ),
-        Step("command", "command" in cucp, "UE context modification of the source DU", cucp.get("command", "")),
-        preamble,
-        Step(
-            "response",
-            None,
-            f"not logged at the info level; the preamble came again {again} time(s)"
-            if again > 0
-            else "not logged at the info level",
-        ),
-        Step("completion", completed, "", cucp.get("complete", cucp.get("ul_rrc", ""))),
-        Step("release", "release" in cucp, "", cucp.get("release", "")),
-    ]
+    report.success = "complete" in cucp or "ul_rrc" in cucp
+    report.steps = _steps(cucp, du, cfra, new, target, completed=report.success)
     for step in report.steps:
         step.evidence = clean(step.evidence)
     report.aftermath = cucp["events"]
-    report.success = completed
+    report.diagnosis = _diagnosis(report, cucp, target, again=len(cfra) - 1)
+    return report
 
+
+def _steps(cucp: dict, du: dict, cfra: list, new: str | None, target: str, *, completed: bool) -> list[Step]:
+    """The steps of the procedure, as the CU-CP and target DU logs show them."""
+    decided = "decision" in cucp
+    setup_ok = "UEContextSetupResponse" in cucp.get("setup_answer", "")
+    decision = (
+        f"DU index {cucp['source_du']} -> {cucp['target_du']}, UE ue={cucp['ue']} on the CU-CP" if decided else ""
+    )
+    preparation = f"target UE ue={cucp.get('target_ue')}" + (f", new C-RNTI {new}" if new else "")
+    again = len(cfra) - 1
+    response = "not logged at the info level" + (f"; the preamble came again {again} time(s)" if again > 0 else "")
+    return [
+        Step("decision", decided, decision, cucp.get("decision", "")),
+        Step("preparation", setup_ok, preparation if setup_ok else "", du.get("created", cucp.get("setup_answer", ""))),
+        Step("command", "command" in cucp, "UE context modification of the source DU", cucp.get("command", "")),
+        _preamble_step(du["prach"], cfra, target, completed),
+        Step("response", None, response),
+        Step("completion", completed, "", cucp.get("complete", cucp.get("ul_rrc", ""))),
+        Step("release", "release" in cucp, "", cucp.get("release", "")),
+    ]
+
+
+def _diagnosis(report: HandoverReport, cucp: dict, target: str, *, again: int) -> str:  # noqa: PLR0911 - one per step
+    """The first step that did not happen, and what it means."""
     if report.success:
-        report.diagnosis = "The UE completed the handover on the target cell."
-    elif "decision" not in cucp:
+        return "The UE completed the handover on the target cell."
+    if "decision" not in cucp:
         refusal = f" It answered: {clean(cucp['refusal'])}" if "refusal" in cucp else ""
-        report.diagnosis = (
+        return (
             "The CU-CP did not start an inter-DU handover: check the serving PCI, the C-RNTI of the UE in the serving "
             f"cell, and the target PCI.{refusal}"
         )
-    elif not setup_ok:
-        report.diagnosis = (
-            f"{target} did not accept the UE (no UEContextSetupResponse): UE context setup failed on the target."
-        )
-    elif "command" not in cucp:
-        report.diagnosis = "The CU-CP did not send the handover command to the source DU (RRCReconfiguration)."
-    elif preamble.ok is False:
-        report.diagnosis = (
+    if not report.step("preparation").ok:
+        return f"{target} did not accept the UE (no UEContextSetupResponse): UE context setup failed on the target."
+    if "command" not in cucp:
+        return "The CU-CP did not send the handover command to the source DU (RRCReconfiguration)."
+    if report.step("preamble").ok is False:
+        return (
             f"No random access on {target} after the handover command: the UE did not receive or execute it, or its "
             "preamble did not reach the target RU."
         )
-    elif again > 0:
-        report.diagnosis = (
+    if again > 0:
+        return (
             "The UE did not decode the random access response of the target cell: it sent its dedicated "
             "preamble again (downlink of the target cell at the UE)."
         )
-    else:
-        report.diagnosis = (
-            "The UE was prepared and commanded, but its RRCReconfigurationComplete never reached the CU-CP through "
-            "the target DU (random access not completed, or uplink of the target cell)."
-        )
-    return report
+    return (
+        "The UE was prepared and commanded, but its RRCReconfigurationComplete never reached the CU-CP through "
+        "the target DU (random access not completed, or uplink of the target cell)."
+    )

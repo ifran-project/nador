@@ -1,19 +1,22 @@
 """Live CSI view (streamer + Streamlit visualizer v9.0) on a node other than the gNB node."""
 
-import asyncio
 import atexit
 import os
 import shlex
 import signal
 import socket
-import subprocess
 from contextlib import suppress
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from ifran.deployment.base import BaseManagement
 from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_role
 
 from nador.csi.collection import ROLES, CsiCollector
+from nador.ssh import close_forward, open_forward, ssh_command
+
+if TYPE_CHECKING:
+    import asyncio
 
 LIVE_ROOT = "/root/csi_live"  # on the live node
 
@@ -137,24 +140,8 @@ class CsiLiveView:
         await self._run("stop", quiet)
 
     def _tunnel_argv(self, local_port: int) -> list[str]:
-        ssh = self.live.ssh_info
-        host = ssh.hostname or self.live_node
-        # Same options as the Grafana tunnel of the example notebooks: a dedicated connection, no
-        # multiplexing (the first -o value wins in ssh, before those of common_args).
-        command = ["ssh", "-N", "-T", "-S", "none"]
-        for option in (
-            "ControlMaster=no",
-            "ControlPersist=no",
-            "BatchMode=yes",
-            "ExitOnForwardFailure=yes",
-            "ConnectTimeout=10",
-        ):
-            command += ["-o", option]
-        command += shlex.split(ssh.common_args or "")
-        if ssh.private_key_file:
-            command += ["-i", str(Path(ssh.private_key_file).expanduser())]
-        command += ["-p", str(ssh.port), "-L", f"127.0.0.1:{local_port}:127.0.0.1:{self.port}", f"{ssh.user}@{host}"]
-        return command
+        forward = f"127.0.0.1:{local_port}:127.0.0.1:{self.port}"
+        return ssh_command(self.live.ssh_info, self.live_node, forward=forward)
 
     def tunnel_command(self, local_port: int | None = None) -> str:
         """The ssh command of open_tunnel(), to run in a terminal instead."""
@@ -173,33 +160,14 @@ class CsiLiveView:
                 raise RuntimeError(f"Local port {local_port} is already in use; pass another local_port=")
             local_port = _free_local_port()
         local_port = local_port or self.port
-        log = self.tunnel_log
-        log.parent.mkdir(parents=True, exist_ok=True)
-        with log.open("w") as stderr:  # noqa: ASYNC230 (opened once, inherited by ssh)
-            process = await asyncio.create_subprocess_exec(  # argv from the deployment model, no shell
-                *self._tunnel_argv(local_port), stdout=subprocess.DEVNULL, stderr=stderr
-            )
-        atexit.register(_terminate, process.pid)  # close it when the kernel exits normally
-        self.tunnel = process
-        async with asyncio.timeout(timeout_s):
-            while True:
-                if process.returncode is not None:
-                    self.tunnel = None
-                    error = log.read_text(errors="replace").strip()  # noqa: ASYNC240
-                    raise RuntimeError(f"CSI live tunnel failed: {error}")
-                try:
-                    _, writer = await asyncio.open_connection("127.0.0.1", local_port)
-                except OSError:
-                    await asyncio.sleep(0.2)
-                    continue
-                writer.close()
-                await writer.wait_closed()
-                return f"http://127.0.0.1:{local_port}"
+        self.tunnel = await open_forward(
+            self._tunnel_argv(local_port), local_port, name="CSI live", log=self.tunnel_log, timeout_s=timeout_s
+        )
+        atexit.register(_terminate, self.tunnel.pid)  # close it when the kernel exits normally
+        return f"http://127.0.0.1:{local_port}"
 
     async def close_tunnel(self) -> None:
         """Close the tunnel opened by open_tunnel(), if any."""
-        if self.tunnel is not None and self.tunnel.returncode is None:
-            self.tunnel.terminate()
-            with suppress(TimeoutError):
-                await asyncio.wait_for(self.tunnel.wait(), 5)
+        if self.tunnel is not None:
+            await close_forward(self.tunnel)
         self.tunnel = None

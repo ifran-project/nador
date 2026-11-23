@@ -67,20 +67,7 @@ step with what it means, the log line found (or why it is missing), a diagnosis 
 followed a failure, and where the UE is served afterwards. :meth:`HandoverReport.to_text` prints it.
 """
 
-from nador.handover.oai import analyze_oai_handover
-from nador.handover.ocudu import analyze_ocudu_handover
-from nador.handover.report import PROCEDURE, HandoverReport, Step
+from nador.handover.report import HandoverReport
 from nador.handover.watch import HandoverWatch
 
-# Former name of the OAI analysis, kept for the notebooks and scripts that use it.
-analyze_handover = analyze_oai_handover
-
-__all__ = [
-    "PROCEDURE",
-    "HandoverReport",
-    "HandoverWatch",
-    "Step",
-    "analyze_handover",
-    "analyze_oai_handover",
-    "analyze_ocudu_handover",
-]
+__all__ = ["HandoverReport", "HandoverWatch"]

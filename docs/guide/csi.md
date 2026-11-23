@@ -5,8 +5,7 @@ here is the raw uplink channel `H`: one complex value per resource block (RB), r
 every SRS occasion of every connected UE. It is the data, not an indicator derived from it.
 
 This page explains where the CSI comes from (section 1), how the gNBs extract it (section 2), how NADOR deploys,
-views and collects it (section 3), the analysis offered on top of it (section 4) and why it is useful (section 5).
-It ends with the limits of the approach (section 6) and the options to expose the CSI to O-RAN xApps (section 7).
+views and collects it (section 3), the tools that read it (section 4) and the limits of the approach (section 5).
 
 ## 1. Source of the CSI: the uplink SRS
 
@@ -105,7 +104,7 @@ metrics:
       output_dir: null         # default /data/csi (OAI), /mnt/csi (OCUDU)
 ```
 
-**Enabling the logger** (`nador.configure_ran_monitoring(ran, config)`, before `ran.deploy()`; it calls `nador.configure_csi`):
+**Enabling the logger** (`nador.configure_ran_monitoring(ran, config)`, before `ran.deploy()`):
 
 - selects the CSI image built from the same OAI tag (or OCUDU release) for the chosen OAI and OCUDU `gnb`/`du`
   components only; the CU has no PHY, hence no SRS, and asking for it is an error. Every other component keeps its
@@ -141,57 +140,13 @@ every component that logs it. Without `collect_csi=True` the gNB keeps logging, 
   rows). `experiment_metadata.json` records, under `csi`, the clock measurements, the offset applied, the summary
   and the warnings (clock drift, dropped rows).
 
-## 4. Proposed analysis
+## 4. Analysis
 
-The CSV v3.1 is read by the same tools whichever gNB wrote it: the Streamlit visualizer, in live mode or on a
-collected file, and the offline tools of `oai-csi-logging` (`csi_diag.py`). The visualizer organizes the
-analysis in eight tabs, in the order of an investigation, each with an explanation, the formulas used and typical
-cases:
+The CSV v3.1 is read by the same tools whichever gNB wrote it: the Streamlit visualizer of `oai-csi-logging`, live
+(`CsiLiveView`) or on a collected file, and its offline tools (`csi_diag.py`). The visualizer starts with automatic
+findings (SRS period, missed occasions, gaps, frequency-selective channels) and explains each of its views.
 
-| Tab | Content |
-|---|---|
-| Start here | automatic key findings, data health, guide and glossary |
-| UEs | level of each UE over time (dB), frequency response, timing, level CDF, per-UE table |
-| Frequency | channel along the band: shape (dips), fluctuation at each frequency, weak or unstable RBs |
-| Heatmap | RB × time, one panel per UE, optional dB scale, experiment sections drawn |
-| Time | evolution and distribution of the level, periodic variations, isolated glitches |
-| Channel | power delay profile, frequency correlation and coherence bandwidth, RMS delay spread, temporal correlation and coherence time |
-| Timing & phase | delay from the phase slope across RBs; residual phase after removing that slope and the common phase of each occasion |
-| Antennas, ports & slots | balance of the radio branches: level per receive antenna, SRS port and slot |
-
-The **key findings** are computed with simple, stated rules, and point to the tab where each can be checked:
-
-- SRS period of each UE;
-- missed SRS occasions (the UE was not scheduled or the logger dropped rows) and rescheduled ones (interval that is
-  not a multiple of the period, e.g. after a reconfiguration);
-- UEs present during part of the file only, and pauses of 1 s or more (UE detached and back, no SRS);
-- RBs never sounded (outside the SRS bandwidth, excluded from every view);
-- gaps without any CSI row;
-- spread of the UE levels (> 3 dB) and frequency-selective channels (dip > 10 dB in the average response).
-
-Statistical findings and channel metrics are only computed for UEs with enough SRS occasions. Raw phase is not
-shown as such: it rotates from one occasion to the next, and only the slope (delay) and the residual phase carry
-information.
-
-## 5. Why this analysis is useful
-
-- **Characterizing the radio channel of an experiment.** Selectivity, delay spread, coherence bandwidth and
-  coherence time describe the channel each UE saw, per antenna. Different positions, setups (R2Lab anechoic
-  chamber, SLICES nodes, RFsim) and radios (AW2S, Benetel, USRP) can be compared on the same basis.
-- **Explaining the KPIs.** Each experiment section has its own CSI file, on the same timeline as the Prometheus
-  metrics and the iperf reports: a throughput drop or a BLER increase can be related to a fading dip, a UE level
-  change or a missing antenna, rather than guessed.
-- **Diagnosing the RAN.** The SRS stream is a health indicator of the cell: missed occasions reveal scheduling or
-  logging problems; pauses reveal UEs that lose the link and re-attach (for instance after radio link failures and
-  RRC re-establishments); an unbalanced or dead receive branch shows up in the antenna view; the timing view
-  shows the residual delay of each UE.
-- **Comparing OAI and OCUDU.** Both gNBs write the same format, through the same chain: the same experiment can be
-  analysed with either implementation, and the differences come from the gNBs, not from the tools.
-- **Building datasets.** The per-section files, with their provenance (image, logger options, node clock offset),
-  are reproducible CSI datasets for offline studies and machine learning (localization, presence or motion
-  detection, channel prediction, link adaptation).
-
-## 6. Limits
+## 5. Limits
 
 - **Uplink channel.** In TDD (n78 with Benetel, AW2S or USRP), the uplink channel equals the downlink one by
   reciprocity, up to the RF calibration. In FDD (band 3 in RFsim), the two directions use different frequencies: the
@@ -209,26 +164,3 @@ information.
 - **Volume.** With real radios the file grows by several MB/s (about 5.5 MB/s observed with 3 UEs on a 100 MHz
   Benetel carrier, 4 receive antennas, RB granularity), and each collection reads the whole file: check the space
   left on the data partition (`df -h /data/csi`).
-
-## 7. Towards O-RAN xApps (E2)
-
-The CSI currently reaches the analysis through a file, with a delay of about 5 s (flush period). Both gNBs have an
-E2 agent (KPM, RC), but no E2 service model carries a channel estimate: KPM only reports aggregated indicators.
-
-| Option | Data in the xApp | Assessment |
-|---|---|---|
-| A. CSI indicators in E2SM-KPM | SRS SNR, delay spread, rank, channel variation per UE | standard transport and low volume, but the raw `H` is lost |
-| B. Dedicated service model (E2SM-CSI) | `H` per RB (per pilot on demand), filtered by UE, antenna, port | complete data; prototyped on OAI by EURECOM (E2SM-SRS, about 7.7 ms end to end); not interoperable without its decoder |
-| C. E2SM-LLC v1.00 | channel information as defined by O-RAN | future standard path, no known open implementation |
-| D. xApp reading the file stream | the current data | almost immediate, but not an O-RAN xApp in the strict sense, 5 s delay |
-| E. dApp on E3 | SRS, IQ, uplink CIR, below 1 ms | the only real-time option (MU-MIMO, beamforming); research code, OAI only |
-
-Per RB, the stream fits E2 (about 3.5 Mbit/s per UE for 100 MHz, 4 antennas, 2 ports and SRS every 20 ms); per
-subcarrier it becomes heavy (about 42 Mbit/s per UE). The PHY hook stays the same in every option: only the
-transport changes, in a thread fed by the existing buffer.
-
-For collection and offline analysis, E2 brings almost nothing. It becomes worthwhile to act on the RAN from the CSI
-in closed loop (link adaptation, mobility, presence detection, localization), or to give experimenters access to
-the CSI through the RIC, without access to the RAN node. The recommended path is option B, on OAI first (from
-E2SM-SRS), then on OCUDU, keeping the file logger as the reference trace. Cheaper improvements of the current chain
-are a timestamp per SRS occasion and a sequence counter in the CSV.

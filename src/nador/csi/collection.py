@@ -13,6 +13,7 @@ from ifran.deployment.base import BaseManagement
 from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_role
 
 from nador.artifacts.collectors import Collector
+from nador.ssh import ssh_command
 
 if TYPE_CHECKING:
     from nador.artifacts.experiment_run import ExperimentRun
@@ -52,7 +53,7 @@ class CsiCollector(Collector):
         env = deployed.extra_env_vars or {}
         if str(env.get("CSI_LOGGING_ENABLED")) != "1":
             raise ValueError(
-                f"{component}: CSI logging is not enabled (set metrics.ran.csi and call nador.configure_csi)"
+                f"{component}: CSI logging is not enabled (set metrics.ran.csi and call nador.configure_ran_monitoring)"
             )
         if not deployed.node_name or deployed.node_name not in model.nodes:
             # The hostPath file lives on the pod's node: it must be known from the deployment model.
@@ -78,23 +79,13 @@ class CsiCollector(Collector):
         self.low_prio = f"{low_prio} taskset -c {shlex.quote(cpu_list)}" if cpu_list else low_prio
         self.cleanup_remote = cleanup_remote
 
-    def _ssh_command(self, remote: list[str]) -> list[str]:
-        ssh = self.node.ssh_info
-        command = ["ssh", "-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10"]
-        # common_args carries the jump host and the connection multiplexing settings used by Ansible.
-        command += shlex.split(ssh.common_args or "")
-        if ssh.private_key_file:
-            command += ["-i", str(Path(ssh.private_key_file).expanduser())]
-        command += ["-p", str(ssh.port), f"{ssh.user}@{ssh.hostname or self.node_name}", *remote]
-        return command
-
     async def measure_clock(self, samples: int = 5) -> dict[str, Any]:
         """Return the gNB node clock offset (node - local, s) from the sample with the smallest round trip."""
         best = None
         for _ in range(samples):
             before = time.time()
             process = await asyncio.create_subprocess_exec(
-                *self._ssh_command(["date", "+%s.%N"]),
+                *ssh_command(self.node.ssh_info, self.node_name, "date", "+%s.%N"),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -212,3 +203,13 @@ class CsiCollector(Collector):
             )
         )
         return summary
+
+
+def csi_collectors(manager: BaseManagement) -> list[CsiCollector]:
+    """A collector for each RAN component that logs CSI."""
+    components = manager.deployment_model.ran.components
+    return [
+        CsiCollector(manager, name)
+        for name, component in components.items()
+        if str((component.extra_env_vars or {}).get("CSI_LOGGING_ENABLED")) == "1"
+    ]
