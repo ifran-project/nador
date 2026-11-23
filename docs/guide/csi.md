@@ -128,8 +128,8 @@ node has no partition.
 monitoring node, never on the RAN node. On the RAN node, only `sshd` and `tail -F` run, at the lowest priority.
 The view shows a sliding window (120 s by default), and a tunnel opens it on the notebook host.
 
-**Collection** is automatic: an `ExperimentRun` given the monitoring manager collects the CSI file of every
-component that logs it.
+**Collection** is per run: `ExperimentRun(..., monitoring=monitoring, collect_csi=True)` collects the CSI file of
+every component that logs it. Without `collect_csi=True` the gNB keeps logging, and nothing is read from the node.
 
 - before the workload, the clock offset between the RAN node and the notebook host is measured over SSH, from
   the sample with the smallest round trip; it is applied to the windows only above 0.5 s. It is measured again

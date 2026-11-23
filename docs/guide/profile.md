@@ -98,7 +98,10 @@ Notes:
 - **`ran_kpis` with OCUDU**: call `nador.configure_ran_kpis(ran, config)` before `ran.deploy()`, so
   the gNB publishes its metrics.
 - **`csi`**: call `nador.configure_csi(ran, config)` before `ran.deploy()`: the logger is part of the gNB
-  image, so turning it on or off means deploying the RAN again (see [CSI](csi.md)).
+  image, so turning it on or off means deploying the RAN again. A run collects it with
+  `ExperimentRun(..., collect_csi=True)` (see [CSI](csi.md)).
+- **`ran_kpis` and `csi`** also deploy the RNTI mapper: it names the UE behind each RNTI in the dashboard
+  panels, from the RRC of the OAI or OCUDU gNB, CU or CU-CP and the AMF.
 
 ## Targets
 

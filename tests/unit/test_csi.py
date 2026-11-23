@@ -186,11 +186,11 @@ def csi_node(monkeypatch, http):
     return node
 
 
-async def csi_run(directory, **metrics):
+async def csi_run(directory, *, collect=True, **metrics):
     config = validate_deployment(profile(metrics=metrics or CSI), explicit=True)
     monitoring = manager(config)
     configure_csi(monitoring, config)
-    async with ExperimentRun(directory, timezone="UTC", monitoring=monitoring, **NO_HOSTS) as run:
+    async with ExperimentRun(directory, timezone="UTC", monitoring=monitoring, collect_csi=collect, **NO_HOSTS) as run:
         with run.section("work"):
             pass
     return json.loads((directory / "experiment_metadata.json").read_text())
@@ -221,6 +221,12 @@ async def test_a_clock_that_moved_and_dropped_rows_are_warned_about(tmp_path, cs
     first, second = metadata["csi"]["gnb"]["warnings"]
     assert "clock offset changed by +1.000 s" in first
     assert second == "the logger dropped 5 rows (buffer full)"
+
+
+async def test_csi_is_collected_only_when_the_run_asks(tmp_path, csi_node):
+    metadata = await csi_run(tmp_path / "run", collect=False)
+    assert csi_node["fetches"] == []
+    assert "csi" not in metadata
 
 
 async def test_without_csi_nothing_is_collected(tmp_path, csi_node):

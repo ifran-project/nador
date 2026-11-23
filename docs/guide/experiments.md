@@ -28,7 +28,7 @@ notebook cell marks it `cancelled` and still stops every collector.
 | `logs/` | Loki logs of the run's time span, when a `logs` metric is on |
 | `ue_context/` | UE, IP, slice and tunnels sampled during the run, when the UE mapper is deployed |
 | `setup/before/`, `setup/after/` | host and cluster snapshots |
-| `csi/<component>/` | the CSI file cut per section, when the `csi` metric is on ([CSI](csi.md)) |
+| `csi/<component>/` | the CSI file cut per section, with `collect_csi=True` and the `csi` metric on ([CSI](csi.md)) |
 | anything you `save_json` | your own results, such as iperf reports |
 
 If a collector fails, the run records it under `collection_errors`, finishes the others, and raises
@@ -48,6 +48,7 @@ at the end so a failure is never silent.
 | `collect_setup` | True | Snapshot the hosts and cluster before and after |
 | `setup_hosts` | every reachable node | Only snapshot these nodes |
 | `collect_ue_context` | True | Sample the UE context during the run |
+| `collect_csi` | False | Cut the CSI file of every logging gNB/DU by section into `csi/<component>/` (needs the `csi` metric) |
 | `mapper_url` | deployed mapper | A UE mapper reachable directly, instead of through the cluster |
 | `namespace`, `service`, `service_port` | monitoring namespace, "ue-mapper-api", 8080 | Where the UE mapper runs |
 | `interval_seconds` | 2 | Seconds between UE context samples |

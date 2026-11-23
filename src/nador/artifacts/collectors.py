@@ -33,6 +33,7 @@ class RunOptions(BaseModel):
 
     collect_setup: bool = True
     collect_ue_context: bool = True
+    collect_csi: bool = False
     setup_hosts: list[Annotated[str, Field(min_length=1)]] | None = None
     mapper_url: str | None = None
     interval_seconds: float = Field(default=2, ge=0.1, le=3600, allow_inf_nan=False)
