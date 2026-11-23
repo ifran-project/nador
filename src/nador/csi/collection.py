@@ -52,7 +52,7 @@ class CsiCollector(Collector):
         env = deployed.extra_env_vars or {}
         if str(env.get("CSI_LOGGING_ENABLED")) != "1":
             raise ValueError(
-                f"{component}: CSI logging is not enabled (set metrics.ran.csi and call nador.configure_csi)"
+                f"{component}: CSI logging is not enabled (set metrics.ran.csi and call nador.configure_ran_monitoring)"
             )
         if not deployed.node_name or deployed.node_name not in model.nodes:
             # The hostPath file lives on the pod's node: it must be known from the deployment model.
