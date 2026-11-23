@@ -9,6 +9,7 @@ from ifran.models.ran import RANImplementation
 from ifran.utils.defaults import DEFAULT_RAN_IMAGES
 from metamodel_3gpp.models.ran import RANComponentType
 
+from nador.config import OCUDU_SRS_PERIODS_MS
 from nador.csi.collection import CsiCollector
 from nador.csi.live import CsiLiveView
 from nador.csi.storage import prepare_csi_storage
@@ -26,7 +27,6 @@ CSI_IMAGE_REPOSITORIES = {
 # matched to the upstream default image of that type and variant (IFRAN DEFAULT_RAN_IMAGES). No ZeroMQ DU image.
 OCUDU_CSI_REPOSITORIES = {"gnb": "docker.io/r2labuser/ocudu-gnb-csi", "du": "docker.io/r2labuser/ocudu-du-csi"}
 OCUDU_CSI_TAGS = {None: "release_26_10-zmq", RUVendor.USRP: "release_26_10-uhd", RUVendor.BENETEL: "release_26_10"}
-OCUDU_SRS_PERIODS_MS = (1, 2, 2.5, 4, 5, 8, 10, 16, 20, 32, 40, 64, 80, 160, 320, 640, 1280, 2560)
 OCUDU_TEMPLATES = files("nador") / "assets" / "ran" / "ocudu"
 
 DEFAULT_OUTPUT_DIR = "/data/csi"
@@ -37,6 +37,7 @@ CSI_COMPONENT_TYPES = {"oai": ("gnb", "du"), "ocudu": ("gnb", "du")}
 
 __all__ = [
     "DEFAULT_OUTPUT_DIR",
+    "configure_csi",
     "OCUDU_OUTPUT_DIR",
     "CsiCollector",
     "CsiLiveView",
@@ -44,6 +45,41 @@ __all__ = [
     "prepare_csi_storage",
     "select_csi_images",
 ]
+
+OAI_CHARTS = files("nador") / "assets" / "ran" / "oai"
+
+
+def configure_csi(ran: RANManagement, config) -> None:
+    """Apply the profile's ``csi`` metric to the RAN before ``ran.deploy()``; without it, change nothing.
+
+    The OAI components that log use NADOR's OAI charts (they mount the CSI output directory); the logger images,
+    their environment and periodic SRS are set by :func:`enable_csi`. This only updates the manager's configuration.
+    """
+    csi = config.metrics.csi
+    if csi is None:
+        return
+    components = ran.deployment_model.ran.components
+    names = csi.components or [
+        name
+        for name, component in components.items()
+        if component.type in CSI_COMPONENT_TYPES.get(str(component.implementation), ())
+    ]
+    for name in names:
+        component = components.get(name)
+        if component is None:
+            continue  # enable_csi names the unknown components
+        if component.is_installed and str((component.extra_env_vars or {}).get("CSI_LOGGING_ENABLED")) != "1":
+            raise ValueError(f"{name}: configure CSI before deploying the RAN")
+        if str(component.implementation) == "oai" and not component.custom_chart_path:
+            component.custom_chart_path = str(OAI_CHARTS / f"oai-{component.type}")
+            component.custom_rendered_files = [str(OAI_CHARTS / "values.yaml.j2"), str(OAI_CHARTS / "config.yaml.j2")]
+    enable_csi(
+        ran,
+        components=csi.components or None,
+        output_dir=csi.output_dir,
+        env=csi.logger_env(),
+        srs_period_ms=csi.srs_period_ms,
+    )
 
 
 def enable_csi(

@@ -153,7 +153,8 @@ class CsiLiveView:
     async def open_tunnel(self, local_port: int | None = None, timeout_s: float = 20) -> str:
         """Forward 127.0.0.1:local_port of the notebook host to the viewer; return its URL.
         Without local_port, the viewer port is used if it is free on the notebook host, else a free port chosen
-        by the system (e.g. a local Streamlit already listens there)."""
+        by the system (e.g. a local Streamlit already listens there).
+        """
         await self.close_tunnel()
         # A busy port would make the readiness check below connect to whatever already listens there.
         if not _local_port_free(local_port or self.port):

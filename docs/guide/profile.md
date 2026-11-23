@@ -36,6 +36,7 @@ metric without options is turned on with `true`; a metric with options is turned
 metrics:
   ran:
     ran_kpis: false
+    csi: false
     split_signaling: false
     logs: true
   core:
@@ -64,6 +65,7 @@ metrics:
 | Group | Metric | What it collects | Options (default) |
 | --- | --- | --- | --- |
 | `ran` | `ran_kpis` | OAI or OCUDU RAN KPIs | `ocudu_port` (8001) |
+| `ran` | `csi` | Uplink channel (SRS) per UE, RB, antenna and port, logged by the OAI or OCUDU gNB/DU ([CSI](csi.md)) | `components` (all), `srs_period_ms` (40, OCUDU), `granularity` (`rb`), `subcarrier_sampling` (1), `antennas` (`all`), `ports` (`all`), `output_dir` (per RAN) |
 | `ran` | `split_signaling` | F1/E1 signalling between CU and DU (split RANs only) | `on_demand`, `targets` |
 | `ran` | `logs` | Logs of the RAN's pods, in Loki | none |
 | `core` | `ngap` | Session-setup times, from the AMF sniffer | `port` (9102) |
@@ -95,6 +97,8 @@ Notes:
   `attributed_drops` and `tcp_flows` only collect when deployed running.
 - **`ran_kpis` with OCUDU**: call `nador.configure_ran_kpis(ran, config)` before `ran.deploy()`, so
   the gNB publishes its metrics.
+- **`csi`**: call `nador.configure_csi(ran, config)` before `ran.deploy()`: the logger is part of the gNB
+  image, so turning it on or off means deploying the RAN again (see [CSI](csi.md)).
 
 ## Targets
 

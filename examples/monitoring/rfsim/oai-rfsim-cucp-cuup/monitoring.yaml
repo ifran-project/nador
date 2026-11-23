@@ -6,6 +6,7 @@ metrics:
   ran:
     # CU has no MAC/L1 statistics; its parser is experimental.
     ran_kpis: false
+    csi: false
     split_signaling: false
     logs: true
   core:

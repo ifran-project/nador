@@ -5,7 +5,7 @@
 {% set csi_env = component.extra_env_vars or {} %}
 {% if csi_env.get('CSI_LOGGING_ENABLED') | string == '1' %}
 {% set config %}{% include 'ran/ocudu/ocudu-' ~ component.type ~ '/config.yaml.j2' %}{% endset %}
-{% if config is not search('(?m)^cell_cfg:$') or config is search('(?m)^cell_cfg:$[\s\S]*^cell_cfg:$') or config is search('(?m)^  srs:') %}
+{% if config is not search('(?m)^cell_cfg:$') or config is search('(?ms)^cell_cfg:$.*^cell_cfg:$') or config is search('(?m)^  srs:') %}
 {# Undefined variable on purpose: fail the prepare step instead of rendering a configuration without SRS. #}
 {{ csi_config_injection_failed_cell_cfg_not_found_twice_or_srs_already_set }}
 {% endif %}

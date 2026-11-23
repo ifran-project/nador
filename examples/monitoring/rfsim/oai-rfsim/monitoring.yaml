@@ -8,6 +8,7 @@ metrics:
   ran:
     # The default notebook enables the OAI statistics parser before RAN deployment.
     ran_kpis: {ocudu_port: 8001}
+    csi: false
     split_signaling: false
     logs: true
   core:

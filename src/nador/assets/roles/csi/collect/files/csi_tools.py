@@ -39,8 +39,7 @@ NON_ROW = re.compile(rb"^(?:[^0-9\n][^\n]*)?\n", re.M)
 def parse_marker(line):
     # "# TIMESTAMP: YYYY-mm-dd HH:MM:SS" -> epoch; v3.1 writes UTC, v3 wrote pod local time
     try:
-        return calendar.timegm(time.strptime(line[len(b"# TIMESTAMP:"):].strip().decode(),
-                                             "%Y-%m-%d %H:%M:%S"))
+        return calendar.timegm(time.strptime(line[len(b"# TIMESTAMP:") :].strip().decode(), "%Y-%m-%d %H:%M:%S"))
     except (ValueError, UnicodeDecodeError):
         return None
 
@@ -58,8 +57,9 @@ def window_subdir(w):
     if level == "step":
         return os.path.join("step", safe_name("__".join([w.get("scenario", ""), w.get("step", "")])))
     if level == "direction":
-        return os.path.join("direction", safe_name("__".join([w.get("scenario", ""), w.get("step", ""),
-                                                              w.get("direction", "")])))
+        return os.path.join(
+            "direction", safe_name("__".join([w.get("scenario", ""), w.get("step", ""), w.get("direction", "")]))
+        )
     return os.path.join(level, safe_name(w.get("window_id", "window")))
 
 
@@ -76,9 +76,19 @@ def load_windows(path, window_types, padding):
         except (KeyError, TypeError, ValueError):
             skipped.append({"window_id": w.get("window_id"), "reason": "no ran_start_epoch/ran_end_epoch"})
             continue
-        windows.append({"w": w, "start": s - padding, "end": e + padding, "ran_start_epoch": s,
-                        "ran_end_epoch": e, "batches": 0, "rows": 0,
-                        "first_batch_start": None, "last_batch_end": None})
+        windows.append(
+            {
+                "w": w,
+                "start": s - padding,
+                "end": e + padding,
+                "ran_start_epoch": s,
+                "ran_end_epoch": e,
+                "batches": 0,
+                "rows": 0,
+                "first_batch_start": None,
+                "last_batch_end": None,
+            }
+        )
     return windows, skipped
 
 
@@ -89,10 +99,10 @@ class Collector:
         self.markers, self.batch_rows = [], []
         self.rows_before_first = self.dropped = 0
         self.prev_t = None
-        self.interval = None          # acquisition interval of the current batch
+        self.interval = None  # acquisition interval of the current batch
         self.marker_line = None
-        self.targets = []             # indices of the windows receiving the current batch
-        self.started = set()          # windows that already got the marker of the current batch
+        self.targets = []  # indices of the windows receiving the current batch
+        self.started = set()  # windows that already got the marker of the current batch
         self.handles = {}
 
     def feed(self, block):
@@ -100,7 +110,7 @@ class Collector:
         pos = 0
         for m in NON_ROW.finditer(block):
             if m.start() > pos:
-                self._rows(block[pos:m.start()])
+                self._rows(block[pos : m.start()])
             self._line(m.group(0))
             pos = m.end()
         if pos < len(block):
@@ -173,12 +183,12 @@ def cmd_collect(args):
     col = Collector(windows, split_dir)
     full = gzip.open(os.path.join(args.out_dir, FILE_NAME + ".gz"), "wb", compresslevel=1) if args.full else None
 
-    size = os.path.getsize(args.src)       # snapshot: data appended after this point is ignored
+    size = os.path.getsize(args.src)  # snapshot: data appended after this point is ignored
     remaining, carry, shrunk = size, b"", False
     with open(args.src, "rb") as f:
         while remaining > 0:
             buf = f.read(min(CHUNK, remaining))
-            if not buf:                     # file truncated while reading (gNB restart)
+            if not buf:  # file truncated while reading (gNB restart)
                 shrunk = True
                 break
             remaining -= len(buf)
@@ -223,15 +233,32 @@ def cmd_collect(args):
         os.makedirs(split_dir, exist_ok=True)
         out = []
         for w in windows:
-            out.append({"window_id": w["w"].get("window_id"), "level": w["w"].get("level"),
-                        "path": os.path.relpath(w["path"], args.out_dir) if "path" in w else None,
-                        "ran_start_epoch": w["ran_start_epoch"], "ran_end_epoch": w["ran_end_epoch"],
-                        "batches": w["batches"], "rows": w["rows"],
-                        "first_batch_start": w["first_batch_start"], "last_batch_end": w["last_batch_end"]})
+            out.append(
+                {
+                    "window_id": w["w"].get("window_id"),
+                    "level": w["w"].get("level"),
+                    "path": os.path.relpath(w["path"], args.out_dir) if "path" in w else None,
+                    "ran_start_epoch": w["ran_start_epoch"],
+                    "ran_end_epoch": w["ran_end_epoch"],
+                    "batches": w["batches"],
+                    "rows": w["rows"],
+                    "first_batch_start": w["first_batch_start"],
+                    "last_batch_end": w["last_batch_end"],
+                }
+            )
         with open(os.path.join(split_dir, "csi_split_summary.json"), "w") as f:
-            json.dump({"csv": args.src, "window_types": args.window_types,
-                       "padding_seconds": args.padding_seconds, "granularity": "flush batch (~5 s)",
-                       "windows": out, "skipped": skipped}, f, indent=2)
+            json.dump(
+                {
+                    "csv": args.src,
+                    "window_types": args.window_types,
+                    "padding_seconds": args.padding_seconds,
+                    "granularity": "flush batch (~5 s)",
+                    "windows": out,
+                    "skipped": skipped,
+                },
+                f,
+                indent=2,
+            )
         summary["windows_written"] = len(col.handles)
         summary["windows_empty"] = len(windows) - len(col.handles)
         summary["windows_skipped"] = len(skipped)
