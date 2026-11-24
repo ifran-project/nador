@@ -1,9 +1,11 @@
 """Exporting a run's logs from Loki, page by page, and saying when the export may be incomplete."""
 
 import json
+import re
 
 import pytest
 
+from nador.artifacts import ExperimentRun, ran_log_filter
 from nador.artifacts.loki_export import collect_logs
 
 
@@ -75,3 +77,48 @@ def test_an_unexpected_answer_is_refused(tmp_path, http):
 def test_only_http_urls_are_queried(tmp_path):
     with pytest.raises(ValueError, match="Expected an HTTP"):
         collect_logs(tmp_path, url="file:///var/log", selector="{}", start=0, end=1)
+
+
+# Choosing which gNB log lines to leave out
+
+LINES = {
+    "ocudu PHY info": "2026-11-24T19:23:13.966694 [PHY     ] [I] [   232.0] PUCCH: rnti=0x4601 format=1",
+    "ocudu PHY warning": "2026-11-24T19:23:13.966694 [PHY     ] [W] [   232.0] late slot",
+    "ocudu MAC info": "2026-11-24T19:23:13.966694 [MAC     ] [I] [   232.0] DL PDSCH rnti=0x4601",
+    "ocudu CU-CP info": "2026-11-24T19:23:13.966694 [CU-CP   ] [I] ue=0 c-rnti=0x4601: UE created",
+    "oai NR_PHY info": "[NR_PHY]   I {L1_rx_thread} slot 7",
+    "oai NR_MAC warning": "[NR_MAC]   W UE 4601: bad CQI",
+    "oai NR_MAC info": "[NR_MAC]   I Frame.Slot 128.0",
+    "oai NR_RRC info": "[NR_RRC]   I UE 1 created",
+}
+
+
+def dropped(patterns):
+    return sorted(name for name, line in LINES.items() if any(re.search(p, line) for p in patterns))
+
+
+@pytest.mark.parametrize(
+    ("layers", "keep_from", "expected"),
+    [
+        (["PHY", "MAC"], "warning", ["oai NR_MAC info", "oai NR_PHY info", "ocudu MAC info", "ocudu PHY info"]),
+        (["PHY"], "error", ["oai NR_PHY info", "ocudu PHY info", "ocudu PHY warning"]),
+        (["cu-cp"], "none", ["ocudu CU-CP info"]),
+        (["NR_RRC"], "warning", ["oai NR_RRC info"]),
+        (["PHY"], "info", []),
+    ],
+)
+def test_chosen_layers_are_dropped_below_the_level_kept_in_both_log_formats(layers, keep_from, expected):
+    assert dropped(ran_log_filter(layers, keep_from=keep_from)) == expected
+
+
+def test_a_layer_or_level_outside_the_set_is_refused():
+    with pytest.raises(ValueError, match="Unknown RAN log layer 'PHYS'; layers: PHY, MAC"):
+        ran_log_filter(["PHYS"])
+    with pytest.raises(ValueError, match="keep_from must be one of info, warning, error, none"):
+        ran_log_filter(["PHY"], keep_from="debug")
+
+
+def test_the_chosen_lines_are_what_a_run_drops():
+    patterns = ran_log_filter(["PHY", "MAC"])
+    run = ExperimentRun("unused", loki_url="http://loki:3100", loki_drop=patterns)
+    assert run.options.loki_drop == patterns

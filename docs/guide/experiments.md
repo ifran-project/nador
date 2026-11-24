@@ -66,8 +66,29 @@ at the end so a failure is never silent.
 lines. Some RANs log that much in a couple of minutes: OCUDU at info level writes a PHY line per slot. Those
 lines (`[PHY     ] [I]`, `[PHY     ] [D]`) are left out by default, filtered in Loki itself; PHY warnings and errors
 are kept. Before exporting, the run asks Loki how many lines remain and warns above `loki_warn_lines`. To keep
-an export short, select fewer logs (`loki_selector='{namespace="oai-core"}'`) or drop more lines
-(`loki_drop=[r"\[PHY *\] \[[DI]\]", r"\[MAC *\] \[I\]"]`). `logs/summary.json` records how long the export took.
+an export short, select fewer logs (`loki_selector='{namespace="oai-core"}'`) or choose which gNB log lines to
+leave out with `ran_log_filter`. `logs/summary.json` records how long the export took.
+
+`ran_log_filter(layers, keep_from="warning")` leaves out the lines of the chosen gNB/CU/DU layers below a level,
+in OCUDU logs (`[MAC     ] [I]`) and OAI logs (`[NR_MAC]   I`) alike:
+
+```python
+from nador.artifacts import ExperimentRun, ran_log_filter
+
+# PHY and MAC: only their warnings and errors; RLC: nothing at all; every other layer untouched
+drop = ran_log_filter(["PHY", "MAC"], keep_from="warning") + ran_log_filter(["RLC"], keep_from="none")
+async with ExperimentRun(directory, monitoring=monitoring, loki_drop=drop) as run:
+    ...
+```
+
+The layers are those of `nador.artifacts.RAN_LOG_LAYERS`: PHY, MAC, SCHED, RLC, PDCP, SDAP, GTPU, RRC, NGAP, F1AP,
+E1AP, CU-CP, CU-UP, DU, FAPI, RU, OFH, HW, SCTP and METRICS. `keep_from` is `info` (leaves out debug), `warning`,
+`error` or `none` (leaves out the whole layer). The CU-CP and NGAP lines also feed the RNTI mapper, which reads
+the pods directly: leaving them out of the export does not change it.
+
+This only shortens what a run exports. To make the gNB log less in the first place, set its log levels when
+deploying it: `advanced_config.log` for OCUDU (`{filename: stdout, all_level: info, phy_level: warning}`; keep
+`filename: stdout` for the logs to reach Loki) and `advanced_config.log_config` for OAI (`{phy_log_level: warn, ...}`).
 
 ## Your own collectors
 

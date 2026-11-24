@@ -14,6 +14,34 @@ PAGE_LIMIT = 5000  # Loki's default max_entries_limit_per_query
 OCUDU_PHY_DETAIL = r"\[PHY *\] \[[DI]\]"
 
 
+# gNB/CU/DU log layers, as OCUDU ("[PHY     ] [I]") and OAI ("[NR_PHY]   I") name them; OAI's NR_ prefix is implied.
+RAN_LOG_LAYERS = (
+    "PHY", "MAC", "SCHED", "RLC", "PDCP", "SDAP", "GTPU", "RRC", "NGAP", "F1AP", "E1AP",
+    "CU-CP", "CU-UP", "DU", "FAPI", "RU", "OFH", "HW", "SCTP", "METRICS",
+)  # fmt: skip
+# Level letters below each threshold: OCUDU writes D/I/W/E, OAI also T (trace) and A (analysis, kept with errors).
+_DROPPED_BELOW = {"info": "DT", "warning": "DTI", "error": "DTIW", "none": "DTIWEA"}
+
+
+def ran_log_filter(layers, keep_from="warning"):
+    """Patterns for ``loki_drop`` leaving out the gNB/CU/DU log lines of ``layers`` below ``keep_from``.
+
+    ``layers`` are names from ``RAN_LOG_LAYERS`` (PHY, MAC, RLC, RRC, NGAP...), matched in OCUDU and OAI logs.
+    ``keep_from`` is the lowest level kept: ``info`` (drops debug), ``warning`` (drops debug and info),
+    ``error``, or ``none`` (drops the layer entirely). Lines of other layers and other components are untouched.
+    """
+    if keep_from not in _DROPPED_BELOW:
+        raise ValueError(f"keep_from must be one of {', '.join(_DROPPED_BELOW)}, not {keep_from!r}")
+    letters = _DROPPED_BELOW[keep_from]
+    patterns = []
+    for layer in layers:
+        name = layer.upper().removeprefix("NR_")
+        if name not in RAN_LOG_LAYERS:
+            raise ValueError(f"Unknown RAN log layer {layer!r}; layers: {', '.join(RAN_LOG_LAYERS)}")
+        patterns.append(rf"\[{name} *\] \[[{letters}]\]|\[(NR_)?{name}\] +[{letters}] ")
+    return patterns
+
+
 def log_query(selector, drop=()):
     """The LogQL query: the stream selector, then a line filter dropping each pattern (RE2) in Loki itself."""
     query = selector
