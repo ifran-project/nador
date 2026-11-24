@@ -342,7 +342,11 @@ class Metrics(StrictBaseModel):
     @model_serializer(mode="wrap")
     def _group(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
         flat = handler(self)
-        return {group: {profile_key(name): flat[name] for name in names} for group, names in METRIC_GROUPS.items()}
+        # exclude_defaults (IFRAN's output()) leaves out the metrics at their default: keep only those written
+        return {
+            group: {profile_key(name): flat[name] for name in names if name in flat}
+            for group, names in METRIC_GROUPS.items()
+        }
 
     def get(self, name: str) -> Metric | None:
         """The metric's options, or None when it is off."""

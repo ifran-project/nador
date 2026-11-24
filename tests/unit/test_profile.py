@@ -55,6 +55,14 @@ def test_metrics_are_written_back_in_their_groups():
     assert list(check(profile()).model_dump()["metrics"]) == ["ran", "core", "e2e", "host"]
 
 
+def test_a_profile_without_its_defaults_is_written_and_read_back():
+    # IFRAN's output() writes the deployment model with exclude_defaults=True
+    config = check(profile(metrics={"rtt": options("rtt", packet_pairing=True), "core_logs": True}))
+    written = config.model_dump(mode="json", exclude_defaults=True)
+    assert "split_signaling" not in written["metrics"]["ran"]
+    assert validate_deployment(written, explicit=False).metrics == config.metrics
+
+
 # Mistakes in metrics, targets and options
 
 CASES = {
