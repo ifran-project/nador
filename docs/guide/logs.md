@@ -65,10 +65,25 @@ from [OCUDU's configuration reference](https://docs.ocudu.org/user_manual/config
 
 The options can change between OCUDU releases: `gnb log -h` in the image you deploy prints its own list.
 
-**Keep the CU-CP and NGAP lines at `info`** when the profile turns on `ran_kpis` or `csi`: the RNTI
-mapper reads them from the CU-CP or gNB pod (`ue=0 c-rnti=0x4601: UE created`, `ue=0 ran_ue=0`) to name
-the UE behind each RNTI. With `all_level: info`, as above, they are; if you lower `all_level`, set
-`cu_level: info` and `ngap_level: info`.
+**What NADOR reads from these logs, and checks.** `nador.configure_ran_monitoring(ran, config)`, called before
+`ran.deploy()`, refuses a `log` section that would hide it, with the component and the option to change:
+
+| The profile turns on | NADOR reads | So each component's `log` must have |
+| --- | --- | --- |
+| `ran.logs` | Every OCUDU pod's log, into Loki | `filename: stdout` |
+| `ran_kpis` or `csi` | The UE lines of the gNB, CU or CU-CP (`ue=0 c-rnti=0x4601: UE created`, `ue=0 ran_ue=0`), for the RNTI mapper to name the UE behind each RNTI | `filename: stdout`, and CU and NGAP at `info` or `debug` |
+
+`cu_level` and `ngap_level` take `all_level` when not written, so `all_level: info` is enough; with
+`all_level: warning`, write `cu_level: info` and `ngap_level: info`. For example, this is refused when the
+profile turns on `ran_kpis`:
+
+```
+ValueError: OCUDU log settings hide what monitoring reads (see the Logs guide):
+  - gnb: log.cu_level must be info or debug for the RNTI mapper, not warning
+  - gnb: log.ngap_level must be info or debug for the RNTI mapper, not warning
+```
+
+Components without their own `log` keep IFRAN's, which fits.
 
 ### OAI: `advanced_config.log_config`
 
