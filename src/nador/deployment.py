@@ -79,8 +79,6 @@ class MonitoringManagement(HelmManagement):
     def plan(self) -> Plan:
         """Resolve targets and chart values without contacting deployment hosts."""
         monitoring = validate_deployment(self.deployment_model.monitoring.model_dump(mode="python"))
-        if monitoring.metrics.throughput and not monitoring.targets:
-            raise ValueError("Throughput requires AMF, SMF and UPF packet targets")
         node_name, _ = self._get_deployment_node(None)
         model = self.deployment_model.model_copy(update={"monitoring": monitoring})
         targets = resolve_targets(model)
@@ -305,7 +303,23 @@ class MonitoringManagement(HelmManagement):
         except ValueError:
             self.deployment_model.monitoring = previous
             raise
-        after = plan.components
+        try:
+            await self._change_releases(before, plan.components, quiet)
+        except BaseException:
+            # Back to the previous profile, keeping what did change: releases uninstalled are marked so (the
+            # uninstall updated them in place), and new releases already installed are kept so remove() finds them.
+            for name, component in plan.components.items():
+                if name not in before and component.is_installed:
+                    previous.components[name] = component
+            self.deployment_model.monitoring = previous
+            raise
+        if self.deployment_model.monitoring.needs_session_stack and not had_sniffers:
+            await self._run_tasks("inject_sniffers", targets=plan.targets, quiet=quiet)
+
+    async def _change_releases(
+        self, before: dict[str, DeployedMonitoringComponent], after: dict[str, DeployedMonitoringComponent], quiet: bool
+    ) -> None:
+        """Uninstall the releases no longer planned, then install the new and changed ones."""
 
         def same(name: str) -> bool:
             old, new = before[name], after[name]
@@ -316,6 +330,7 @@ class MonitoringManagement(HelmManagement):
         for name in after.keys() & before.keys():
             after[name].is_installed = before[name].is_installed
         gone = [name for name in before if name not in after and before[name].is_installed]
+        changed = [name for name in after if name not in before or not same(name)]
         node = self._get_deployment_node(None)
         for name in reversed(gone):
             await _run_component_action(
@@ -326,11 +341,8 @@ class MonitoringManagement(HelmManagement):
                 action="uninstall",
                 quiet=quiet,
             )
-        changed = [name for name in after if name not in before or not same(name)]
         if changed:
             await self.install(components=changed, quiet=quiet)
-        if self.deployment_model.monitoring.needs_session_stack and not had_sniffers:
-            await self._run_tasks("inject_sniffers", targets=plan.targets, quiet=quiet)
 
     async def remove(self, *, quiet: bool = False) -> None:
         """Remove monitoring using the current deployment configuration."""
