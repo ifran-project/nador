@@ -8,6 +8,8 @@ Changes up to 1.0.0 are listed in the [GitHub releases](https://github.com/ifran
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-24
+
 ### Added
 - CSI (channel state information) as a profile metric, `metrics.ran.csi`: OAI and OCUDU gNBs and DUs log it with
   their CSI logger image, and `ExperimentRun(collect_csi=True)` collects it cut by section.
@@ -33,4 +35,5 @@ Changes up to 1.0.0 are listed in the [GitHub releases](https://github.com/ifran
 - OCUDU log settings that hide what monitoring reads are refused before deployment.
 - IMSIs read as octal numbers in the UE names of the RNTI mapper.
 
-[Unreleased]: https://github.com/ifran-project/nador/compare/v1.0.0...develop
+[Unreleased]: https://github.com/ifran-project/nador/compare/v1.1.0...develop
+[1.1.0]: https://github.com/ifran-project/nador/compare/v1.0.0...v1.1.0
