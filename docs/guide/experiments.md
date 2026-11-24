@@ -59,6 +59,15 @@ at the end so a failure is never silent.
 | `loki_selector` | everything collected | Which logs to export (a LogQL selector such as `{namespace="core"}`) |
 | `loki_limit` | 5000 | Most log lines per query |
 | `loki_max_queries` | 1024 | Most Loki queries per run |
+| `loki_drop` | OCUDU's PHY info/debug lines | Line patterns (RE2) Loki leaves out of the export; `[]` keeps every line |
+| `loki_warn_lines` | 100000 | Warn before exporting more lines than this, with how to shorten the export; 0: never |
+
+**Log volume.** The export pages through Loki 5000 lines at a time, which takes roughly 20 minutes for 400,000
+lines. Some RANs log that much in a couple of minutes: OCUDU at info level writes a PHY line per slot. Those
+lines (`[PHY     ] [I]`, `[PHY     ] [D]`) are left out by default, filtered in Loki itself; PHY warnings and errors
+are kept. Before exporting, the run asks Loki how many lines remain and warns above `loki_warn_lines`. To keep
+an export short, select fewer logs (`loki_selector='{namespace="oai-core"}'`) or drop more lines
+(`loki_drop=[r"\[PHY *\] \[[DI]\]", r"\[MAC *\] \[I\]"]`). `logs/summary.json` records how long the export took.
 
 ## Your own collectors
 
