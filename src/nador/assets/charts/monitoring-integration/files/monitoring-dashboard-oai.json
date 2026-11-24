@@ -139,10 +139,10 @@
             "uid": "monitoring-prometheus"
           },
           "editorMode": "code",
-          "expr": "(sum(rate(container_cpu_usage_seconds_total{pod=~\"open5gs-upf1-.*\"}[1m]))/sum(machine_cpu_cores))*100",
+          "expr": "(sum by (pod) (rate(container_cpu_usage_seconds_total{pod=~\"(open5gs|oai|free5gc)-upf.*\",container!=\"\",container!=\"POD\"}[1m]))/scalar(sum(machine_cpu_cores)))*100",
           "hide": false,
           "instant": false,
-          "legendFormat": "upf1",
+          "legendFormat": "{{pod}}",
           "range": true,
           "refId": "B"
         },
@@ -152,20 +152,7 @@
             "uid": "monitoring-prometheus"
           },
           "editorMode": "code",
-          "expr": "(sum(rate(container_cpu_usage_seconds_total{pod=~\"open5gs-upf2-.*\"}[1m]))/sum(machine_cpu_cores))*100",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "upf2",
-          "range": true,
-          "refId": "C"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "monitoring-prometheus"
-          },
-          "editorMode": "code",
-          "expr": "(sum(rate(container_cpu_usage_seconds_total{pod=~\"oai-nr-ue-.*\"}[1m]))/sum(machine_cpu_cores))*100",
+          "expr": "(sum(rate(container_cpu_usage_seconds_total{pod=~\"oai-nr-ue-.*\",container!=\"\",container!=\"POD\"}[1m]))/sum(machine_cpu_cores))*100",
           "hide": false,
           "instant": false,
           "legendFormat": "nr_ue",
@@ -178,7 +165,7 @@
             "uid": "monitoring-prometheus"
           },
           "editorMode": "code",
-          "expr": "(sum(rate(container_cpu_usage_seconds_total{pod=~\"oai-nr-ue2-.*\"}[1m]))/sum(machine_cpu_cores))*100",
+          "expr": "(sum(rate(container_cpu_usage_seconds_total{pod=~\"oai-nr-ue2-.*\",container!=\"\",container!=\"POD\"}[1m]))/sum(machine_cpu_cores))*100",
           "hide": false,
           "instant": false,
           "legendFormat": "nr_ue2",
@@ -191,7 +178,7 @@
             "uid": "monitoring-prometheus"
           },
           "editorMode": "code",
-          "expr": "(sum(rate(container_cpu_usage_seconds_total{pod=~\"oai-nr-ue3-.*\"}[1m]))/sum(machine_cpu_cores))*100",
+          "expr": "(sum(rate(container_cpu_usage_seconds_total{pod=~\"oai-nr-ue3-.*\",container!=\"\",container!=\"POD\"}[1m]))/sum(machine_cpu_cores))*100",
           "hide": false,
           "instant": false,
           "legendFormat": "nr_ue3",
@@ -290,7 +277,7 @@
         {
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "(sum(rate(container_memory_usage_bytes{container=\"gnb\"}[1m]))/sum(machine_memory_bytes))*100",
+          "expr": "(sum(container_memory_working_set_bytes{container=\"gnb\"})/sum(machine_memory_bytes))*100",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "gnb",
@@ -305,7 +292,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "(sum(rate(container_memory_usage_bytes{container=\"metrics-parser\"}[1m]))/sum(machine_memory_bytes))*100",
+          "expr": "(sum(container_memory_working_set_bytes{container=\"metrics-parser\"})/sum(machine_memory_bytes))*100",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": true,
@@ -320,10 +307,10 @@
             "uid": "monitoring-prometheus"
           },
           "editorMode": "code",
-          "expr": "(sum(rate(container_memory_usage_bytes{pod=~\"open5gs-upf1-.*\"}[1m]))/sum(machine_memory_bytes))*100",
+          "expr": "(sum by (pod) (container_memory_working_set_bytes{pod=~\"(open5gs|oai|free5gc)-upf.*\",container!=\"\",container!=\"POD\"})/scalar(sum(machine_memory_bytes)))*100",
           "hide": false,
           "instant": false,
-          "legendFormat": "upf1",
+          "legendFormat": "{{pod}}",
           "range": true,
           "refId": "B"
         },
@@ -333,20 +320,7 @@
             "uid": "monitoring-prometheus"
           },
           "editorMode": "code",
-          "expr": "(sum(rate(container_memory_usage_bytes{pod=~\"open5gs-upf2-.*\"}[1m]))/sum(machine_memory_bytes))*100",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "upf2",
-          "range": true,
-          "refId": "C"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "monitoring-prometheus"
-          },
-          "editorMode": "code",
-          "expr": "(sum(rate(container_memory_usage_bytes{pod=~\"oai-nr-ue-.*\"}[1m]))/sum(machine_memory_bytes))*100",
+          "expr": "(sum(container_memory_working_set_bytes{pod=~\"oai-nr-ue-.*\",container!=\"\",container!=\"POD\"})/sum(machine_memory_bytes))*100",
           "hide": false,
           "instant": false,
           "legendFormat": "nr_ue",
@@ -359,7 +333,7 @@
             "uid": "monitoring-prometheus"
           },
           "editorMode": "code",
-          "expr": "(sum(rate(container_memory_usage_bytes{pod=~\"oai-nr-ue2-.*\"}[1m]))/sum(machine_memory_bytes))*100",
+          "expr": "(sum(container_memory_working_set_bytes{pod=~\"oai-nr-ue2-.*\",container!=\"\",container!=\"POD\"})/sum(machine_memory_bytes))*100",
           "hide": false,
           "instant": false,
           "legendFormat": "nr_ue2",
@@ -372,7 +346,7 @@
             "uid": "monitoring-prometheus"
           },
           "editorMode": "code",
-          "expr": "(sum(rate(container_memory_usage_bytes{pod=~\"oai-nr-ue3-.*\"}[1m]))/sum(machine_memory_bytes))*100",
+          "expr": "(sum(container_memory_working_set_bytes{pod=~\"oai-nr-ue3-.*\",container!=\"\",container!=\"POD\"})/sum(machine_memory_bytes))*100",
           "hide": false,
           "instant": false,
           "legendFormat": "nr_ue3",
