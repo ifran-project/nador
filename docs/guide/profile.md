@@ -102,9 +102,8 @@ Notes:
   again. A run collects it with
   `ExperimentRun(..., collect_csi=True)` (see [CSI](csi.md)).
 - **`ran_kpis` and `csi`** also deploy the RNTI mapper: it names the UE behind each RNTI in the dashboard
-  panels, from the RRC of the OAI or OCUDU gNB, CU or CU-CP and the AMF. It reads the AMF log of an OAI or
-  Open5GS core; with free5gc, the IMSI comes only from the UE mapper's inventory, so also turn on a session metric
-  (`rtt`, `throughput`, `ngap`...).
+  panels, from the RRC of the OAI or OCUDU gNB, CU or CU-CP and the AMF. It reads the AMF log of an OAI, Open5GS
+  or free5gc core, and prefers the UE mapper's inventory (deployed with a session metric) when there is one.
 
 ## Targets
 
