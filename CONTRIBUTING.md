@@ -28,7 +28,24 @@ Open an issue with:
    pytest -m ""
    ```
 
-5. Open a pull request into `develop` that says what changed and why.
+5. Add your change to [`CHANGELOG.md`](CHANGELOG.md), under `[Unreleased]` (see below).
+6. Open a pull request into `develop` that says what changed and why.
+
+## Changelog
+
+Every pull request that changes what NADOR does or how it is used adds a line to `CHANGELOG.md`,
+under `## [Unreleased]`, in one of these sections:
+
+- `### Added` for new metrics, options, functions or examples;
+- `### Changed` for behaviour that changes, especially anything users must adapt to;
+- `### Deprecated` and `### Removed` for what is going away or gone;
+- `### Fixed` for bugs;
+- `### Security` for vulnerabilities.
+
+Write it for someone who uses NADOR, not for its developers: what they can do now, or must change, in
+one sentence, naming the profile key, option or function. Changes to tests, CI or internal code that
+users do not see need no line; say so in the pull request. At release, `[Unreleased]` becomes the
+version and its date.
 
 ## Tests
 
