@@ -101,7 +101,9 @@ Notes:
   again. A run collects it with
   `ExperimentRun(..., collect_csi=True)` (see [CSI](csi.md)).
 - **`ran_kpis` and `csi`** also deploy the RNTI mapper: it names the UE behind each RNTI in the dashboard
-  panels, from the RRC of the OAI or OCUDU gNB, CU or CU-CP and the AMF.
+  panels, from the RRC of the OAI or OCUDU gNB, CU or CU-CP and the AMF. It reads the AMF log of an OAI or
+  Open5GS core; with free5gc, the IMSI comes only from the UE mapper's inventory, so also turn on a session metric
+  (`rtt`, `throughput`, `ngap`...).
 
 ## Targets
 
@@ -125,6 +127,10 @@ targets:
 | `metrics_port`, `metrics_path` | scrape the component's own metrics (default path `/metrics`) |
 
 Several gNB or UPF targets (a CU and a gNB, two UPFs) are supported: probes run on each.
+
+The example profiles watch an Open5GS core, whose network functions export Prometheus metrics on 9090. OAI's
+core network functions export none: leave `metrics_port` out of their targets, or Prometheus reports them down.
+(IFRAN's OAI core has no BSF, so its meta model lists the core components without one.)
 
 ## Tuning
 
