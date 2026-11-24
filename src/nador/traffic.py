@@ -17,7 +17,7 @@ IFRAN runs container commands through ``kubectl exec`` as one space-joined strin
 import ipaddress
 import json
 from contextlib import suppress
-from itertools import count
+from itertools import cycle
 from pathlib import Path
 from typing import Any, Literal
 
@@ -27,6 +27,9 @@ from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_command,
 # Finds an installed iperf3 without a shell; prints nothing when it is missing.
 FIND = ["find", "/usr", "-name", "iperf3", "-type", "f"]
 INSTALL = (["apt-get", "update"], ["env", "DEBIAN_FRONTEND=noninteractive", "apt-get", "install", "-y", "iperf3"])
+# Ports for run(), shared by every Iperf of the notebook: a one-shot server idles up to 60 s on its port, so a new
+# Iperf object must not start again from the first port.
+PORTS = cycle(range(5201, 5301))
 
 
 class Iperf:
@@ -41,7 +44,6 @@ class Iperf:
         self.server_ip = server_ip
         self._inventory = get_ansible_inventory_line(server, model.nodes[server])
         self._runner = str(Path(model.params.ansible.runner_path) / "iperf-server")
-        self._ports = count(5201)
 
     @classmethod
     async def setup(cls, manager: Any, *, server: str, interface: str, clients: list[str]) -> "Iperf":
@@ -141,6 +143,6 @@ class Iperf:
 
     async def run(self, client: str, direction: Literal["uplink", "downlink"], duration: int) -> dict[str, Any]:
         """Start a server on a fresh port, then run the client against it."""
-        port = next(self._ports)  # a port no earlier run() of this object used
+        port = next(PORTS)  # not used by the last 99 run() calls of any Iperf
         await self.serve(port)
         return await self.client(client, direction, duration, port)

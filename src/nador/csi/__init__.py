@@ -1,0 +1,196 @@
+"""CSI logging of OAI gNBs/DUs (oai-csi-logging images) and OCUDU gNBs/DUs (ocudu-csi-logging images)."""
+
+from importlib.resources import files
+
+from ifran.deployment import RANManagement
+from ifran.models.k8s import ContainerImage
+from ifran.models.provisioning import RUVendor
+from ifran.models.ran import RANImplementation
+from ifran.utils.defaults import DEFAULT_RAN_IMAGES
+from metamodel_3gpp.models.ran import RANComponentType
+
+from nador.csi.live import CsiLiveView
+from nador.csi.storage import prepare_csi_storage
+
+# OAI gNB repository -> CSI logger image built from the same OAI tag: upstream default images, and the r2labuser
+# images built by the R2Lab OAI CI (same OAI tag with the R2Lab patches) with and without CSI logger.
+# The r2labuser entries come last: _select_csi_images takes the reverse of this table, and a "-csi" image without
+# CSI logging then goes back to the r2labuser image of the same build.
+CSI_IMAGE_REPOSITORIES = {
+    "docker.io/oaisoftwarealliance/oai-gnb": "docker.io/r2labuser/oai-gnb-csi",
+    "docker.io/r2labuser/oai-gnb": "docker.io/r2labuser/oai-gnb-csi",
+}
+
+# OCUDU gNB and DU: one CSI image per component type and radio variant (ocudu-csi-logging build_image.sh -c gnb|du),
+# matched to the upstream default image of that type and variant (IFRAN DEFAULT_RAN_IMAGES). No ZeroMQ DU image.
+OCUDU_CSI_REPOSITORIES = {"gnb": "docker.io/r2labuser/ocudu-gnb-csi", "du": "docker.io/r2labuser/ocudu-du-csi"}
+OCUDU_CSI_TAGS = {None: "release_26_10-zmq", RUVendor.USRP: "release_26_10-uhd", RUVendor.BENETEL: "release_26_10"}
+OCUDU_TEMPLATES = files("nador") / "assets" / "ran" / "ocudu"
+
+DEFAULT_OUTPUT_DIR = "/data/csi"
+# The upstream OCUDU gNB and DU charts mount only the node's /mnt (hostPath): the OCUDU logger writes there.
+OCUDU_OUTPUT_DIR = "/mnt/csi"
+# gNB and DU (OAI and OCUDU): the CU has no PHY, hence no SRS.
+CSI_COMPONENT_TYPES = {"oai": ("gnb", "du"), "ocudu": ("gnb", "du")}
+
+__all__ = ["CsiLiveView", "configure_csi", "prepare_csi_storage"]
+
+OAI_CHARTS = files("nador") / "assets" / "ran" / "oai"
+
+
+def configure_csi(ran: RANManagement, config) -> None:
+    """Apply the profile's ``csi`` metric to the RAN before ``ran.deploy()``; without it, change nothing.
+
+    Each OAI or OCUDU gnb/du that logs (``csi.components``, else all of them) gets the CSI logger image built from
+    its own image, the ``CSI_*`` environment of the profile and a configuration with periodic SRS: NADOR's OAI charts,
+    or NADOR's rendered OCUDU files. The logger writes ``<output_dir>/csi_per_rb.csv`` on the node (a hostPath),
+    so two loggers on one node need different output directories. Components that do not log get their image
+    without logger. Each component that logs must be pinned to a deployment node (``node_name``), where its
+    file is read. This only updates the manager's configuration.
+    """
+    csi = config.metrics.csi
+    if csi is None:
+        return
+    components = ran.deployment_model.ran.components
+    names = csi.components or list(components)
+    unknown = set(names) - components.keys()
+    if unknown:
+        raise ValueError(f"Unknown RAN components: {sorted(unknown)}")
+    directories = _csi_directories(components, names, csi.output_dir, explicit=bool(csi.components))
+    nodes = ran.deployment_model.nodes
+    for name in directories:
+        component = components[name]
+        if component.is_installed and str((component.extra_env_vars or {}).get("CSI_LOGGING_ENABLED")) != "1":
+            raise ValueError(f"{name}: configure CSI before deploying the RAN")
+        if component.node_name not in nodes:
+            # The file is a hostPath: collection and storage read it on this node, so the pod must be pinned there.
+            raise ValueError(f"{name}: set node_name to a deployment node; the CSI file is read on that node")
+    _check_distinct_files(components, directories)
+    for name, directory in directories.items():
+        component = components[name]
+        ocudu = str(component.implementation) == "ocudu"
+        _select_image(name, component, ocudu=ocudu)
+        csi_env = {"CSI_LOGGING_ENABLED": "1", "CSI_OUTPUT_DIR": directory}
+        if ocudu:
+            # CSI_ENABLED switches the OCUDU logger on; CSI_SRS_PERIOD_MS is read by the rendered configuration.
+            csi_env |= {"CSI_ENABLED": "1", "CSI_SRS_PERIOD_MS": f"{csi.srs_period_ms:g}"}
+            component.custom_rendered_files = _ocudu_rendered_files()
+        elif not component.custom_chart_path:
+            component.custom_chart_path = str(OAI_CHARTS / f"oai-{component.type}")
+            component.custom_rendered_files = [str(OAI_CHARTS / "values.yaml.j2"), str(OAI_CHARTS / "config.yaml.j2")]
+        component.extra_env_vars = (component.extra_env_vars or {}) | csi_env | csi.logger_env()
+    _select_csi_images(ran)
+
+
+def _csi_directories(all_components: dict, names: list[str], output_dir: str | None, *, explicit: bool) -> dict:
+    """CSI output directory of each selected component; unsupported components are skipped unless named."""
+    directories = {}
+    for name in names:
+        component = all_components[name]
+        implementation = str(component.implementation)
+        if component.type not in CSI_COMPONENT_TYPES.get(implementation, ()):
+            if not explicit:
+                continue
+            raise ValueError(f"{name}: CSI logging is only supported on OAI and OCUDU gnb/du components")
+        if implementation == "ocudu" and component.custom_rendered_files not in (None, _ocudu_rendered_files()):
+            raise ValueError(f"{name}: custom_rendered_files already set; CSI needs the nador OCUDU files")
+        directory = output_dir or (OCUDU_OUTPUT_DIR if implementation == "ocudu" else DEFAULT_OUTPUT_DIR)
+        if implementation == "ocudu" and not directory.startswith("/mnt/"):
+            raise ValueError(f"{name}: the OCUDU charts only mount the node's /mnt; output_dir must be under it")
+        directories[name] = directory
+    return directories
+
+
+def _select_image(name: str, component, *, ocudu: bool) -> None:
+    """CSI logger image of the component, built from its current image."""
+    if component.image is None:
+        return
+    if ocudu:
+        if component.image.repository != OCUDU_CSI_REPOSITORIES[str(component.type)]:
+            component.image = _ocudu_csi_image(name, component.image, str(component.type))
+    elif not component.image.repository.endswith("-csi"):
+        repository = CSI_IMAGE_REPOSITORIES.get(component.image.repository)
+        if repository is None:
+            raise ValueError(f"{name}: no CSI image known for {component.image.repository!r}")
+        component.image = component.image.model_copy(update={"repository": repository})
+
+
+def _ocudu_rendered_files() -> list[str]:
+    return [str(OCUDU_TEMPLATES / "values.yaml.j2"), str(OCUDU_TEMPLATES / "config.yaml.j2")]
+
+
+def _ocudu_variants(component_type: str) -> dict:
+    """Upstream default OCUDU image (IFRAN DEFAULT_RAN_IMAGES) of a gnb or du of each radio variant."""
+    defaults = DEFAULT_RAN_IMAGES[RANImplementation.OCUDU]
+    return {
+        vendor: defaults[vendor][RANComponentType(component_type)] for vendor in OCUDU_CSI_TAGS if vendor in defaults
+    }
+
+
+def _ocudu_csi_image(name: str, current: ContainerImage, component_type: str) -> ContainerImage:
+    for vendor, default in _ocudu_variants(component_type).items():
+        # no ZeroMQ DU image (build_image.sh: the zmq variant builds the gNB only)
+        if current.repository == default.repository and not (component_type == "du" and vendor is None):
+            return current.model_copy(
+                update={"repository": OCUDU_CSI_REPOSITORIES[component_type], "image_tag": OCUDU_CSI_TAGS[vendor]}
+            )
+    raise ValueError(f"{name}: no OCUDU CSI image known for {current.repository!r}")
+
+
+def _check_distinct_files(all_components: dict, selected: dict[str, str]) -> None:
+    """Refuse two CSI loggers writing the same hostPath file (same node, same output directory)."""
+    files = {}
+    for name, component in all_components.items():
+        env = component.extra_env_vars or {}
+        if name in selected:
+            directory = selected[name]
+        elif str(env.get("CSI_LOGGING_ENABLED")) == "1":
+            directory = env.get("CSI_OUTPUT_DIR", DEFAULT_OUTPUT_DIR)
+        else:
+            continue
+        files.setdefault(directory.rstrip("/"), []).append((name, component.node_name))
+    for directory, users in files.items():
+        if len(users) == 1:
+            continue
+        nodes = [node for _, node in users]
+        shared = {node for node in nodes if nodes.count(node) > 1}
+        if shared:
+            raise ValueError(
+                f"{[n for n, node in users if node in shared]} write {directory}/csi_per_rb.csv on the same node: "
+                "use distinct output_dir"
+            )
+
+
+def _select_csi_images(ran: RANManagement) -> None:
+    """
+    Use a CSI logger image only on the components where CSI logging is enabled.
+
+    OCUDU: r2labuser/ocudu-gnb-csi or ocudu-du-csi without CSI goes back to the upstream default image of its type
+    and radio variant.
+
+    The logger of these images always starts (oai-csi-logging v3.1), and the orchestrator defaults to
+    r2labuser/oai-gnb-aw2s-csi for the AW2S gNB, DU, CU and CU-CP: without configure_csi it would write
+    /data/csi inside the container. Every other OAI component with a "-csi" image gets the same image
+    without logger: the reverse of CSI_IMAGE_REPOSITORIES, else the repository without its "-csi" suffix
+    (r2labuser/oai-gnb-aw2s-csi -> r2labuser/oai-gnb-aw2s), with the same tag.
+    """
+    without_csi = {csi: plain for plain, csi in CSI_IMAGE_REPOSITORIES.items()}
+    for component in ran.deployment_model.ran.components.values():
+        if component.image is None or str((component.extra_env_vars or {}).get("CSI_LOGGING_ENABLED")) == "1":
+            continue
+        if str(component.implementation) == "ocudu":
+            component_type = str(component.type)
+            if component_type in OCUDU_CSI_REPOSITORIES:
+                variants = _ocudu_variants(component_type)
+                default = {OCUDU_CSI_TAGS[vendor]: image for vendor, image in variants.items()}.get(
+                    component.image.image_tag
+                )
+                if component.image.repository == OCUDU_CSI_REPOSITORIES[component_type] and default is not None:
+                    component.image = default.model_copy(deep=True)
+            continue
+        if str(component.implementation) != "oai":
+            continue
+        repository = component.image.repository
+        if repository.endswith("-csi"):
+            plain = without_csi.get(repository, repository.removesuffix("-csi"))
+            component.image = component.image.model_copy(update={"repository": plain})

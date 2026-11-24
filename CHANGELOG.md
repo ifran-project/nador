@@ -1,0 +1,39 @@
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+Changes up to 1.0.0 are listed in the [GitHub releases](https://github.com/ifran-project/nador/releases).
+
+## [Unreleased]
+
+## [1.1.0] - 2026-11-24
+
+### Added
+- CSI (channel state information) as a profile metric, `metrics.ran.csi`: OAI and OCUDU gNBs and DUs log it with
+  their CSI logger image, and `ExperimentRun(collect_csi=True)` collects it cut by section.
+- `configure_ran_monitoring(ran, config)`: one call, before `ran.deploy()`, for everything the profile needs from
+  the RAN (OCUDU metrics, CSI logger).
+- RNTI mapper: names the UE behind each RNTI in the dashboards (`ran_ue_info`), for OAI and OCUDU RANs with OAI,
+  Open5GS or free5gc cores.
+- `nador.handover.HandoverWatch`: checks an F1 handover step by step in the OAI or OCUDU logs.
+- `iperf_summary`: the throughput of every iperf test of a run.
+- Log export controls: `loki_drop` and `ran_log_filter` leave chosen gNB log lines out of a run's export,
+  `loki_warn_lines` warns before a large export, and `logs/summary.json` records how long it took.
+- Documentation site, with guides to the profile, probes, experiments, logs, CSI and handovers.
+
+### Changed
+- `configure_ran_kpis` is no longer exported by `nador`: call `configure_ran_monitoring`.
+- A profile with `throughput` and no AMF, SMF and UPF targets is refused when it is read, as with `rtt`.
+- The UPF panels of the dashboards show every UPF, of any core, and memory as used, not as a rate.
+- `monitoring.output()` writes the profile without its default metrics.
+
+### Fixed
+- `deploy_probe` and `remove_probe` keep the deployment model truthful when an installation fails.
+- An unpinned CSI logger is refused before deployment, instead of failing the experiment run.
+- OCUDU log settings that hide what monitoring reads are refused before deployment.
+- IMSIs read as octal numbers in the UE names of the RNTI mapper.
+
+[Unreleased]: https://github.com/ifran-project/nador/compare/v1.1.0...develop
+[1.1.0]: https://github.com/ifran-project/nador/compare/v1.0.0...v1.1.0

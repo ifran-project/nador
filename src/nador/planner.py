@@ -11,6 +11,7 @@ import yaml
 from ifran.utils.k8s import build_k8s_safe
 from ifran.utils.utils import deep_merge
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
+from metamodel_3gpp.models.metamodel import MetaModel
 
 from nador.config import (
     DeployedMonitoringComponent,
@@ -136,14 +137,35 @@ def _controller_values(
     Single-anchor deployments describe their gNB/UPF through ``anchors`` (targets.json);
     multi-anchor deployments pass explicit per-request target lists instead.
     """
-    metrics = monitoring.metrics
     anchors = [target.values() for target in targets if target.role in ("gnb", "upf")]
-    upfs = [target for target in anchors if target["role"] == "upf"]
-    by_role = {target["role"]: target for target in anchors}
     controller_image = monitoring.image("controller") if monitoring.uses_controller else None
-    has_session_context = {"amf", "smf"} <= {target.role for target in targets}
-    scoped_probes_allowed = controller_image is not None and has_session_context
+    # Session-scoped probes need the session context, which the AMF and SMF sniffers provide.
+    scoped = controller_image is not None and {"amf", "smf"} <= {target.role for target in targets}
+    # Explicit target lists: always with several anchors; for RTT also when rtt.at leaves some out.
+    explicit = monitoring.multi_anchor and controller_image is not None
+    return {
+        "targetNamespaces": sorted({target.namespace for target in targets}),
+        "operationTimeoutSeconds": monitoring.operation_timeout_seconds,
+        "controllerImage": controller_image,
+        "cleanupImage": monitoring.image("controller"),
+        "anchors": {} if monitoring.multi_anchor else {target["role"]: target for target in anchors},
+        "hostProbeStates": probe_states,
+        # Workloads the controller may pause and resume; RBAC is generated from this list.
+        "hostProbeWorkloads": [
+            dict(zip(("resource", "name"), workload(kind), strict=True)) for kind in sorted(probe_states)
+        ],
+        "probeApiTlsSecret": monitoring.probe_api_tls_secret,
+        "probeApiTokenSecret": monitoring.probe_api_token_secret,
+        "oneWay": _one_way_values(monitoring, anchors),
+        "rtt": _rtt_values(monitoring, anchors, scoped=scoped, controller=controller_image is not None),
+        "throughput": _throughput_values(monitoring, anchors, scoped=scoped, explicit=explicit),
+        "userPlanePaths": _paths_values(monitoring, anchors, explicit=explicit),
+    }
 
+
+def _one_way_values(monitoring: MonitoringDeployment, anchors: list[dict]) -> dict:
+    """N3 one-way delay and UPF transit time: one probe image, two metrics."""
+    metrics = monitoring.metrics
     upf_transit = metrics.upf_transit
     one_way: dict = {
         "image": monitoring.image("one_way_probe") if monitoring.one_way_probes else None,
@@ -160,58 +182,55 @@ def _controller_values(
     }
     if monitoring.one_way_probes and monitoring.separate_one_way_targets:
         one_way["one_way_targets"] = anchors
+    return one_way
 
-    rtt = metrics.rtt
-    rtt_anchors = [target for target in anchors if rtt is None or target["role"] in rtt.at]
-    rtt_request: dict = {
-        "enabled": metrics.running("rtt"),
-        "allowed": scoped_probes_allowed and bool(rtt_anchors),
+
+def _rtt_values(monitoring: MonitoringDeployment, anchors: list[dict], *, scoped: bool, controller: bool) -> dict:
+    """RTT probes at the anchors rtt.at names, for the UEs and slices it selects."""
+    rtt = monitoring.metrics.rtt
+    at = [target for target in anchors if rtt is None or target["role"] in rtt.at]
+    values: dict = {
+        "enabled": monitoring.metrics.running("rtt"),
+        "allowed": scoped and bool(at),
         "image": monitoring.image("rtt_probe"),
         "imsis": rtt.imsis if rtt else [],
         "slices": rtt.slices if rtt else [],
     }
     if rtt and rtt.packet_pairing:
-        rtt_request["pairer_image"] = monitoring.image("packet_pairer")
-    throughput_image = monitoring.image("throughput_probe") if metrics.throughput else None
-    throughput = {
-        "enabled": metrics.running("throughput"),
-        "allowed": scoped_probes_allowed and bool(upfs) and throughput_image is not None,
-        "image": throughput_image,
-    }
-    paths_metric = metrics.user_plane_paths
-    path_image = monitoring.image("path_probe") if paths_metric else None
-    paths = {
-        "enabled": metrics.running("user_plane_paths"),
-        "allowed": bool(anchors) and path_image is not None,
-        "image": path_image,
-        "port": paths_metric.port if paths_metric else 9403,
-        "interval": paths_metric.interval_seconds if paths_metric else 5,
-    }
-    if monitoring.multi_anchor and controller_image:
-        paths["targets"] = anchors
-        throughput["targets"] = upfs
-    if controller_image and (monitoring.multi_anchor or len(rtt_anchors) < len(anchors)):
-        # An explicit list limits RTT probes to the anchors rtt.at names.
-        rtt_request["targets"] = rtt_anchors
+        values["pairer_image"] = monitoring.image("packet_pairer")
+    if controller and (monitoring.multi_anchor or len(at) < len(anchors)):
+        values["targets"] = at
+    return values
 
-    return {
-        "targetNamespaces": sorted({target.namespace for target in targets}),
-        "operationTimeoutSeconds": monitoring.operation_timeout_seconds,
-        "controllerImage": controller_image,
-        "cleanupImage": monitoring.image("controller"),
-        "anchors": {} if monitoring.multi_anchor else by_role,
-        "hostProbeStates": probe_states,
-        # Workloads the controller may pause and resume; RBAC is generated from this list.
-        "hostProbeWorkloads": [
-            dict(zip(("resource", "name"), workload(kind), strict=True)) for kind in sorted(probe_states)
-        ],
-        "probeApiTlsSecret": monitoring.probe_api_tls_secret,
-        "probeApiTokenSecret": monitoring.probe_api_token_secret,
-        "oneWay": one_way,
-        "rtt": rtt_request,
-        "throughput": throughput,
-        "userPlanePaths": paths,
+
+def _throughput_values(monitoring: MonitoringDeployment, anchors: list[dict], *, scoped: bool, explicit: bool) -> dict:
+    """Throughput probes on the UPFs."""
+    upfs = [target for target in anchors if target["role"] == "upf"]
+    image = monitoring.image("throughput_probe") if monitoring.metrics.throughput else None
+    values: dict = {
+        "enabled": monitoring.metrics.running("throughput"),
+        "allowed": scoped and bool(upfs) and image is not None,
+        "image": image,
     }
+    if explicit:
+        values["targets"] = upfs
+    return values
+
+
+def _paths_values(monitoring: MonitoringDeployment, anchors: list[dict], *, explicit: bool) -> dict:
+    """User-plane path probes on the gNBs and UPFs."""
+    paths = monitoring.metrics.user_plane_paths
+    image = monitoring.image("path_probe") if paths else None
+    values: dict = {
+        "enabled": monitoring.metrics.running("user_plane_paths"),
+        "allowed": bool(anchors) and image is not None,
+        "image": image,
+        "port": paths.port if paths else 9403,
+        "interval": paths.interval_seconds if paths else 5,
+    }
+    if explicit:
+        values["targets"] = anchors
+    return values
 
 
 def _chart_name(component: DeployedMonitoringComponent) -> str:
@@ -237,6 +256,7 @@ def _render_chart_values(
     model: MonitoringModel,
     targets: list[ResolvedTarget],
     probe_states: dict[str, bool],
+    ue_names: dict[str, str],
 ) -> dict:
     """Render chart configuration before applying explicit user overrides."""
     chart = _chart_name(component)
@@ -250,6 +270,8 @@ def _render_chart_values(
         context = _host_probe_chart_context(model, targets, probe_name, probe_states)
     elif chart == "ocudu-metrics":
         context["ocudu_sources"] = ocudu_sources(model)
+    elif chart == "rnti-mapper":
+        context |= {"ue_names": ue_names, "components": _enabled_components(model), "build_k8s_safe": build_k8s_safe}
     elif chart == "promtail":
         context["log_namespaces"] = _log_namespaces(model)
     elif chart == "kube-prometheus-stack":
@@ -281,11 +303,34 @@ def _enabled_components(model: MonitoringModel) -> set[str]:
         enabled.update(("loki", "promtail"))
     if metrics.ran_kpis:
         enabled.add("ocudu-metrics" if ran == "ocudu" else "kpi-calculator-oai")
+    if (metrics.ran_kpis or metrics.csi is not None) and _has_rrc(model):
+        # RNTI -> UE for the dashboard panels per RNTI (RAN KPIs, CSI)
+        enabled.add("rnti-mapper")
     return enabled
 
 
-def resolve_components(model: MonitoringModel, targets: list[ResolvedTarget]) -> dict[str, DeployedMonitoringComponent]:
-    """Build enabled monitoring components and their Helm values in installation order."""
+def ue_names(metamodel: MetaModel | None) -> dict[str, str]:
+    """IMSI -> UE name, from the UEs of the meta model (their SUPI is the IMSI)."""
+    if metamodel is None:
+        return {}
+    return {ue.config.supi: name for name, ue in metamodel.ues.items() if ue.config is not None}
+
+
+def _has_rrc(model: MonitoringModel) -> bool:
+    """Whether an OAI or OCUDU gNB, CU or CU-CP runs the RRC: the rnti-mapper reads its UE contexts."""
+    return any(
+        str(ran.type) in ("gnb", "cu", "cu_cp") and str(ran.implementation) in ("oai", "ocudu")
+        for ran in model.ran.components.values()
+    )
+
+
+def resolve_components(
+    model: MonitoringModel, targets: list[ResolvedTarget], ue_names: dict[str, str] | None = None
+) -> dict[str, DeployedMonitoringComponent]:
+    """Build enabled monitoring components and their Helm values in installation order.
+
+    ``ue_names`` maps an IMSI to the UE's name, for the rnti-mapper.
+    """
     monitoring = model.monitoring
     catalog = yaml.safe_load((ASSETS / "components.yaml").read_text())
     enabled = _enabled_components(model)
@@ -313,7 +358,7 @@ def resolve_components(model: MonitoringModel, targets: list[ResolvedTarget]) ->
             )
         component = DeployedMonitoringComponent.model_validate(data)
         component.namespace = monitoring.namespace
-        component.chart_values = _render_chart_values(component, model, targets, probe_states)
+        component.chart_values = _render_chart_values(component, model, targets, probe_states, ue_names or {})
         if probe_kind(name) and component.chart_values.get("settings", {}).get("paused"):
             component.pod_selector = []
         if not component.chart_version:

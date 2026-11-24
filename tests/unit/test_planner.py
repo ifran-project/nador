@@ -5,6 +5,7 @@ and checks one rule.
 """
 
 import pytest
+from metamodel_3gpp.models.metamodel import MetaModel
 from support import TARGETS, manager, network, options, profile
 
 from nador.planner import REMOTE_CHARTS
@@ -45,7 +46,26 @@ def test_any_logs_bring_loki_and_promtail(logs):
 
 @pytest.mark.parametrize(("ran", "calculator"), [("oai", "kpi-calculator-oai"), ("ocudu", "ocudu-metrics")])
 def test_ran_kpis_use_the_calculator_of_the_ran(ran, calculator):
-    assert releases(profile(metrics={"ran_kpis": options("ran_kpis")}), network(ran=ran)) == ALWAYS | {calculator}
+    expected = ALWAYS | {calculator, "rnti-mapper"}
+    assert releases(profile(metrics={"ran_kpis": options("ran_kpis")}), network(ran=ran)) == expected
+
+
+def test_csi_brings_the_rnti_mapper():
+    assert releases(profile(metrics={"csi": options("csi")})) == ALWAYS | {"rnti-mapper"}
+
+
+def test_the_rnti_mapper_reads_the_rrc_and_names_the_ues():
+    net = network()
+    net.metamodel = MetaModel.model_validate(
+        net.metamodel.model_dump(mode="json") | {"ues": {"ue1": {"config": {"supi": "001010000000001"}}}}
+    )
+    mapper = manager(profile(metrics={"csi": options("csi"), "rtt": options("rtt")}), net).plan().components
+    values = mapper["rnti-mapper"].chart_values
+    assert values["sources"] == [{"component": "gnb", "namespace": "ran", "selector": "app=oai-gnb", "type": "oai"}]
+    assert values["core"] == {"type": "open5gs", "namespace": "core", "selector": "app=open5gs-amf", "container": "amf"}
+    assert values["ueNames"] == ["001010000000001 ue1"]
+    assert values["inventoryUrl"] == "http://ue-mapper-api.monitoring.svc.cluster.local:8080/inventory/ues"
+    assert values["image"]["repository"] == "ghcr.io/ifran-project/nador-rnti-mapper"
 
 
 def test_ran_kpis_are_refused_for_a_ran_without_a_calculator():

@@ -93,6 +93,22 @@ async def test_removing_the_last_session_metric_removes_the_session_stack(ansibl
     assert ansible.releases("uninstall") == ["monitoring-controller", "ue-mapper-api", "redis"]
 
 
+async def test_a_failed_change_keeps_the_previous_profile_and_what_was_installed(ansible):
+    managed = await deployed({"host_logs": True})
+    ansible.clear()
+    ansible.fail = ("install", "monitoring-controller")
+    with pytest.raises(RuntimeError, match="helm install monitoring-controller failed"):
+        await managed.deploy_probe("rtt", options("rtt"), quiet=True)
+    monitoring = managed.deployment_model.monitoring
+    assert monitoring.metrics.rtt is None
+    installed = set(ansible.releases("install")) - {"monitoring-controller"}
+    assert installed  # releases installed before the failure
+    assert {c.release_name for c in monitoring.components.values() if c.is_installed} >= installed
+    ansible.clear()
+    await managed.remove(quiet=True)
+    assert installed <= set(ansible.releases("uninstall"))
+
+
 async def test_mistakes_change_nothing(ansible):
     managed = await deployed({"host_logs": True})
     before = managed.deployment_model.monitoring

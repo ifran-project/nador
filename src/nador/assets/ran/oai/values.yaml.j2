@@ -5,3 +5,12 @@ metricsParser:
   enabled: true
   # Published 2026.w38 image; parser source verified against the supplied branch.
   image: ghcr.io/ifran-project/oai-gnb-metrics-parser@sha256:5ab00d04b270256eb2f80bf10a5091e6b2750e024adb2ea7579d7f043845d4e0
+{# CSI logger (oai-csi-logging images): CSI_LOGGING_ENABLED and CSI_OUTPUT_DIR are set by configure_csi. #}
+{% set csi_env = component.extra_env_vars or {} %}
+{% if csi_env.get('CSI_LOGGING_ENABLED') | string == '1' %}
+
+csi:
+  enabled: true
+  # The logger writes <outputDir>/csi_per_rb.csv; outputDir is a hostPath on the gNB node.
+  outputDir: {{ csi_env.get('CSI_OUTPUT_DIR', '/data/csi') }}
+{% endif %}

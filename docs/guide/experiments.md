@@ -28,6 +28,7 @@ notebook cell marks it `cancelled` and still stops every collector.
 | `logs/` | Loki logs of the run's time span, when a `logs` metric is on |
 | `ue_context/` | UE, IP, slice and tunnels sampled during the run, when the UE mapper is deployed |
 | `setup/before/`, `setup/after/` | host and cluster snapshots |
+| `csi/<component>/` | the CSI file cut per section, with `collect_csi=True` and the `csi` metric on ([CSI](csi.md)) |
 | anything you `save_json` | your own results, such as iperf reports |
 
 If a collector fails, the run records it under `collection_errors`, finishes the others, and raises
@@ -47,6 +48,7 @@ at the end so a failure is never silent.
 | `collect_setup` | True | Snapshot the hosts and cluster before and after |
 | `setup_hosts` | every reachable node | Only snapshot these nodes |
 | `collect_ue_context` | True | Sample the UE context during the run |
+| `collect_csi` | False | Cut the CSI file of every logging gNB/DU by section into `csi/<component>/` (needs the `csi` metric) |
 | `mapper_url` | deployed mapper | A UE mapper reachable directly, instead of through the cluster |
 | `namespace`, `service`, `service_port` | monitoring namespace, "ue-mapper-api", 8080 | Where the UE mapper runs |
 | `interval_seconds` | 2 | Seconds between UE context samples |
@@ -57,6 +59,13 @@ at the end so a failure is never silent.
 | `loki_selector` | everything collected | Which logs to export (a LogQL selector such as `{namespace="core"}`) |
 | `loki_limit` | 5000 | Most log lines per query |
 | `loki_max_queries` | 1024 | Most Loki queries per run |
+| `loki_drop` | OCUDU's PHY info/debug lines | Line patterns (RE2) Loki leaves out of the export; `[]` keeps every line |
+| `loki_warn_lines` | 100000 | Warn before exporting more lines than this, with how to shorten the export; 0: never |
+
+**Log volume.** A gNB at `info` can log hundreds of thousands of lines in a few minutes, and exporting
+400,000 lines takes about 20 minutes. By default a run leaves out OCUDU's PHY `info` and `debug` lines, and
+warns before a large export. [Logs](logs.md) explains how to choose which gNB layers a run leaves out
+(`ran_log_filter`), and how to set the gNB's own log levels when deploying it.
 
 ## Your own collectors
 
@@ -101,7 +110,8 @@ async with ExperimentRun("results/run3", monitoring=monitoring) as run:
 `iperf.run` starts a one-shot server on a fresh port and runs the UE side; `iperf.serve(port)` and
 `iperf.client(ue, direction, seconds, port)` do the two halves separately, for several UEs at once.
 Each returns iperf3's JSON report; a failed test returns the report with iperf's `error`, so it can
-be saved before acting on it.
+be saved before acting on it. `nador.artifacts.iperf_summary("results/run3")` prints one line per
+saved report: sent and received throughput and retransmissions, or the error.
 
 ## Checking that metrics arrive
 

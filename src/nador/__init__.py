@@ -2,6 +2,11 @@
 
 from .config import Metrics, MonitoringDeployment
 from .deployment import MonitoringManagement
-from .ran_kpis import configure_ran_kpis
+from .ran_setup import configure_ran_monitoring
 
-__all__ = ["Metrics", "MonitoringDeployment", "MonitoringManagement", "configure_ran_kpis"]
+__all__ = [
+    "Metrics",
+    "MonitoringDeployment",
+    "MonitoringManagement",
+    "configure_ran_monitoring",
+]

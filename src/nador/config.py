@@ -38,6 +38,7 @@ COMPONENT_IMAGES = {
     "monitoring-controller": "controller",
     "ue-mapper-api": "ue_mapper",
     "kpi-calculator-oai": "kpi_calculator_oai",
+    "rnti-mapper": "rnti_mapper",
 }
 
 
@@ -166,6 +167,50 @@ class RanKpis(Metric):
     ocudu_port: int = Field(default=8001, ge=1, le=65535)
 
 
+# SRS periods OCUDU accepts (ms); OAI chooses its own period from the TDD pattern and the number of UEs.
+OCUDU_SRS_PERIODS_MS = (1, 2, 2.5, 4, 5, 8, 10, 16, 20, 32, 40, 64, 80, 160, 320, 640, 1280, 2560)
+INDICES = r"^(all|[0-9]+(,[0-9]+)*)$"
+
+
+class Csi(Metric):
+    """Channel state information logged by OAI ``gnb``/``du`` and OCUDU ``gnb``/``du`` (``configure_csi``).
+
+    ``components`` limits it to some of them (empty: every supported one). ``srs_period_ms`` is OCUDU's SRS period.
+    ``granularity`` is one value per resource block (``rb``) or per subcarrier, keeping one in
+    ``subcarrier_sampling``. ``antennas`` and ``ports`` select receive antennas and SRS ports (``all`` or ``0,1``).
+    ``output_dir`` is where the logger writes on its node (default ``/data/csi`` for OAI, ``/mnt/csi`` for OCUDU).
+    """
+
+    components: list[Annotated[str, Field(min_length=1)]] = Field(default_factory=list)
+    srs_period_ms: float = 40
+    granularity: Literal["rb", "subcarrier"] = "rb"
+    subcarrier_sampling: int = Field(default=1, ge=1, le=12)
+    antennas: str = Field(default="all", pattern=INDICES)
+    ports: str = Field(default="all", pattern=INDICES)
+    output_dir: str | None = Field(default=None, pattern=r"^/[^\s]*[^/\s]$")
+
+    @field_validator("srs_period_ms")
+    @classmethod
+    def _ocudu_period(cls, period: float) -> float:
+        if period not in OCUDU_SRS_PERIODS_MS:
+            raise ValueError(f"csi srs_period_ms must be one of {', '.join(f'{p:g}' for p in OCUDU_SRS_PERIODS_MS)}")
+        return period
+
+    @model_validator(mode="after")
+    def _sampling_needs_subcarriers(self) -> Self:
+        if self.subcarrier_sampling != 1 and self.granularity != "subcarrier":
+            raise ValueError("csi subcarrier_sampling applies to granularity: subcarrier")
+        return self
+
+    def logger_env(self) -> dict[str, str]:
+        """The logger's environment variables for these options."""
+        env = {"CSI_GRANULARITY": self.granularity, "CSI_ANTENNA_SELECTION": self.antennas}
+        env["CSI_PORT_SELECTION"] = self.ports
+        if self.granularity == "subcarrier":
+            env["CSI_SUBCARRIER_SAMPLING"] = str(self.subcarrier_sampling)
+        return env
+
+
 class HostProbe(OnDemand):
     """A probe that runs on the nodes. ``targets`` limits it to some components (``ran/gnb``)."""
 
@@ -212,7 +257,7 @@ Switch = BeforeValidator(_on_off)
 
 # Where each metric measures; profiles write metrics under these groups.
 METRIC_GROUPS = {
-    "ran": ("ran_kpis", "split_signaling", "ran_logs"),
+    "ran": ("ran_kpis", "csi", "split_signaling", "ran_logs"),
     "core": ("ngap", "pfcp", "throughput", "upf_transit", "ue_mapper_coverage", "core_logs"),
     "e2e": ("rtt", "n3_one_way", "user_plane_paths"),
     "host": (
@@ -246,6 +291,7 @@ class Metrics(StrictBaseModel):
 
     # ran
     ran_kpis: Annotated[RanKpis | None, Switch] = None
+    csi: Annotated[Csi | None, Switch] = None
     split_signaling: Annotated[HostProbe | None, Switch] = None
     ran_logs: Annotated[Metric | None, Switch] = None  # pods in the RAN's namespaces
     # core
@@ -296,7 +342,11 @@ class Metrics(StrictBaseModel):
     @model_serializer(mode="wrap")
     def _group(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
         flat = handler(self)
-        return {group: {profile_key(name): flat[name] for name in names} for group, names in METRIC_GROUPS.items()}
+        # exclude_defaults (IFRAN's output()) leaves out the metrics at their default: keep only those written
+        return {
+            group: {profile_key(name): flat[name] for name in names if name in flat}
+            for group, names in METRIC_GROUPS.items()
+        }
 
     def get(self, name: str) -> Metric | None:
         """The metric's options, or None when it is off."""
@@ -542,8 +592,7 @@ class MonitoringDeployment(StrictBaseModel):
         if metrics.rtt and self.targets and not set(metrics.rtt.at) <= roles:
             missing = sorted(set(metrics.rtt.at) - roles)
             raise ValueError(f"rtt measures at {', '.join(missing)}, but no target has that role")
-        # An empty target list is allowed here so defaults can be built; plan() requires targets.
-        if metrics.throughput and self.targets and not {"amf", "smf", "upf"} <= roles:
+        if metrics.throughput and not {"amf", "smf", "upf"} <= roles:
             raise ValueError("throughput requires AMF, SMF and UPF packet targets")
         if self.one_way_probes and not {"amf", "smf", "upf"} <= roles:
             raise ValueError("One-way metrics require UPF, AMF and SMF targets for slice mapping")

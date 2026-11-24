@@ -36,6 +36,7 @@ metric without options is turned on with `true`; a metric with options is turned
 metrics:
   ran:
     ran_kpis: false
+    csi: false
     split_signaling: false
     logs: true
   core:
@@ -64,6 +65,7 @@ metrics:
 | Group | Metric | What it collects | Options (default) |
 | --- | --- | --- | --- |
 | `ran` | `ran_kpis` | OAI or OCUDU RAN KPIs | `ocudu_port` (8001) |
+| `ran` | `csi` | Uplink channel (SRS) per UE, RB, antenna and port, logged by the OAI or OCUDU gNB/DU ([CSI](csi.md)) | `components` (all), `srs_period_ms` (40, OCUDU), `granularity` (`rb`), `subcarrier_sampling` (1), `antennas` (`all`), `ports` (`all`), `output_dir` (per RAN) |
 | `ran` | `split_signaling` | F1/E1 signalling between CU and DU (split RANs only) | `on_demand`, `targets` |
 | `ran` | `logs` | Logs of the RAN's pods, in Loki | none |
 | `core` | `ngap` | Session-setup times, from the AMF sniffer | `port` (9102) |
@@ -93,8 +95,15 @@ Notes:
   (see [Controlling probes](probes.md)).
 - **Host probes that share a row run in one probe**, so they start and stop together.
   `attributed_drops` and `tcp_flows` only collect when deployed running.
-- **`ran_kpis` with OCUDU**: call `nador.configure_ran_kpis(ran, config)` before `ran.deploy()`, so
-  the gNB publishes its metrics.
+- **`ran_kpis` and `csi` change the RAN**: call `nador.configure_ran_monitoring(ran, config)` before `ran.deploy()`.
+  It makes an OCUDU gNB publish its metrics (`ran_kpis`) and sets up the CSI logger (`csi`); with both off it
+  changes nothing. It also refuses OCUDU log settings that would hide what NADOR reads from the RAN's logs
+  (see [Logs](logs.md)). The CSI logger is part of the gNB image, so turning it on or off means deploying the RAN
+  again. A run collects it with
+  `ExperimentRun(..., collect_csi=True)` (see [CSI](csi.md)).
+- **`ran_kpis` and `csi`** also deploy the RNTI mapper: it names the UE behind each RNTI in the dashboard
+  panels, from the RRC of the OAI or OCUDU gNB, CU or CU-CP and the AMF. It reads the AMF log of an OAI, Open5GS
+  or free5gc core, and prefers the UE mapper's inventory (deployed with a session metric) when there is one.
 
 ## Targets
 
@@ -118,6 +127,10 @@ targets:
 | `metrics_port`, `metrics_path` | scrape the component's own metrics (default path `/metrics`) |
 
 Several gNB or UPF targets (a CU and a gNB, two UPFs) are supported: probes run on each.
+
+The example profiles watch an Open5GS core, whose network functions export Prometheus metrics on 9090. OAI's
+core network functions export none: leave `metrics_port` out of their targets, or Prometheus reports them down.
+(IFRAN's OAI core has no BSF, so its meta model lists the core components without one.)
 
 ## Tuning
 

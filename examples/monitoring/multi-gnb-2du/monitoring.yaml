@@ -6,6 +6,7 @@ operation_timeout_seconds: 600
 metrics:
   ran:
     ran_kpis: {ocudu_port: 8001}
+    csi: false
     split_signaling: false
     logs: true
   core:

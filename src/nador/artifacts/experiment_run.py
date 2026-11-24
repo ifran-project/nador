@@ -107,6 +107,10 @@ class ExperimentRun:
             collectors.append(UEContext(options, hosts))
         if monitoring is not None or prometheus_url is not None:
             collectors.append(PrometheusExport(url=prometheus_url, queries_file=self.queries_file, step=step))
+        if options.collect_csi and monitoring is not None and profile is not None and profile.metrics.csi is not None:
+            from nador.csi.collection import csi_collectors  # noqa: PLC0415 - nador.csi imports the collectors
+
+            collectors += csi_collectors(monitoring)
         if options.loki_url or (profile is not None and profile.metrics.log_groups):
             collectors.append(
                 LokiExport(
@@ -114,6 +118,8 @@ class ExperimentRun:
                     selector=options.loki_selector,
                     limit=options.loki_limit,
                     max_queries=options.loki_max_queries,
+                    drop=options.loki_drop,
+                    warn_lines=options.loki_warn_lines,
                 )
             )
         return collectors
