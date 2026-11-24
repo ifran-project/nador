@@ -97,7 +97,8 @@ Notes:
   `attributed_drops` and `tcp_flows` only collect when deployed running.
 - **`ran_kpis` and `csi` change the RAN**: call `nador.configure_ran_monitoring(ran, config)` before `ran.deploy()`.
   It makes an OCUDU gNB publish its metrics (`ran_kpis`) and sets up the CSI logger (`csi`); with both off it
-  changes nothing. The CSI logger is part of the gNB image, so turning it on or off means deploying the RAN
+  changes nothing. It also refuses OCUDU log settings that would hide what NADOR reads from the RAN's logs
+  (see [Logs](logs.md)). The CSI logger is part of the gNB image, so turning it on or off means deploying the RAN
   again. A run collects it with
   `ExperimentRun(..., collect_csi=True)` (see [CSI](csi.md)).
 - **`ran_kpis` and `csi`** also deploy the RNTI mapper: it names the UE behind each RNTI in the dashboard

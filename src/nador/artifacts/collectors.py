@@ -6,6 +6,8 @@
 """
 
 import asyncio
+import math
+import warnings
 from contextlib import AsyncExitStack
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
@@ -15,7 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from nador.probes import enabled_probes
 
-from .loki_export import collect_logs
+from .loki_export import OCUDU_PHY_DETAIL, PAGE_LIMIT, collect_logs, count_lines, log_query
 from .prometheus_export import export_ranges, load_queries, split_windows
 from .ssh_tunnel import loki_connection, prometheus_connection
 
@@ -47,6 +49,14 @@ class RunOptions(BaseModel):
     loki_selector: str = '{namespace=~".+"}'
     loki_limit: int = Field(default=5000, ge=1, le=100_000)
     loki_max_queries: int = Field(default=1024, ge=1, le=100_000)
+    loki_drop: list[Annotated[str, Field(min_length=1)]] = Field(default_factory=lambda: [OCUDU_PHY_DETAIL])
+    loki_warn_lines: int = Field(default=100_000, ge=0)
+
+    @field_validator("loki_drop")
+    @classmethod
+    def _check_loki_drop(cls, patterns: list[str]) -> list[str]:
+        log_query("{}", patterns)  # refuses a pattern LogQL cannot quote
+        return patterns
 
     @field_validator("mapper_url")
     @classmethod
@@ -132,15 +142,43 @@ class PrometheusExport(Collector):
 
 
 class LokiExport(Collector):
-    """Export the run's log lines to logs/loki.jsonl, with an explicit completeness report."""
+    """Export the run's log lines to logs/loki.jsonl, with an explicit completeness report.
+
+    Lines matching a ``drop`` pattern are filtered out by Loki. Before exporting, Loki is asked how many lines
+    remain: above ``warn_lines`` (0: never) a warning says how long the export may take and how to shorten it.
+    """
 
     label = "loki"
 
-    def __init__(self, *, url: str | None, selector: str, limit: int, max_queries: int) -> None:
+    def __init__(
+        self,
+        *,
+        url: str | None,
+        selector: str,
+        limit: int,
+        max_queries: int,
+        drop: list[str] | tuple[str, ...] = (OCUDU_PHY_DETAIL,),
+        warn_lines: int = 100_000,
+    ) -> None:
         self.url = url
         self.selector = selector
         self.limit = limit
         self.max_queries = max_queries
+        self.drop = list(drop)
+        self.warn_lines = warn_lines
+
+    def _warn_if_large(self, lines: int | None) -> None:
+        if lines is None or not self.warn_lines or lines <= self.warn_lines:
+            return
+        queries = math.ceil(lines / min(self.limit, PAGE_LIMIT))
+        warnings.warn(
+            f"Loki export: about {lines:,} log lines for this run, {queries:,}+ queries; this can take many minutes "
+            f"(roughly 20 min for 400,000 lines). To shorten it, narrow loki_selector (e.g. one namespace), add "
+            f"line patterns to loki_drop, or set loki_selector to a namespace without logs to skip it; "
+            f"loki_warn_lines=0 silences this warning.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
 
     async def collect(self, run: "ExperimentRun", start: float, end: float) -> None:
         """Export logs and flag a possibly incomplete export."""
@@ -148,6 +186,9 @@ class LokiExport(Collector):
             url = await _open(stack, self.url, loki_connection, run, self.label)
             if url is None:
                 return
+            if self.warn_lines:
+                query = log_query(self.selector, self.drop)
+                self._warn_if_large(await asyncio.to_thread(count_lines, url, query, start, end))
             summary = await asyncio.to_thread(
                 collect_logs,
                 run.directory / "logs",
@@ -157,6 +198,7 @@ class LokiExport(Collector):
                 end=end,
                 limit=self.limit,
                 max_queries=self.max_queries,
+                drop=self.drop,
             )
         if summary.get("possible_truncation"):
             budget = f"query budget exhausted ({summary['queries']}/{summary['max_queries']}); "

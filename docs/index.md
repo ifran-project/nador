@@ -15,6 +15,7 @@ guide/how-it-works
 guide/profile
 guide/probes
 guide/experiments
+guide/logs
 guide/csi
 guide/handover
 ```

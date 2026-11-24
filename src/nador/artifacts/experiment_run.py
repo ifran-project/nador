@@ -118,6 +118,8 @@ class ExperimentRun:
                     selector=options.loki_selector,
                     limit=options.loki_limit,
                     max_queries=options.loki_max_queries,
+                    drop=options.loki_drop,
+                    warn_lines=options.loki_warn_lines,
                 )
             )
         return collectors

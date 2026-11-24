@@ -65,6 +65,59 @@ async def test_a_possibly_truncated_log_export_is_flagged(tmp_path, http):
     assert error == "loki: query budget exhausted (1/1); possible truncation; log export may be incomplete"
 
 
+# Large log exports: filtered in Loki, announced before they start
+
+
+def line_count(lines):
+    return lambda q: {"status": "success", "data": {"resultType": "vector", "result": [{"value": [0, str(lines)]}]}}
+
+
+async def test_ocudu_phy_detail_is_filtered_out_by_loki_by_default(tmp_path, http):
+    http.routes["/loki/api/v1/query_range"] = streams("kept")
+    await experiment(tmp_path / "run", loki_url=http.url)
+    (query,) = {q["query"] for path, q in http.requests if path == "/loki/api/v1/query_range"}
+    assert query == '{namespace=~".+"} !~ `\\[PHY *\\] \\[[DI]\\]`'
+    summary = json.loads((tmp_path / "run" / "logs" / "summary.json").read_text())
+    assert summary["dropped_lines_matching"] == [r"\[PHY *\] \[[DI]\]"]
+    assert summary["seconds"] >= 0
+
+
+async def test_every_line_is_kept_with_an_empty_drop_list(tmp_path, http):
+    http.routes["/loki/api/v1/query_range"] = streams("kept")
+    await experiment(tmp_path / "run", loki_url=http.url, loki_drop=[], loki_selector='{namespace="ran"}')
+    assert {q["query"] for path, q in http.requests if path == "/loki/api/v1/query_range"} == {'{namespace="ran"}'}
+
+
+async def test_a_large_export_is_announced_with_how_to_shorten_it(tmp_path, http):
+    http.routes["/loki/api/v1/query"] = line_count(420_000)
+    http.routes["/loki/api/v1/query_range"] = streams("line")
+    with pytest.warns(RuntimeWarning, match=r"about 420,000 log lines for this run, 84\+ queries.*loki_drop"):
+        await experiment(tmp_path / "run", loki_url=http.url)
+    (count,) = [q["query"] for path, q in http.requests if path == "/loki/api/v1/query"]
+    assert count.startswith('sum(count_over_time({namespace=~".+"} !~ `')
+
+
+@pytest.mark.parametrize("options", [{"loki_warn_lines": 500_000}, {"loki_warn_lines": 0}])
+async def test_no_warning_below_the_threshold_or_when_turned_off(tmp_path, http, options):
+    http.routes["/loki/api/v1/query"] = line_count(420_000)
+    http.routes["/loki/api/v1/query_range"] = streams("line")
+    await experiment(tmp_path / "run", loki_url=http.url, **options)  # filterwarnings=error: a warning would fail
+    asked = [path for path, _ in http.requests if path == "/loki/api/v1/query"]
+    assert asked == ([] if options["loki_warn_lines"] == 0 else ["/loki/api/v1/query"])
+
+
+async def test_an_unknown_line_count_does_not_stop_the_export(tmp_path, http):
+    http.routes["/loki/api/v1/query"] = lambda q: (500, {"error": "too many outstanding requests"})
+    http.routes["/loki/api/v1/query_range"] = streams("line")
+    await experiment(tmp_path / "run", loki_url=http.url)
+    assert (tmp_path / "run" / "logs" / "loki.jsonl").read_text()
+
+
+def test_a_line_pattern_loki_cannot_quote_is_refused():
+    with pytest.raises(ValueError, match="without backquotes"):
+        ExperimentRun("unused", loki_url="http://loki:3100", loki_drop=["a`b"])
+
+
 # With a monitoring manager, Prometheus and Loki are reached through it
 
 

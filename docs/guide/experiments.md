@@ -59,6 +59,13 @@ at the end so a failure is never silent.
 | `loki_selector` | everything collected | Which logs to export (a LogQL selector such as `{namespace="core"}`) |
 | `loki_limit` | 5000 | Most log lines per query |
 | `loki_max_queries` | 1024 | Most Loki queries per run |
+| `loki_drop` | OCUDU's PHY info/debug lines | Line patterns (RE2) Loki leaves out of the export; `[]` keeps every line |
+| `loki_warn_lines` | 100000 | Warn before exporting more lines than this, with how to shorten the export; 0: never |
+
+**Log volume.** A gNB at `info` can log hundreds of thousands of lines in a few minutes, and exporting
+400,000 lines takes about 20 minutes. By default a run leaves out OCUDU's PHY `info` and `debug` lines, and
+warns before a large export. [Logs](logs.md) explains how to choose which gNB layers a run leaves out
+(`ran_log_filter`), and how to set the gNB's own log levels when deploying it.
 
 ## Your own collectors
 
