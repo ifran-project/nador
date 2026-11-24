@@ -62,33 +62,10 @@ at the end so a failure is never silent.
 | `loki_drop` | OCUDU's PHY info/debug lines | Line patterns (RE2) Loki leaves out of the export; `[]` keeps every line |
 | `loki_warn_lines` | 100000 | Warn before exporting more lines than this, with how to shorten the export; 0: never |
 
-**Log volume.** The export pages through Loki 5000 lines at a time, which takes roughly 20 minutes for 400,000
-lines. Some RANs log that much in a couple of minutes: OCUDU at info level writes a PHY line per slot. Those
-lines (`[PHY     ] [I]`, `[PHY     ] [D]`) are left out by default, filtered in Loki itself; PHY warnings and errors
-are kept. Before exporting, the run asks Loki how many lines remain and warns above `loki_warn_lines`. To keep
-an export short, select fewer logs (`loki_selector='{namespace="oai-core"}'`) or choose which gNB log lines to
-leave out with `ran_log_filter`. `logs/summary.json` records how long the export took.
-
-`ran_log_filter(layers, keep_from="warning")` leaves out the lines of the chosen gNB/CU/DU layers below a level,
-in OCUDU logs (`[MAC     ] [I]`) and OAI logs (`[NR_MAC]   I`) alike:
-
-```python
-from nador.artifacts import ExperimentRun, ran_log_filter
-
-# PHY and MAC: only their warnings and errors; RLC: nothing at all; every other layer untouched
-drop = ran_log_filter(["PHY", "MAC"], keep_from="warning") + ran_log_filter(["RLC"], keep_from="none")
-async with ExperimentRun(directory, monitoring=monitoring, loki_drop=drop) as run:
-    ...
-```
-
-The layers are those of `nador.artifacts.RAN_LOG_LAYERS`: PHY, MAC, SCHED, RLC, PDCP, SDAP, GTPU, RRC, NGAP, F1AP,
-E1AP, CU-CP, CU-UP, DU, FAPI, RU, OFH, HW, SCTP and METRICS. `keep_from` is `info` (leaves out debug), `warning`,
-`error` or `none` (leaves out the whole layer). The CU-CP and NGAP lines also feed the RNTI mapper, which reads
-the pods directly: leaving them out of the export does not change it.
-
-This only shortens what a run exports. To make the gNB log less in the first place, set its log levels when
-deploying it: `advanced_config.log` for OCUDU (`{filename: stdout, all_level: info, phy_level: warning}`; keep
-`filename: stdout` for the logs to reach Loki) and `advanced_config.log_config` for OAI (`{phy_log_level: warn, ...}`).
+**Log volume.** A gNB at `info` can log hundreds of thousands of lines in a few minutes, and exporting
+400,000 lines takes about 20 minutes. By default a run leaves out OCUDU's PHY `info` and `debug` lines, and
+warns before a large export. [Logs](logs.md) explains how to choose which gNB layers a run leaves out
+(`ran_log_filter`), and how to set the gNB's own log levels when deploying it.
 
 ## Your own collectors
 
