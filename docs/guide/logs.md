@@ -37,28 +37,33 @@ ran:
 ```
 
 `log` **replaces** IFRAN's whole log section, which is `{filename: stdout, all_level: info,
-config_level: debug}`: write every option you want, `filename: stdout` included. Options not written
-take OCUDU's defaults (mostly `warning`).
+config_level: debug}`: write every option you want. Options not written take OCUDU's defaults, and
+OCUDU's default `filename` is `/tmp/gnb.log`, a file inside the pod: **always write `filename: stdout`**,
+or Loki, Grafana and the exported runs get no gNB log at all.
 
-The levels are, from least to most detailed, `none`, `error`, `warning`, `info` and `debug`. The
-options, as the [srsRAN Project configuration reference](https://docs.srsran.com/projects/project/en/latest/user_manuals/source/config_ref.html)
-documents them (OCUDU continues that code; `gnb log -h` prints the options of the version you deploy):
+The levels are, from least to most detailed, `none`, `error`, `warning`, `info` and `debug`. The options,
+from [OCUDU's configuration reference](https://docs.ocudu.org/user_manual/config_reference/) (the complete
+[gnb.yaml](https://docs.ocudu.org/config_examples/gnb.yaml) lists every section):
 
 | Option | Default | What it sets |
 | --- | --- | --- |
-| `filename` | `stdout` | Where logs go. Keep `stdout` for Loki. |
+| `filename` | `/tmp/gnb.log` | Where logs go. Write `stdout` for Loki. |
 | `all_level` | `warning` | One level for PHY, MAC, RLC, PDCP, RRC, SDAP, NGAP and GTP-U; the options below override it per layer |
-| `phy_level`, `mac_level`, `rlc_level`, `pdcp_level`, `rrc_level`, `sdap_level` | `warning` | One radio layer |
-| `ngap_level`, `f1ap_level`, `f1u_level`, `e1ap_level`, `e2ap_level`, `nrppa_level`, `gtpu_level` | `warning` | One interface |
+| `phy_level`, `mac_level`, `rlc_level`, `pdcp_level`, `rrc_level`, `sdap_level`, `rohc_level` | `warning` | One radio layer |
+| `ngap_level`, `f1ap_level`, `f1u_level`, `e1ap_level`, `e2ap_level`, `xnap_level`, `nrppa_level`, `gtpu_level` | `warning` | One interface |
 | `cu_level`, `du_level` | `warning` | The CU and DU applications |
-| `fapi_level`, `ofh_level`, `hal_level` | `warning` | FAPI, Open Fronthaul and hardware acceleration |
+| `fapi_level` | `warning` | FAPI, with split 7.2 and split 6 only |
+| `ofh_level`, `hal_level`, `ntn_level` | `warning` | Open Fronthaul, hardware acceleration, non-terrestrial networks |
 | `radio_level` | `info` | The radio (UHD, ZMQ) |
-| `lib_level`, `sec_level`, `config_level` | `warning`, `warning`, `none` | Libraries, security functions, the configuration printed at start |
-| `hex_max_size` | `0` | Bytes of each message printed in hex (0: none, -1: all) |
+| `lib_level`, `sec_level` | `warning` | Libraries, security functions |
+| `config_level` | `none` | The configuration printed at start: `none`, `info` or `debug` only |
+| `hex_max_size` | `0` | Bytes of each message printed in hex (0: none, -1: all, up to 1024) |
 | `broadcast_enabled` | `false` | Also log broadcast messages and every PRACH occasion |
 | `f1ap_json_enabled`, `e1ap_json_enabled` | `false` | Log F1AP or E1AP messages as JSON |
 | `high_latency_diagnostics_enabled` | `false` | Log diagnostics when processing falls behind |
-| `phy_rx_symbols_filename`, `phy_rx_symbols_port`, `phy_rx_symbols_prach` | none | Dump received IQ symbols to a file |
+| `phy_rx_symbols_filename`, `phy_rx_symbols_port`, `phy_rx_symbols_prach` | none, `0`, `false` | Dump received IQ symbols to a file |
+
+The options can change between OCUDU releases: `gnb log -h` in the image you deploy prints its own list.
 
 **Keep the CU-CP and NGAP lines at `info`** when the profile turns on `ran_kpis` or `csi`: the RNTI
 mapper reads them from the CU-CP or gNB pod (`ue=0 c-rnti=0x4601: UE created`, `ue=0 ran_ue=0`) to name
