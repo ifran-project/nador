@@ -45,7 +45,8 @@ def configure_csi(ran: RANManagement, config) -> None:
     its own image, the ``CSI_*`` environment of the profile and a configuration with periodic SRS: NADOR's OAI charts,
     or NADOR's rendered OCUDU files. The logger writes ``<output_dir>/csi_per_rb.csv`` on the node (a hostPath),
     so two loggers on one node need different output directories. Components that do not log get their image
-    without logger. This only updates the manager's configuration.
+    without logger. Each component that logs must be pinned to a deployment node (``node_name``), where its
+    file is read. This only updates the manager's configuration.
     """
     csi = config.metrics.csi
     if csi is None:
@@ -56,10 +57,14 @@ def configure_csi(ran: RANManagement, config) -> None:
     if unknown:
         raise ValueError(f"Unknown RAN components: {sorted(unknown)}")
     directories = _csi_directories(components, names, csi.output_dir, explicit=bool(csi.components))
+    nodes = ran.deployment_model.nodes
     for name in directories:
         component = components[name]
         if component.is_installed and str((component.extra_env_vars or {}).get("CSI_LOGGING_ENABLED")) != "1":
             raise ValueError(f"{name}: configure CSI before deploying the RAN")
+        if component.node_name not in nodes:
+            # The file is a hostPath: collection and storage read it on this node, so the pod must be pinned there.
+            raise ValueError(f"{name}: set node_name to a deployment node; the CSI file is read on that node")
     _check_distinct_files(components, directories)
     for name, directory in directories.items():
         component = components[name]
@@ -147,11 +152,6 @@ def _check_distinct_files(all_components: dict, selected: dict[str, str]) -> Non
     for directory, users in files.items():
         if len(users) == 1:
             continue
-        if any(node is None for _, node in users):
-            # Without node_name the scheduler may put them on the same node.
-            raise ValueError(
-                f"{[n for n, _ in users]} share {directory}: set node_name on each or use distinct output_dir"
-            )
         nodes = [node for _, node in users]
         shared = {node for node in nodes if nodes.count(node) > 1}
         if shared:

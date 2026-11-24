@@ -31,10 +31,12 @@ class HandoverWatch:
 
     ``start`` records the restart count of every RAN container, so that ``report`` also reads the previous log of a DU
     container that restarted during the handover. ``ue`` is the CU UE ID with OAI, the C-RNTI in the source cell
-    (``0x4601``) with OCUDU.
+    (``0x4601``) with OCUDU. ``kubeconfig`` is the cluster's kubeconfig on the Kubernetes master node.
     """
 
-    def __init__(self, ran: RANManagement, *, source: str, target: str, cucp: str = "cucp") -> None:
+    def __init__(
+        self, ran: RANManagement, *, source: str, target: str, cucp: str = "cucp", kubeconfig: str = KUBECONFIG
+    ) -> None:
         model = ran.deployment_model
         unknown = [name for name in (cucp, source, target) if name not in model.ran.components]
         if unknown:
@@ -43,6 +45,7 @@ class HandoverWatch:
         if implementation not in ("oai", "ocudu"):
             raise ValueError(f"handover of {implementation!r} RAN not supported (oai, ocudu)")
         self.ran = ran
+        self.kubeconfig = kubeconfig
         self.cucp, self.source, self.target = cucp, source, target
         self.implementation = implementation
         self.containers = (oai if implementation == "oai" else ocudu).CONTAINERS
@@ -105,7 +108,7 @@ class HandoverWatch:
 
     async def _kubectl(self, *args: str) -> str:
         output = await self.nodes.run_node_command(
-            command=["kubectl", "--kubeconfig", KUBECONFIG, "-n", self.namespace, *args],
+            command=["kubectl", "--kubeconfig", self.kubeconfig, "-n", self.namespace, *args],
             nodes=[self.master],
             become=True,
             quiet=True,

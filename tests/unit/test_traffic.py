@@ -118,8 +118,12 @@ async def test_run_starts_a_server_on_a_fresh_port_then_the_client(playbooks):
     iperf = await traffic.Iperf.setup(ue, server="node4", interface="oaitun_ue1", clients=["sim_ue"])
     first = await iperf.run("sim_ue", "downlink", 5)
     second = await iperf.run("sim_ue", "uplink", 5)
+    again = await traffic.Iperf.setup(ue, server="node4", interface="oaitun_ue1", clients=["sim_ue"])
+    await again.run("sim_ue", "uplink", 5)  # a new Iperf: the first server may still idle on its port
     servers = [kwargs["command"] for kind, kwargs in playbooks if kind == "command"]
-    assert [command[command.index("-p") + 1] for command in servers] == ["5201", "5202"]
+    ports = [int(command[command.index("-p") + 1]) for command in servers]
+    assert len(set(ports)) == 3
+    assert all(5201 <= port <= 5300 for port in ports)
     assert first["command"][-1] == "-R"
     assert "-R" not in second["command"]
     assert first["command"][first["command"].index("-B") + 1] == "10.45.0.2"

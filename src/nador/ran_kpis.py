@@ -12,7 +12,7 @@ OCUDU_LAYERS = {
 
 
 def configure_ran_kpis(ran, config) -> None:
-    """Enable OCUDU's native JSON stream before ``ran.deploy()``.
+    """Enable OCUDU's native JSON stream before ``ran.deploy()`` (called by ``configure_ran_monitoring``).
 
     Existing OAI parser configuration is left unchanged. This only updates the
     supplied manager's configuration; it does not contact or restart a cluster.
@@ -55,7 +55,7 @@ def ocudu_sources(model) -> list[dict]:
         remote = (advanced.remote_control if advanced is not None else None) or {}
         metrics = (advanced.metrics if advanced is not None else None) or {}
         if not metrics.get("enable_json") or not remote.get("enabled"):
-            raise ValueError(f"{name}: call configure_ran_kpis(ran, config) before ran.deploy()")
+            raise ValueError(f"{name}: call nador.configure_ran_monitoring(ran, config) before ran.deploy()")
         if remote.get("bind_addr", "127.0.0.1") in {"127.0.0.1", "localhost", "::1"}:
             raise ValueError(f"{name}: OCUDU metrics must bind to the pod network, not loopback")
         target = next((t for t in model.monitoring.targets if t.category == "ran" and t.component == name), None)

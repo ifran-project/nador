@@ -134,9 +134,12 @@ class Ansible:
     """Stands in for ``run_ansible_role``: records what NADOR asks the cluster to do."""
 
     calls: list[dict[str, Any]] = field(default_factory=list)
+    fail: tuple[str, str] | None = None  # (helm action, release) that fails, as a broken install would
 
     async def __call__(self, *, role: str, inputs: dict[str, Any], **_: Any) -> dict[str, Any] | None:
         self.calls.append({"role": role, **inputs})
+        if self.fail == (inputs.get("helm_action"), inputs.get("chart_name")):
+            raise RuntimeError(f"helm {self.fail[0]} {self.fail[1]} failed")
         if inputs.get("helm_action") == "get_logs":
             return {"logs": {"pod": "log line"}}
         return None

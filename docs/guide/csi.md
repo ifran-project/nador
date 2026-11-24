@@ -114,9 +114,12 @@ metrics:
   components that log;
 - mounts the output directory of the node as a hostPath (`/data/csi` for OAI, `/mnt/csi` for OCUDU), where the
   file survives pod restarts, and refuses two loggers writing the same file on the same node;
+- requires each logging component to be pinned to a deployment node (`node_name`): the file is a hostPath on that
+  node, where collection and storage read it. Set it in the deployment model, or before the call:
+  `ran.deployment_model.ran.components["gnb"].node_name = "node2"`;
 - refuses a RAN that is already deployed: the image and configuration are set at deployment.
 
-Without `csi` in the profile, `configure_csi` changes nothing.
+Without `csi` in the profile, `configure_ran_monitoring` changes nothing for CSI.
 
 **Storage** (`nador.csi.prepare_csi_storage`): the R2Lab and SLICES nodes boot a live image whose root filesystem
 is in RAM, which a CSI file of several MB/s fills in minutes. The data partition of the node is bind-mounted on the

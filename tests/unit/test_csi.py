@@ -440,14 +440,26 @@ def second_gnb(managed, node="node1"):
     return managed
 
 
+def test_a_logger_must_be_pinned_to_the_node_its_file_is_read_on():
+    managed, config = ran()
+    gnb = managed.deployment_model.ran.components["gnb"]
+    for node in (None, "elsewhere"):
+        gnb.node_name = node
+        with pytest.raises(ValueError, match="gnb: set node_name to a deployment node"):
+            configure_csi(managed, config)
+    assert "CSI_LOGGING_ENABLED" not in env(gnb)
+
+
 def test_two_loggers_cannot_write_the_same_file():
     managed, config = ran()
     second_gnb(managed)
     with pytest.raises(ValueError, match="write /data/csi/csi_per_rb.csv on the same node"):
         configure_csi(managed, config)
     second_gnb(managed, node=None)
-    with pytest.raises(ValueError, match="share /data/csi: set node_name on each"):
+    with pytest.raises(ValueError, match="gnb2: set node_name to a deployment node"):
         configure_csi(managed, config)
+    nodes = managed.deployment_model.nodes
+    nodes["node2"] = nodes["node1"].model_copy(deep=True)
     second_gnb(managed, node="node2")
     configure_csi(managed, config)
 

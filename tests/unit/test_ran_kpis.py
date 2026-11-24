@@ -3,9 +3,8 @@
 import pytest
 from support import manager, network, options, profile
 
-from nador import configure_ran_kpis
 from nador.config import validate_deployment
-from nador.ran_kpis import ocudu_sources
+from nador.ran_kpis import configure_ran_kpis, ocudu_sources
 
 KPIS = profile(metrics={"ran_kpis": options("ran_kpis")})
 
@@ -75,7 +74,7 @@ def test_each_ocudu_component_is_a_source():
     ("change", "message"),
     [
         (lambda gnb: setattr(gnb, "namespace", None), "gnb: RAN namespace is unresolved"),
-        (lambda gnb: setattr(gnb, "advanced_config", None), r"call configure_ran_kpis\(ran, config\)"),
+        (lambda gnb: setattr(gnb, "advanced_config", None), r"call nador.configure_ran_monitoring\(ran, config\)"),
         (
             lambda gnb: gnb.advanced_config.remote_control.update(bind_addr="127.0.0.1"),
             "must bind to the pod network, not loopback",

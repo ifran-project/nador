@@ -592,8 +592,7 @@ class MonitoringDeployment(StrictBaseModel):
         if metrics.rtt and self.targets and not set(metrics.rtt.at) <= roles:
             missing = sorted(set(metrics.rtt.at) - roles)
             raise ValueError(f"rtt measures at {', '.join(missing)}, but no target has that role")
-        # An empty target list is allowed here so defaults can be built; plan() requires targets.
-        if metrics.throughput and self.targets and not {"amf", "smf", "upf"} <= roles:
+        if metrics.throughput and not {"amf", "smf", "upf"} <= roles:
             raise ValueError("throughput requires AMF, SMF and UPF packet targets")
         if self.one_way_probes and not {"amf", "smf", "upf"} <= roles:
             raise ValueError("One-way metrics require UPF, AMF and SMF targets for slice mapping")
