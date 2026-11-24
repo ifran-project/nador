@@ -96,6 +96,10 @@ CASES = {
         profile(metrics={"throughput": options("throughput")}, targets=["amf", "smf", "gnb"]),
         "throughput requires AMF, SMF and UPF packet targets",
     ),
+    "throughput needs targets, like rtt": (
+        profile(metrics={"throughput": options("throughput")}) | {"targets": []},
+        "throughput requires AMF, SMF and UPF packet targets",
+    ),
     "ngap needs the AMF": (profile(metrics={"ngap": options("ngap")}, targets=["smf"]), "ngap/ue_mapper_coverage"),
     "NADOR ports stay off the NF metrics port": (
         profile(
