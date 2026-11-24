@@ -118,6 +118,13 @@ def test_a_layer_or_level_outside_the_set_is_refused():
         ran_log_filter(["PHY"], keep_from="debug")
 
 
+def test_counting_lines_needs_an_http_loki():
+    from nador.artifacts.loki_export import count_lines  # noqa: PLC0415
+
+    with pytest.raises(ValueError, match="Expected an HTTP"):
+        count_lines("file:///etc/passwd", "{}", 0, 1)
+
+
 def test_the_chosen_lines_are_what_a_run_drops():
     patterns = ran_log_filter(["PHY", "MAC"])
     run = ExperimentRun("unused", loki_url="http://loki:3100", loki_drop=patterns)
