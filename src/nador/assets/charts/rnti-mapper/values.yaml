@@ -5,7 +5,7 @@ port: 9101
 period: 10
 # RAN components running the RRC: [{component, namespace, selector, type: oai|ocudu}]
 sources: []
-# AMF: {type: oai|open5gs, namespace, selector, container}
+# AMF: {type: oai|open5gs|free5gc, namespace, selector, container}
 core: {}
 # ue-mapper-api inventory (exact RAN UE NGAP id <-> IMSI from the N2 captures), empty when not deployed
 inventoryUrl: ""
