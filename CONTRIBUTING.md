@@ -44,8 +44,9 @@ under `## [Unreleased]`, in one of these sections:
 
 Write it for someone who uses NADOR, not for its developers: what they can do now, or must change, in
 one sentence, naming the profile key, option or function. Changes to tests, CI or internal code that
-users do not see need no line; say so in the pull request. At release, `[Unreleased]` becomes the
-version and its date.
+users do not see need no line: label the pull request `no-changelog` instead. CI checks one or the
+other on every pull request into `develop`. At release, `[Unreleased]` becomes the version and its
+date.
 
 ## Tests
 

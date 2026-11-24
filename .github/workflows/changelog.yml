@@ -1,0 +1,34 @@
+name: Changelog
+
+# Every pull request into develop adds a line to CHANGELOG.md (see CONTRIBUTING.md). A pull request users do not
+# see (tests, CI, internal code) carries the no-changelog label instead; adding or removing it runs the check again.
+on:
+  pull_request:
+    branches: [develop]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changelog:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+      - name: CHANGELOG.md has a line for this pull request
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if git diff --quiet "$BASE"...HEAD -- CHANGELOG.md; then
+            echo "::error file=CHANGELOG.md::Add a line under [Unreleased] in CHANGELOG.md (see CONTRIBUTING.md)," \
+              "or label the pull request no-changelog if users do not see the change."
+            exit 1
+          fi
+          echo "CHANGELOG.md updated."
