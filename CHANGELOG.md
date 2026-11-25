@@ -8,6 +8,10 @@ Changes up to 1.0.0 are listed in the [GitHub releases](https://github.com/ifran
 
 ## [Unreleased]
 
+### Added
+- `HandoverWatch` with OCUDU: the report checks step 5, the random access response of the target DU (its RAR to
+  the RA-RNTI of the dedicated preamble), and says when the target DU detected the preamble but sent no RAR.
+
 ## [1.1.0] - 2026-11-24
 
 ### Added

@@ -126,10 +126,23 @@ OCUDU_COMPLETED = (
     "[CU-F1] Rx PDU du=2 ue=15: ULRRCMessageTransfer\n"
     "[CU-F1] Tx PDU du=1 ue=8: UEContextReleaseCommand\n"
 )
+OCUDU_PRACH = "[SCHED] Processed slot events pci=2: prach(ra-rnti=0x10b preamble=52 ssb=0 tc-rnti=0x4701)\n"
+OCUDU_RAR = "[SCHED] Slot decisions pci=2 t=1us (1 PDSCH, 0 PUSCHs, 0 PUCCHs): RAR: ra-rnti=0x10b rb=[0..3) tbs=10\n"
 OCUDU_TARGET = (
     "[F1AP] UEContextSetupRequest received\n"
-    '[MAC] ue=0 crnti=0x4701 proc="MAC UE Creation": finished successfully\n'
-    "[SCHED] Processed slot events pci=2: prach(ra-rnti=0x10b preamble=52 ssb=0 tc-rnti=0x4701)\n"
+    '[MAC] ue=0 crnti=0x4701 proc="MAC UE Creation": finished successfully\n' + OCUDU_PRACH + OCUDU_RAR
+)
+# R2Lab, OCUDU 920f88c7, 24 November 2026: du02 (PCI 2) answers the dedicated preamble of the UE coming from du01
+R2LAB_TARGET = (
+    "2026-11-24T09:26:14.823553 [MAC     ] [I] [  626.12] ue=0 crnti=0x4601 "
+    'proc="MAC UE Creation": finished successfully\n'
+    "2026-11-24T09:26:14.930537 [SCHED   ] [I] [   637.6] Processed slot events pci=2: "
+    "prach(ra-rnti=0x10b preamble=63 ssb=0 tc-rnti=0x4601)\n"
+    "2026-11-24T09:26:14.931027 [SCHED   ] [I] [   637.7] Slot decisions pci=2 t=1us "
+    "(1 PDSCH, 0 PUSCHs, 0 PUCCHs): RAR: ra-rnti=0x10b rb=[0..3) tbs=10\n"
+    "2026-11-24T09:26:14.934524 [SCHED   ] [I] [  637.14] Slot decisions pci=2 t=1us "
+    "(0 PDSCHs, 1 PUSCH, 0 PUCCHs): UL: ue=invalid rnti=0x4601 h_id=0 ss_id=1 rb=[8..11) newtx=true rv=0 tbs=11 "
+    "msg3_delay=7\n"
 )
 
 
@@ -147,18 +160,41 @@ def test_an_ocudu_handover_seen_at_every_step():
         "preparation": True,
         "command": True,
         "preamble": True,
-        "response": None,
+        "response": True,
         "completion": True,
         "release": True,
     }
     assert (report.rntis, report.preamble) == ({"source": "0x4601", "target": "0x4701"}, 52)
     assert report.step("preparation").detail == "target UE ue=15, new C-RNTI 0x4701"
+    assert report.step("response").evidence == OCUDU_RAR.strip()
+
+
+def test_the_random_access_response_of_an_r2lab_handover_is_found():
+    report = ocudu.analyze_ocudu_handover(
+        0x4605,
+        "du01",
+        "du02",
+        OCUDU_ATTACH + OCUDU_PREPARED.replace("0x4701", "0x4601") + OCUDU_COMPLETED,
+        {"du01": "", "du02": R2LAB_TARGET},
+        target_pci=2,
+    )
+    assert (report.step("preamble").ok, report.step("response").ok) == (True, True)
+    assert report.step("response").detail == "RAR to RA-RNTI 0x10b, after the dedicated preamble"
+    assert "RAR: ra-rnti=0x10b" in report.step("response").evidence
 
 
 def test_an_ocudu_target_log_that_does_not_cover_the_handover():
     report = ocudu_report(OCUDU_PREPARED + OCUDU_COMPLETED, "")
     assert report.success
     assert report.step("preamble").ok is None
+    assert report.step("response").ok is None
+
+
+def test_a_response_is_only_counted_on_the_target_cell_and_after_the_preamble():
+    other_cell = OCUDU_RAR.replace("pci=2", "pci=1")
+    before = OCUDU_TARGET.replace(OCUDU_PRACH + OCUDU_RAR, OCUDU_RAR + OCUDU_PRACH)
+    for target in (OCUDU_TARGET.replace(OCUDU_RAR, other_cell), before):
+        assert ocudu_report(OCUDU_PREPARED + OCUDU_COMPLETED, target).step("response").ok is None
 
 
 @pytest.mark.parametrize(
@@ -167,7 +203,8 @@ def test_an_ocudu_target_log_that_does_not_cover_the_handover():
         (OCUDU_PREPARED.replace("UEContextSetupResponse", "UEContextSetupFailure"), "", "du2 did not accept the UE"),
         (OCUDU_PREPARED.split("[CU-F1] Tx PDU du=1", maxsplit=1)[0], "", "The CU-CP did not send the handover command"),
         (OCUDU_PREPARED, "", "No random access on du2 after the handover command"),
-        (OCUDU_PREPARED, OCUDU_TARGET + OCUDU_TARGET.splitlines()[-1], "The UE did not decode the random access"),
+        (OCUDU_PREPARED, OCUDU_TARGET.replace(OCUDU_RAR, ""), "du2 detected the dedicated preamble but sent no"),
+        (OCUDU_PREPARED, OCUDU_TARGET + OCUDU_PRACH, "The UE did not decode the random access"),
         (OCUDU_PREPARED, OCUDU_TARGET, "The UE was prepared and commanded"),
     ],
 )
