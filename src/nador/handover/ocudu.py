@@ -71,7 +71,8 @@ preamble    target DU ``Processed slot events pci=<target PCI>: prach(ra-rnti=<r
                       tc-rnti=<new rnti>)``: with contention-free random access (``prach: cfra_enabled: true``), the
                       dedicated preamble comes with the new C-RNTI. With contention-based access, the UE gets a
                       temporary RNTI and gives its C-RNTI in Msg3, which the DU logs only at the ``debug`` level
-response    (none)    not logged at the ``info`` level
+response    target DU ``Slot decisions pci=<target PCI> ...: RAR: ra-rnti=<r> ...`` after the dedicated preamble, with
+                      its RA-RNTI. A RAR and then the preamble again: the UE did not decode the RAR
 completion  CU-CP     ``ue=<target ue> c-rnti=<new rnti>: DCCH UL rrcReconfigurationComplete``, or
                       ``Rx PDU du=<target> ue=<target ue> ...: ULRRCMessageTransfer``
 release     CU-CP     ``Tx PDU du=<source> ue=<ue> ...: UEContextReleaseCommand``
@@ -85,9 +86,9 @@ reconfiguration not sent), ``UEContextReleaseCommand`` to the target DU for the 
 out), ``CCCH UL rrcReestablishmentRequest`` (re-establishment) or ``CCCH UL rrcSetupRequest`` (new attachment).
 
 Validation: the lines of a successful handover and of the UE attachments were checked against R2Lab logs (OCUDU
-image 920f88c7, 20 and 23 November 2026), the remote command against the OCUDU source (``main``, November 2026). The
-failure lines come from the srsRAN Project source (``main``, February 2026), from which OCUDU derives: adapt their
-patterns if a failure is not recognised.
+image 920f88c7, 20, 23 and 24 November 2026, the RAR on the 24th), the remote command against the OCUDU source
+(``main``, November 2026). The failure lines come from the srsRAN Project source (``main``, February 2026), from which
+OCUDU derives: adapt their patterns if a failure is not recognised.
 """
 
 import re
@@ -229,7 +230,7 @@ def _target_du(lines: list[str], target_pci: int | None) -> dict:
     The UE of a handover is created by the F1AP UE context setup, without a "UE Create" procedure line: its first
     line is ``ue=<i> crnti=<rnti> proc="MAC UE Creation": finished successfully`` (OCUDU 920f88c7).
     """
-    found: dict = {"prach": []}
+    found: dict = {"prach": [], "rar": []}
     lines = after_last(lines, "UEContextSetupRequest") or lines
     for line in lines:
         if m := re.search(
@@ -240,10 +241,18 @@ def _target_du(lines: list[str], target_pci: int | None) -> dict:
             found.setdefault("rnti", m.group(1))
             found.setdefault("created", line)
     pci = rf"pci={target_pci}\b" if target_pci is not None else r"pci=\d+"
-    for line in lines:
+    # PRACH: (line index, line, preamble, TC-RNTI, RA-RNTI); RAR: (line index, line, RA-RNTI), in log order
+    for index, line in enumerate(lines):
         if re.search(rf"Processed slot events {pci}", line):
             found["prach"] += [
-                (line, int(p), r) for p, r in re.findall(r"preamble=(\d+)(?: ssb=\d+)? tc-rnti=(0x[0-9a-f]+)", line)
+                (index, line, int(p), tc, ra)
+                for ra, p, tc in re.findall(
+                    r"(?:ra-rnti=(0x[0-9a-f]+) )?preamble=(\d+)(?: ssb=\d+)? tc-rnti=(0x[0-9a-f]+)", line
+                )
+            ]
+        elif re.search(rf"Slot decisions {pci}\b.*\bRAR: ", line):
+            found["rar"] += [
+                (index, line, ra) for ra in re.findall(r"ra-rnti=(0x[0-9a-f]+)", line.split("RAR: ", 1)[1])
             ]
     return found
 
@@ -258,7 +267,7 @@ def _preamble_step(prach: list, cfra: list, target: str, completed: bool) -> Ste
             None,
             f"{len(prach)} PRACH on the target cell, none with the new C-RNTI: contention-based access, the UE "
             "gives its C-RNTI in Msg3 (logged at the debug level only)",
-            prach[0][0],
+            prach[0][1],
         )
     if completed:
         # the UE did its random access on the target cell: the target DU log does not cover the handover (rotated
@@ -290,7 +299,11 @@ def analyze_ocudu_handover(
     # C-RNTI in the target cell: CU-CP log (UE created after the UE context setup), else first UE created on the DU
     new = cucp.get("target_rnti") or du.get("rnti")
     report.rntis = {"source": rnti} | ({"target": new} if new else {})
-    cfra = [(line, preamble) for line, preamble, tc_rnti in du["prach"] if new is not None and tc_rnti == new]
+    cfra = [
+        (line, preamble, index, ra_rnti)
+        for index, line, preamble, tc_rnti, ra_rnti in du["prach"]
+        if new is not None and tc_rnti == new
+    ]
     if cfra:
         report.preamble = cfra[0][1]
     report.success = "complete" in cucp or "ul_rrc" in cucp
@@ -310,17 +323,31 @@ def _steps(cucp: dict, du: dict, cfra: list, new: str | None, target: str, *, co
         f"DU index {cucp['source_du']} -> {cucp['target_du']}, UE ue={cucp['ue']} on the CU-CP" if decided else ""
     )
     preparation = f"target UE ue={cucp.get('target_ue')}" + (f", new C-RNTI {new}" if new else "")
-    again = len(cfra) - 1
-    response = "not logged at the info level" + (f"; the preamble came again {again} time(s)" if again > 0 else "")
     return [
         Step("decision", decided, decision, cucp.get("decision", "")),
         Step("preparation", setup_ok, preparation if setup_ok else "", du.get("created", cucp.get("setup_answer", ""))),
         Step("command", "command" in cucp, "UE context modification of the source DU", cucp.get("command", "")),
         _preamble_step(du["prach"], cfra, target, completed),
-        Step("response", None, response),
+        _response_step(du["rar"], cfra, completed),
         Step("completion", completed, "", cucp.get("complete", cucp.get("ul_rrc", ""))),
         Step("release", "release" in cucp, "", cucp.get("release", "")),
     ]
+
+
+def _response_step(rar: list, cfra: list, completed: bool) -> Step:
+    """Random access response: a RAR of the target cell to the RA-RNTI of the dedicated preamble, after it."""
+    again = len(cfra) - 1
+    repeated = f"; the preamble came again {again} time(s)" if again > 0 else ""
+    if not cfra or cfra[0][3] is None:
+        return Step("response", None, "no dedicated preamble to match a RAR with" + repeated)
+    _, _, index, ra_rnti = cfra[0]
+    answers = [line for position, line, ra in rar if position > index and ra == ra_rnti]
+    if answers:
+        return Step("response", True, f"RAR to RA-RNTI {ra_rnti}, after the dedicated preamble" + repeated, answers[0])
+    if completed:
+        # the UE completed: the target DU log stops before the RAR, or logs the scheduler at another level
+        return Step("response", None, f"no RAR to RA-RNTI {ra_rnti} in the log of the target DU" + repeated)
+    return Step("response", False, f"no RAR to RA-RNTI {ra_rnti} after the dedicated preamble" + repeated)
 
 
 def _diagnosis(report: HandoverReport, cucp: dict, target: str, *, again: int) -> str:  # noqa: PLR0911 - one per step
@@ -341,6 +368,11 @@ def _diagnosis(report: HandoverReport, cucp: dict, target: str, *, again: int) -
         return (
             f"No random access on {target} after the handover command: the UE did not receive or execute it, or its "
             "preamble did not reach the target RU."
+        )
+    if report.step("response").ok is False:
+        return (
+            f"{target} detected the dedicated preamble but sent no random access response (RAR) to it: check the "
+            "scheduler of the target DU (PDCCH or PDSCH resources for the RAR)."
         )
     if again > 0:
         return (
