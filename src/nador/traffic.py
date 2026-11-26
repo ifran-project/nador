@@ -22,7 +22,9 @@ from pathlib import Path
 from typing import Any, Literal
 
 from ifran.deployment import ProvisioningManagement
-from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_command, run_ansible_playbook
+from ifran.utils.ansible import run_ansible_command, run_ansible_playbook
+
+from nador.ssh import inventory_line, node_ssh
 
 # Finds an installed iperf3 without a shell; prints nothing when it is missing.
 FIND = ["find", "/usr", "-name", "iperf3", "-type", "f"]
@@ -42,7 +44,7 @@ class Iperf:
         self.interface = interface
         self.ue_ips = ue_ips
         self.server_ip = server_ip
-        self._inventory = get_ansible_inventory_line(server, model.nodes[server])
+        self._inventory = inventory_line(model, server)
         self._runner = str(Path(model.params.ansible.runner_path) / "iperf-server")
 
     @classmethod
@@ -51,8 +53,8 @@ class Iperf:
         model = manager.deployment_model
         if server not in model.nodes:
             raise ValueError(f"Unknown server node {server!r}; nodes: {sorted(model.nodes)}")
-        node = model.nodes[server]
-        iperf = cls(manager, server=server, interface=interface, ue_ips={}, server_ip=node.ssh_info.hostname or server)
+        server_ip = node_ssh(model, server).hostname or server
+        iperf = cls(manager, server=server, interface=interface, ue_ips={}, server_ip=server_ip)
         await run_ansible_playbook(
             playbook=[
                 {

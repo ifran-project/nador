@@ -42,8 +42,10 @@ def test_a_layer_turned_off_by_the_user_stays_off():
 def test_nothing_changes_without_ran_kpis_or_for_oai():
     for net, config in ((network(ran="ocudu"), profile()), (network(ran="oai"), KPIS)):
         managed = ran(net)
+        gnb = managed.deployment_model.ran.components["gnb"]
+        before = gnb.advanced_config.model_dump()
         configure_ran_kpis(managed, validate_deployment(config))
-        assert managed.deployment_model.ran.components["gnb"].advanced_config is None
+        assert gnb.advanced_config.model_dump() == before
 
 
 def test_a_deployed_ran_must_be_configured_before_it_was_deployed():

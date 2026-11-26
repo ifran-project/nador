@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from nador.deployment import MonitoringManagement
-from nador.ssh import close_forward, open_forward, ssh_command
+from nador.ssh import close_forward, node_ssh, open_forward, ssh_command
 
 
 @asynccontextmanager
@@ -15,7 +15,7 @@ async def _connection(monitoring: MonitoringManagement, node_port: int, service:
     name = model.params.k8s.master_node
     if not name or name not in model.nodes:
         raise ValueError("The deployment model has no Kubernetes control node to tunnel through")
-    ssh = model.nodes[name].ssh_info
+    ssh = node_ssh(model, name)
     with socket.socket() as reservation:
         reservation.bind(("127.0.0.1", 0))
         port = reservation.getsockname()[1]

@@ -4,6 +4,7 @@ import json
 from types import SimpleNamespace
 
 import pytest
+from ifran.models.provisioning import SSHInfo
 
 from nador import traffic
 
@@ -25,9 +26,9 @@ class Containers:
         self.installed = set(outputs) if installed else set()
         self.iperf_error = iperf_error
         self.files = {}
-        node = SimpleNamespace(name="node4", ssh_info=SimpleNamespace(hostname="10.0.0.4"))
+        node = SimpleNamespace(name="node4", ssh_info=SSHInfo(hostname="10.0.0.4"))
         self.deployment_model = SimpleNamespace(
-            nodes={"node4": node}, params=SimpleNamespace(ansible=SimpleNamespace(runner_path="runner"))
+            nodes={"node4": node}, params=SimpleNamespace(ansible=SimpleNamespace(runner_path="runner"), ssh=SSHInfo())
         )
 
     async def run_command(self, command, **kwargs):
@@ -76,7 +77,7 @@ def playbooks(monkeypatch):
 
     monkeypatch.setattr(traffic, "run_ansible_playbook", playbook)
     monkeypatch.setattr(traffic, "run_ansible_command", command)
-    monkeypatch.setattr(traffic, "get_ansible_inventory_line", lambda name, node: f"{name} inventory")
+    monkeypatch.setattr(traffic, "inventory_line", lambda model, name: f"{name} inventory")
     monkeypatch.setattr(traffic, "ProvisioningManagement", Machines)
     return calls
 

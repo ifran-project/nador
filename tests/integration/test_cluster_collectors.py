@@ -14,6 +14,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from ifran.models.provisioning import SSHInfo
 
 from nador.artifacts import ExperimentRun
 
@@ -39,25 +40,21 @@ def local_monitoring(runner_path: Path) -> SimpleNamespace:
     """The parts of a MonitoringManagement that ObservabilityRun reads, pointing at localhost."""
     node = SimpleNamespace(
         name="local",
-        ssh_info=SimpleNamespace(
+        ssh_info=SSHInfo(
             hostname="127.0.0.1",
-            port=22,
             user="root",
-            private_key_file=None,
-            password=None,
-            sudo_password=None,
-            common_args=None,
+            extra_ansible_vars={
+                "ansible_connection": "local",
+                "ansible_become": "false",
+                "ansible_python_interpreter": sys.executable,
+            },
         ),
-        provisioning_params={
-            "ansible_connection": "local",
-            "ansible_become": "false",
-            "ansible_python_interpreter": sys.executable,
-        },
     )
     model = SimpleNamespace(
         nodes={"local": node},
         params=SimpleNamespace(
             k8s=SimpleNamespace(master_node="local"),
+            ssh=SSHInfo(),
             ansible=SimpleNamespace(runner_path=str(runner_path), roles_paths=[]),
         ),
         # No Prometheus or Loki here: the run records that collection as incomplete.

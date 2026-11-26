@@ -8,7 +8,7 @@ from ifran.deployment.base import BaseManagement
 from ifran.deployment.helm import HelmManagement
 from ifran.models.deployment import DeploymentModel
 from ifran.models.provisioning import ProvisionableNode
-from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_role
+from ifran.utils.ansible import run_ansible_role
 from metamodel_3gpp.models.metamodel import MetaModel
 from pydantic import ValidationError
 
@@ -26,6 +26,7 @@ from nador.config import (
 )
 from nador.planner import ASSETS, ocudu_dus, resolve_components, resolve_targets, ue_names
 from nador.probes import HOST_PROBES, kind_of
+from nador.ssh import inventory_line
 
 
 @dataclass(frozen=True)
@@ -140,11 +141,11 @@ class MonitoringManagement(HelmManagement):
     ) -> None:
         """Run a monitoring stack task on the Kubernetes control node."""
         monitoring = self.deployment_model.monitoring
-        node_name, control_node = self._get_deployment_node(None)
+        node_name, _ = self._get_deployment_node(None)
         await run_ansible_role(
             role="monitoring/stack",
             hosts=node_name,
-            inventory=get_ansible_inventory_line(node_name, control_node),
+            inventory=inventory_line(self.deployment_model, node_name),
             become=True,
             inputs={
                 "monitoring_action": action,
@@ -367,7 +368,7 @@ async def _run_component_action(
     monitoring = model.monitoring
     component.namespace = monitoring.namespace
     ansible = model.params.ansible
-    node_name, node_data = node
+    node_name, _ = node
     if action in ("get_logs", "run_cmd") and not component.pod_selector:
         raise ValueError(f"Monitoring component {component_name!r} has no workload")
     if action == "run_cmd" and not command:
@@ -380,7 +381,7 @@ async def _run_component_action(
     result = await run_ansible_role(
         role="monitoring/component",
         hosts=node_name,
-        inventory=get_ansible_inventory_line(node_name, node_data),
+        inventory=inventory_line(model, node_name),
         become=True,
         inputs={
             "helm_action": action,

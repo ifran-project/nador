@@ -10,10 +10,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from ifran.deployment.base import BaseManagement
-from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_role
+from ifran.utils.ansible import run_ansible_role
 
 from nador.artifacts.collectors import Collector
-from nador.ssh import ssh_command
+from nador.ssh import inventory_line, node_ssh, ssh_command
 
 if TYPE_CHECKING:
     from nador.artifacts.experiment_run import ExperimentRun
@@ -61,7 +61,8 @@ class CsiCollector(Collector):
         self.component = component
         self.label = f"csi {component}"
         self.node_name = deployed.node_name
-        self.node = model.nodes[deployed.node_name].model_copy(deep=True)
+        self.ssh = node_ssh(model, deployed.node_name)
+        self.inventory = inventory_line(model, deployed.node_name)
         self.ansible = model.params.ansible.model_copy(deep=True)
         self.src_file = f"{env.get('CSI_OUTPUT_DIR', '/data/csi').rstrip('/')}/{CSI_FILE_NAME}"
         self.provenance = {
@@ -85,7 +86,7 @@ class CsiCollector(Collector):
         for _ in range(samples):
             before = time.time()
             process = await asyncio.create_subprocess_exec(
-                *ssh_command(self.node.ssh_info, self.node_name, "date", "+%s.%N"),
+                *ssh_command(self.ssh, self.node_name, "date", "+%s.%N"),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -174,7 +175,7 @@ class CsiCollector(Collector):
             output_keys=["csi_summary"],
             roles_paths=[str(ROLES), *self.ansible.roles_paths],
             hosts=self.node_name,
-            inventory=get_ansible_inventory_line(self.node_name, self.node),
+            inventory=self.inventory,
             become=True,
             quiet=quiet,
         )

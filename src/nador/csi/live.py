@@ -10,10 +10,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ifran.deployment.base import BaseManagement
-from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_role
+from ifran.utils.ansible import run_ansible_role
 
 from nador.csi.collection import ROLES, CsiCollector
-from nador.ssh import close_forward, open_forward, ssh_command
+from nador.ssh import close_forward, inventory_line, node_ssh, open_forward, ssh_command
 
 if TYPE_CHECKING:
     import asyncio
@@ -77,9 +77,10 @@ class CsiLiveView:
             raise ValueError("The live view must not run on the gNB node")
         self.source = source
         self.live_node = live_node
-        self.live = model.nodes[live_node].model_copy(deep=True)
+        self.live_ssh = node_ssh(model, live_node)
+        self.inventory = "\n".join((inventory_line(model, live_node), source.inventory))
         self.ansible = model.params.ansible.model_copy(deep=True)
-        ran_ssh = source.node.ssh_info
+        ran_ssh = source.ssh
         output_dir, file_name = source.src_file.rsplit("/", 1)
         self.port = port
         self.tunnel: asyncio.subprocess.Process | None = None
@@ -107,10 +108,6 @@ class CsiLiveView:
         }
 
     async def _run(self, action: str, quiet: bool) -> dict:
-        inventory = "\n".join(
-            get_ansible_inventory_line(name, node)
-            for name, node in ((self.live_node, self.live), (self.source.node_name, self.source.node))
-        )
         result = await run_ansible_role(
             role="csi/live",
             runner_path=str(Path(self.ansible.runner_path) / "csi" / "live" / self.source.component),
@@ -118,7 +115,7 @@ class CsiLiveView:
             output_keys=["csi_live_status"] if action == "status" else None,
             roles_paths=[str(ROLES), *self.ansible.roles_paths],
             hosts=self.live_node,
-            inventory=inventory,
+            inventory=self.inventory,
             become=True,
             quiet=quiet,
         )
@@ -141,7 +138,7 @@ class CsiLiveView:
 
     def _tunnel_argv(self, local_port: int) -> list[str]:
         forward = f"127.0.0.1:{local_port}:127.0.0.1:{self.port}"
-        return ssh_command(self.live.ssh_info, self.live_node, forward=forward)
+        return ssh_command(self.live_ssh, self.live_node, forward=forward)
 
     def tunnel_command(self, local_port: int | None = None) -> str:
         """The ssh command of open_tunnel(), to run in a terminal instead."""

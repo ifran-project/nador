@@ -13,9 +13,10 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_role
+from ifran.utils.ansible import run_ansible_role
 
 from nador.planner import ASSETS
+from nador.ssh import inventory_line, node_ssh
 
 from .collectors import Collector, RunOptions
 
@@ -44,11 +45,7 @@ class ClusterHosts:
 
     def reachable(self) -> list[str]:
         """The control node plus every node with an SSH address."""
-        return [
-            name
-            for name, node in self.model.nodes.items()
-            if name == self.control or getattr(getattr(node, "ssh_info", None), "hostname", None)
-        ]
+        return [name for name in self.model.nodes if name == self.control or node_ssh(self.model, name).hostname]
 
     async def run(self, run: ExperimentRun, action: str, inputs: dict, host: str | None = None, outputs=None) -> dict:
         """Run one role action; ``outputs`` names the values to return."""
@@ -56,7 +53,7 @@ class ClusterHosts:
         result = await run_ansible_role(
             role="experiment/context",
             hosts=host,
-            inventory=get_ansible_inventory_line(host, self.model.nodes[host]),
+            inventory=inventory_line(self.model, host),
             become=True,
             inputs={"context_action": action, **inputs},
             output_keys=outputs,

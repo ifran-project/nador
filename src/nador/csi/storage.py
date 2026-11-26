@@ -4,9 +4,10 @@ import asyncio
 from pathlib import Path
 
 from ifran.deployment.base import BaseManagement
-from ifran.utils.ansible import get_ansible_inventory_line, run_ansible_role
+from ifran.utils.ansible import run_ansible_role
 
 from nador.csi.collection import ROLES
+from nador.ssh import inventory_line
 
 DEFAULT_STORAGE_MOUNT = "/mnt/csi-disk"
 
@@ -56,7 +57,7 @@ async def prepare_csi_storage(
             output_keys=["csi_storage"],
             roles_paths=[str(ROLES), *ansible.roles_paths],
             hosts=node_name,
-            inventory=get_ansible_inventory_line(node_name, model.nodes[node_name]),
+            inventory=inventory_line(model, node_name),
             become=True,
             quiet=quiet,
         )
