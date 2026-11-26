@@ -8,6 +8,12 @@ Changes up to 1.0.0 are listed in the [GitHub releases](https://github.com/ifran
 
 ## [Unreleased]
 
+### Fixed
+- OCUDU Grafana dashboard with several DUs or gNBs: a `RAN component` selector filters the RAN panels, each curve is
+  named after its component (`du01 · ue_rnti=...`), totals are given per component, and connected UEs are counted
+  per cell, since two DUs can give a UE the same RNTI. The CPU and memory panels show the DU, CU, CU-CP and CU-UP
+  pods as well as the gNB pod.
+
 ## [1.1.1] - 2026-11-25
 
 ### Fixed
