@@ -551,6 +551,11 @@ class MonitoringDeployment(StrictBaseModel):
     @field_validator("images")
     @classmethod
     def _known_images(cls, images: dict[str, str]) -> dict[str, str]:
+        if "oai_gnb_metrics_parser" in images:
+            raise ValueError(
+                "images.oai_gnb_metrics_parser is deployed with the OAI RAN (its chart), not by the monitoring: "
+                "it comes from nador's assets/images.json"
+            )
         if unknown := images.keys() - DEFAULT_IMAGES.keys():
             raise ValueError(f"Unknown images {sorted(unknown)}; known: {sorted(DEFAULT_IMAGES)}")
         for key in ("ue_mapper", "kpi_calculator_oai"):

@@ -17,6 +17,24 @@ Changes up to 1.0.0 are listed in the [GitHub releases](https://github.com/ifran
   writes the C-RNTI in hex (`rnti="4601"`), as OCUDU logs it and the RNTI mapper reports it, instead of in decimal
   (`17921`); this also changes the `rnti` label of the exported OCUDU KPIs. With an OCUDU CU-CP and several DUs, the
   RNTI mapper names the DU of each UE (needs the rnti-mapper image of nador-images with the DU table).
+- OAI and OCUDU dashboards with several cells on one gNB or DU: a UE is named by its cell (`pci` of the RNTI mapper)
+  when the mapper knows it, else by its RNTI only when no other UE of the component has that RNTI, and never with a
+  guessed name. The OAI panels and the RRC ARFCN and SCS show the cell (`pci`) of each curve, and the UE identity table
+  its PCI. The uplink PRB saturation of a UE uses the PRBs of its cell when the gNB lists its cells. Needs the
+  nador-images oai-gnb-metrics-parser 2026.w46-1 and rnti-mapper images with the cell labels; with older images the
+  panels show what they showed before. What is per pod and per cell, and the one unsupported case (the L1 metrics of
+  an OAI pod with several cells), are in the profile guide.
+
+### Added
+- A warning when an OAI gNB or DU pod serves several cells, whose L1 metrics are then not per cell: the OAI
+  dashboard's "Cells per gNB/DU pod" panel turns red, and `ExperimentRun` raises a `RuntimeWarning` and records it
+  under `warnings` in `experiment_metadata.json`.
+
+### Changed
+- The changelog check skips the image update pull requests that nador-images opens.
+- The OAI metrics parser of NADOR's OAI charts is pinned in `images.json` (`oai_gnb_metrics_parser`) and updated by
+  the nador-images pull requests like the other images; a profile cannot override it (`images:`), as it is deployed
+  with the RAN.
 
 ## [1.1.1] - 2026-11-25
 

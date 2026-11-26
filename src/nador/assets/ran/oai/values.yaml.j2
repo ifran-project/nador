@@ -1,10 +1,14 @@
 {# Keep upstream values, adding only the statistics-parser configuration. #}
 {% include 'ran/oai/oai-' ~ component.type ~ '/values.yaml.j2' %}
 
+{# The OAI metrics parser of nador-images, pinned like the other images in nador's images.json
+   (oai_gnb_metrics_parser, kept up to date by the nador-images update pull requests). IFRAN renders this file with
+   Ansible, on the machine that runs the notebook: it reads images.json next to it. Until the first update pull
+   request adds the key, the image published as 2026.w38. #}
+{% set nador_images = (lookup('ansible.builtin.file', (template_fullpath | dirname) ~ '/../../images.json') | from_json).images %}
 metricsParser:
   enabled: true
-  # Published 2026.w38 image; parser source verified against the supplied branch.
-  image: ghcr.io/ifran-project/oai-gnb-metrics-parser@sha256:5ab00d04b270256eb2f80bf10a5091e6b2750e024adb2ea7579d7f043845d4e0
+  image: {{ nador_images.oai_gnb_metrics_parser | default('ghcr.io/ifran-project/oai-gnb-metrics-parser@sha256:5ab00d04b270256eb2f80bf10a5091e6b2750e024adb2ea7579d7f043845d4e0') }}
 {# CSI logger (oai-csi-logging images): CSI_LOGGING_ENABLED and CSI_OUTPUT_DIR are set by configure_csi. #}
 {% set csi_env = component.extra_env_vars or {} %}
 {% if csi_env.get('CSI_LOGGING_ENABLED') | string == '1' %}

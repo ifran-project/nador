@@ -4,7 +4,7 @@ import json
 from contextlib import asynccontextmanager
 
 import pytest
-from support import manager, matrix, options, profile
+from support import manager, matrix, network, options, profile
 
 from nador.artifacts import ExperimentRun, collectors
 
@@ -127,6 +127,42 @@ def through(url):
         yield url
 
     return connection
+
+
+CELLS = "max by (namespace, service) (oai_gnb_cells)"
+
+
+def cells(count):
+    """Prometheus answering an OAI pod with ``count`` cells, and one sample for every other query."""
+    du = {"namespace": "ran", "service": "metrics-ran-du1"}
+    return lambda q: (
+        matrix((du, [(float(q["start"]), str(count))]))
+        if q["query"] == CELLS
+        else matrix(({}, [(float(q["start"]), "1")]))
+    )
+
+
+async def test_a_run_warns_when_an_oai_pod_served_several_cells(tmp_path, http, queries):
+    http.routes["/api/v1/query_range"] = cells(2)
+    with pytest.warns(RuntimeWarning, match=r"several cells: ran/metrics-ran-du1\. Their L1 metrics"):
+        await experiment(tmp_path / "run", prometheus_url=http.url, queries_file=queries)
+    (warning,) = metadata(tmp_path / "run")["warnings"]
+    assert warning.startswith("prometheus: OAI gNB/DU pods with several cells: ran/metrics-ran-du1.")
+    assert metadata(tmp_path / "run")["status"] == "completed"  # a caveat, not a failed collection
+
+
+async def test_one_cell_per_pod_gives_no_warning(tmp_path, http, queries):
+    http.routes["/api/v1/query_range"] = cells(1)
+    await experiment(tmp_path / "run", prometheus_url=http.url, queries_file=queries)  # filterwarnings=error
+    assert "warnings" not in metadata(tmp_path / "run")
+
+
+async def test_the_cell_check_needs_a_ran_that_may_run_the_oai_parser(tmp_path, http, queries, monkeypatch):
+    http.routes["/api/v1/query_range"] = cells(2)
+    monkeypatch.setattr(collectors, "prometheus_connection", through(http.url))
+    ocudu = manager(profile(metrics={"ran_kpis": options("ran_kpis")}), network(ran="ocudu"))
+    await experiment(tmp_path / "run", monitoring=ocudu, queries_file=queries, **NO_HOSTS)
+    assert CELLS not in [query["query"] for _, query in http.requests]
 
 
 async def test_the_monitoring_manager_opens_prometheus_and_adds_host_probe_series(tmp_path, http, queries, monkeypatch):

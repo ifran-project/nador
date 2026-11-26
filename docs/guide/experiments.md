@@ -21,7 +21,7 @@ notebook cell marks it `cancelled` and still stops every collector.
 
 | Path | Content |
 | --- | --- |
-| `experiment_metadata.json` | name, run id, time zone, status (`completed`, `failed`, `cancelled`), errors |
+| `experiment_metadata.json` | name, run id, time zone, status (`completed`, `failed`, `cancelled`), errors, warnings |
 | `timeline_events.jsonl`, `timeline_summary.*`, `timeline_recap.txt` | each section's start, end and status |
 | `prometheus_timeseries.csv`, `prometheus_export_summary.json` | every query of the queries file, at `step` resolution |
 | `by_window/` | the same samples split per section |
@@ -33,6 +33,10 @@ notebook cell marks it `cancelled` and still stops every collector.
 
 If a collector fails, the run records it under `collection_errors`, finishes the others, and raises
 at the end so a failure is never silent.
+
+A caveat about data that was collected, such as an OAI gNB or DU pod that served several cells (its L1 metrics are
+not per cell, see [Several gNBs, DUs and cells](profile.md#several-gnbs-dus-and-cells)), is recorded under `warnings`
+and raised as a `RuntimeWarning`; it does not fail the run.
 
 ## Options
 

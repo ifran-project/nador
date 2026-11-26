@@ -107,6 +107,42 @@ Notes:
   With an OCUDU CU-CP and several DUs, it names the DU of each UE from the gNB-DU ID in the F1AP lines of the
   CU-CP: the `gnb_du_id` of the DU's `advanced_config` when it has one, else the `gnbDuId` of the meta model
   (see [Logs](logs.md)). The dashboard's RAN component selector then shows each DU's UEs by name.
+  With several cells, see [Several gNBs, DUs and cells](#several-gnbs-dus-and-cells).
+
+### Several gNBs, DUs and cells
+
+Each gNB, CU or DU runs in its own pod, with its own metrics collector: its metrics carry its component (OAI:
+`service`, OCUDU: `ran_component`), and the dashboards' RAN component selector shows one or several of them. This
+covers every IFRAN deployment, where each gNB or DU has one cell (one `physicalCellId` in the meta model).
+
+An RNTI is unique only within a cell, so two UEs of two components, or of two cells of one component, can have the
+same RNTI. The per-UE metrics are therefore kept apart by their component and their cell:
+
+| What | Several gNBs or DUs (several pods) | Several cells in one OAI gNB or DU pod (OAI 2026.w46 and later) |
+| --- | --- | --- |
+| Per-UE MAC metrics (`oai_gnb_mac_*`), OCUDU KPIs | Per pod | Per cell: `pci`, `cell_id` from the UE header |
+| Cell metrics (ARFCN, SCS, SSB ARFCN, PRBs: `oai_gnb_rrc_*`) | Per pod | Per cell: `pci`, `cell_id` |
+| UE names (RNTI mapper, `ran_ue_info`) | Per pod | By the cell (`pci`) of the UE's measurement report, or of a DU with one cell; else by the RNTI only when no other UE of the component has it, never a guess |
+| PRB saturation (`saturation_percentage`, dashboard) | PRBs of the UE's own gNB or DU | PRBs of the UE's cell (`oai_gnb_rrc_prbs`) in a gNB; a DU pod has no cell list (its RRC is in the CU), so the L1 total of the pod |
+| L1 metrics (`oai_gnb_l1_*`: I0 noise, PRACH I0, blacklisted PRBs, DLSCH, ULSCH) | Per pod | **Not supported** |
+
+```{warning}
+**One OAI gNB or DU pod serving several cells: its L1 metrics are not per cell.** The problem arises only when all
+three hold: an OAI gNB or DU (not OCUDU), configured with two or more cells in one pod (OAI 2026.w46 and later; IFRAN
+deploys one cell per gNB or DU), and you read its L1 metrics (`oai_gnb_l1_*`: PRB I0 noise, PRACH I0, blacklisted
+PRBs, DLSCH, ULSCH) or the PRB saturation of a DU pod.
+
+Each cell has its own L1 instance in that pod, and every instance rewrites the same file, `nrL1_stats.log`, every
+second, without naming its cell. The values are those of whichever cell wrote last, so one curve jumps between the
+cells, and two UEs with one RNTI on two cells share one series. Do not use these values for such a pod.
+
+NADOR warns when it happens: the OAI metrics parser exports the number of cells of its pod (`oai_gnb_cells`) and logs
+a warning above one, the OAI dashboard's **Cells per gNB/DU pod** panel turns red, and `ExperimentRun` raises a
+`RuntimeWarning` and records it under `warnings` in `experiment_metadata.json` when such a pod ran during the
+experiment.
+```
+
+OAI versions before 2026.w46 write no cell at all: their metrics are per pod only, as before.
 
 ## Targets
 

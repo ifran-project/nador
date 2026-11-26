@@ -18,7 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from nador.probes import enabled_probes
 
 from .loki_export import OCUDU_PHY_DETAIL, PAGE_LIMIT, collect_logs, count_lines, log_query
-from .prometheus_export import export_ranges, load_queries, split_windows
+from .prometheus_export import export_ranges, load_queries, several_cells, split_windows
 from .ssh_tunnel import loki_connection, prometheus_connection
 
 if TYPE_CHECKING:
@@ -118,6 +118,29 @@ class PrometheusExport(Collector):
                 queries.append(dict(HOST_PROBE_QUERY))
         return queries
 
+    @staticmethod
+    def _may_run_the_oai_parser(run: "ExperimentRun") -> bool:
+        """Whether the run's RAN may have the OAI metrics parser (unknown without a monitoring manager)."""
+        if run.monitoring is None:
+            return True
+        model = run.monitoring.deployment_model
+        metrics = model.monitoring.metrics
+        return str(model.ran.implementation) == "oai" and bool(metrics.ran_kpis or metrics.csi is not None)
+
+    async def _warn_about_several_cells(self, run: "ExperimentRun", url: str, start: float, end: float) -> None:
+        """Warn when an OAI pod served several cells: its L1 metrics are not per cell."""
+        try:
+            pods = await asyncio.to_thread(several_cells, url, start, end, self.step)
+        except (OSError, ValueError):
+            return  # the check must not fail the export; the dashboard shows the cell count too
+        if pods:
+            run.warn(
+                self.label,
+                f"OAI gNB/DU pods with several cells: {', '.join(pods)}. Their L1 metrics (oai_gnb_l1_*: I0 noise, "
+                "PRACH I0, blacklisted PRBs, DLSCH, ULSCH) and a DU pod's PRB saturation cannot be attributed to a "
+                "cell; do not use them for these pods (see 'Several gNBs, DUs and cells' in the profile guide).",
+            )
+
     async def collect(self, run: "ExperimentRun", start: float, end: float) -> None:
         """Export metrics for the run and split them into campaign and section windows."""
         async with AsyncExitStack() as stack:
@@ -133,6 +156,8 @@ class PrometheusExport(Collector):
                 step=self.step,
                 queries=self._queries(run),
             )
+            if self._may_run_the_oai_parser(run):
+                await self._warn_about_several_cells(run, url, start, end)
         for query in summary["queries"]:
             if query.get("error"):
                 run.error(query["name"], query["error"])

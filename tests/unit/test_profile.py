@@ -4,7 +4,7 @@ import re
 
 import pytest
 import yaml
-from support import TARGETS, options, profile
+from support import TARGETS, monitoring, options, profile
 
 from nador.config import DEFAULT_IMAGES, MonitoringDeployment, validate_deployment
 
@@ -219,3 +219,8 @@ def test_yes_and_no_are_not_booleans(tmp_path):
     text = yaml.safe_dump(profile(), sort_keys=False).replace("logs: false", "logs: no")
     with pytest.raises(ValueError, match="metrics.ran.logs: Input should be"):
         MonitoringDeployment.from_yaml_file(write(tmp_path, None, text))
+
+
+def test_the_oai_parser_image_is_not_a_monitoring_override():
+    with pytest.raises(ValueError, match="deployed with the OAI RAN"):
+        monitoring(images={"oai_gnb_metrics_parser": "ghcr.io/x/parser:v1"})
