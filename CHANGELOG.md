@@ -36,6 +36,8 @@ Changes up to 1.0.0 are listed in the [GitHub releases](https://github.com/ifran
 - NADOR reaches a node the way IFRAN does: with the deployment SSH defaults (`params.ssh`) under the node's own
   `ssh_info`. This applies to its Ansible runs, its Prometheus and Loki tunnels, CSI collection and the CSI live view,
   and `Iperf`. The SSH connection timeout is the `timeout` of these settings (30 s by default) instead of a fixed 10 s.
+- `Iperf` runs its server-side commands through IFRAN's `ProvisioningManagement`, like the rest of NADOR, and
+  installs iperf3 on the server node only when it is missing.
 - Examples: the Grafana tunnel cell builds its command with `nador.ssh`, and the R2Lab examples call
   `ue.configure()` before `ue.connect()`, which IFRAN 0.0.7 requires for COTS UEs.
 - The changelog check skips the image update pull requests that nador-images opens.

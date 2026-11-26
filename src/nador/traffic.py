@@ -8,6 +8,7 @@ report = await iperf.client("sim_ue", "downlink", 20, 5201)
 
 ``clients`` are UE containers when the manager is an IFRAN ``UEManagement``, or UE machines
 reached over SSH when it is a ``ProvisioningManagement`` (physical UEs, such as USB modems).
+The server node is reached through IFRAN's ``ProvisioningManagement``, like any node.
 
 Commands sent to UEs are plain argument lists with no spaces inside an argument and no shell:
 IFRAN runs container commands through ``kubectl exec`` as one space-joined string, so
@@ -18,13 +19,11 @@ import ipaddress
 import json
 from contextlib import suppress
 from itertools import cycle
-from pathlib import Path
 from typing import Any, Literal
 
 from ifran.deployment import ProvisioningManagement
-from ifran.utils.ansible import run_ansible_command, run_ansible_playbook
 
-from nador.ssh import inventory_line, node_ssh
+from nador.ssh import node_ssh
 
 # Finds an installed iperf3 without a shell; prints nothing when it is missing.
 FIND = ["find", "/usr", "-name", "iperf3", "-type", "f"]
@@ -38,45 +37,33 @@ class Iperf:
     """iperf3 tests between UEs and one server node of the deployment."""
 
     def __init__(self, manager: Any, *, server: str, interface: str, ue_ips: dict[str, str], server_ip: str) -> None:
-        model = manager.deployment_model
         self.manager = manager
+        self.nodes = ProvisioningManagement(preceding=manager)
         self.server = server
         self.interface = interface
         self.ue_ips = ue_ips
         self.server_ip = server_ip
-        self._inventory = inventory_line(model, server)
-        self._runner = str(Path(model.params.ansible.runner_path) / "iperf-server")
 
     @classmethod
     async def setup(cls, manager: Any, *, server: str, interface: str, clients: list[str]) -> "Iperf":
-        """Install iperf3 on the server and on clients that lack it; find each client's address."""
+        """Install iperf3 where it is missing, on the server and the clients; find each client's address."""
         model = manager.deployment_model
         if server not in model.nodes:
             raise ValueError(f"Unknown server node {server!r}; nodes: {sorted(model.nodes)}")
         server_ip = node_ssh(model, server).hostname or server
         iperf = cls(manager, server=server, interface=interface, ue_ips={}, server_ip=server_ip)
-        await run_ansible_playbook(
-            playbook=[
-                {
-                    "name": "Install iperf3 on the server",
-                    "hosts": server,
-                    "gather_facts": False,
-                    "become": True,
-                    "tasks": [
-                        {"ansible.builtin.apt": {"name": "iperf3", "update_cache": True, "cache_valid_time": 3600}}
-                    ],
-                }
-            ],
-            inventory=iperf._inventory,
-            runner_path=iperf._runner,
-            quiet=True,
-        )
+        if not (await iperf._on_server(FIND)).strip():
+            for command in INSTALL:
+                await iperf._on_server(command)
         # Install only where missing, so repeated setups are quick and UEs without internet that have it work.
         missing = [name for name, found in (await iperf._run(FIND, clients)).items() if not found.strip()]
         for command in INSTALL if missing else ():
             await iperf._run(command, missing)
         iperf.ue_ips = await iperf._addresses(clients)
         return iperf
+
+    async def _on_server(self, command: list[str]) -> str:
+        return str(await self.nodes.run_node_command(command=command, nodes=[self.server], become=True, quiet=True))
 
     async def _run(self, command: list[str], clients: list[str]) -> dict[str, str]:
         if isinstance(self.manager, ProvisioningManagement):
@@ -106,12 +93,8 @@ class Iperf:
 
     async def serve(self, port: int) -> None:
         """Start a one-shot iperf3 server on ``port``; it exits after one test or 60 idle seconds."""
-        await run_ansible_command(
-            command=["iperf3", "-s", "-D", "-1", "--idle-timeout", "60", "-B", self.server_ip, "-p", str(port), "-J"],
-            hosts=self.server,
-            inventory=self._inventory,
-            runner_path=self._runner,
-            quiet=True,
+        await self._on_server(
+            ["iperf3", "-s", "-D", "-1", "--idle-timeout", "60", "-B", self.server_ip, "-p", str(port), "-J"]
         )
 
     async def client(
