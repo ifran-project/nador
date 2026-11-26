@@ -25,8 +25,16 @@ Changes up to 1.0.0 are listed in the [GitHub releases](https://github.com/ifran
   panels show what they showed before. What is per pod and per cell, and the one unsupported case (the L1 metrics of
   an OAI pod with several cells), are in the profile guide.
 
+### Added
+- A warning when an OAI gNB or DU pod serves several cells, whose L1 metrics are then not per cell: the OAI
+  dashboard's "Cells per gNB/DU pod" panel turns red, and `ExperimentRun` raises a `RuntimeWarning` and records it
+  under `warnings` in `experiment_metadata.json`.
+
 ### Changed
 - The changelog check skips the image update pull requests that nador-images opens.
+- The OAI metrics parser of NADOR's OAI charts is pinned in `images.json` (`oai_gnb_metrics_parser`) and updated by
+  the nador-images pull requests like the other images; a profile cannot override it (`images:`), as it is deployed
+  with the RAN.
 
 ## [1.1.1] - 2026-11-25
 

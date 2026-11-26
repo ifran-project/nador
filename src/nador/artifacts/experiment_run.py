@@ -11,6 +11,7 @@ is deployed) and setup snapshots. A collector failure is recorded in
 import asyncio
 import json
 import time
+import warnings
 from collections.abc import Coroutine, Iterable, Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -129,6 +130,11 @@ class ExperimentRun:
     def error(self, label: str, error: object) -> None:
         """Record a collection problem; it fails the run only if the workload itself succeeded."""
         self.metadata["collection_errors"].append(f"{label}: {error}")
+
+    def warn(self, label: str, message: str) -> None:
+        """Record a caveat about the collected data (``warnings`` of the metadata) and raise a RuntimeWarning."""
+        self.metadata.setdefault("warnings", []).append(f"{label}: {message}")
+        warnings.warn(f"{label}: {message}", RuntimeWarning, stacklevel=2)
 
     def save_json(self, path: str | Path, data: Any) -> Path:
         """Save JSON under the run directory, creating folders as needed (collectors use it too)."""

@@ -91,6 +91,21 @@ def query_range(
     )
 
 
+def several_cells(prometheus_url: str, start: float, end: float, step: str) -> list[str]:
+    """OAI gNB or DU pods (``namespace/service``) that had more than one cell between start and end.
+
+    Their L1 metrics (``oai_gnb_l1_*``) cannot be attributed to a cell: OAI writes none in nrL1_stats.log, and every
+    L1 instance of the pod rewrites that file. ``oai_gnb_cells`` is exported by the OAI metrics parser.
+    """
+    payload = query_range(prometheus_url, "max by (namespace, service) (oai_gnb_cells)", start, end, step)
+    pods = set()
+    for series in payload.get("data", {}).get("result", []):
+        if any(float(value) > 1 for _, value in series.get("values", [])):
+            labels = series.get("metric", {})
+            pods.add(f"{labels.get('namespace', '')}/{labels.get('service', '')}")
+    return sorted(pods)
+
+
 def write_rows(
     writer: csv.DictWriter,
     query_name: str,

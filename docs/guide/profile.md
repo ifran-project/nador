@@ -126,11 +126,23 @@ same RNTI. The per-UE metrics are therefore kept apart by their component and th
 | PRB saturation (`saturation_percentage`, dashboard) | PRBs of the UE's own gNB or DU | PRBs of the UE's cell (`oai_gnb_rrc_prbs`) in a gNB; a DU pod has no cell list (its RRC is in the CU), so the L1 total of the pod |
 | L1 metrics (`oai_gnb_l1_*`: I0 noise, PRACH I0, blacklisted PRBs, DLSCH, ULSCH) | Per pod | **Not supported** |
 
-The one unsupported case is the L1 metrics of an OAI pod serving several cells: OAI writes no cell in
-`nrL1_stats.log`, and every L1 instance of the pod rewrites that same file every second, so the values are those of
-whichever cell wrote last, and two UEs with one RNTI on two cells share one series. Do not use the L1 metrics, nor the
-PRB saturation of a DU pod, of such a deployment. OAI versions before 2026.w46 write no cell at all: their metrics
-are per pod only, as before.
+```{warning}
+**One OAI gNB or DU pod serving several cells: its L1 metrics are not per cell.** The problem arises only when all
+three hold: an OAI gNB or DU (not OCUDU), configured with two or more cells in one pod (OAI 2026.w46 and later; IFRAN
+deploys one cell per gNB or DU), and you read its L1 metrics (`oai_gnb_l1_*`: PRB I0 noise, PRACH I0, blacklisted
+PRBs, DLSCH, ULSCH) or the PRB saturation of a DU pod.
+
+Each cell has its own L1 instance in that pod, and every instance rewrites the same file, `nrL1_stats.log`, every
+second, without naming its cell. The values are those of whichever cell wrote last, so one curve jumps between the
+cells, and two UEs with one RNTI on two cells share one series. Do not use these values for such a pod.
+
+NADOR warns when it happens: the OAI metrics parser exports the number of cells of its pod (`oai_gnb_cells`) and logs
+a warning above one, the OAI dashboard's **Cells per gNB/DU pod** panel turns red, and `ExperimentRun` raises a
+`RuntimeWarning` and records it under `warnings` in `experiment_metadata.json` when such a pod ran during the
+experiment.
+```
+
+OAI versions before 2026.w46 write no cell at all: their metrics are per pod only, as before.
 
 ## Targets
 
