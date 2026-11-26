@@ -15,6 +15,15 @@ def emit(value):
     print(json.dumps(value), flush=True)
 
 
+def hex_rnti(value):
+    """Write each UE's C-RNTI as OCUDU logs it and the RNTI mapper reports it: 4-digit hex (17921 -> "4601")."""
+    for cell in value.get("cells") or []:
+        for ue in (cell.get("ue_list") if isinstance(cell, dict) else None) or []:
+            if isinstance(ue, dict) and isinstance(ue.get("rnti"), int):
+                ue["rnti"] = f"{ue['rnti']:04x}"
+    return value
+
+
 def forward(message):
     """Ignore control acknowledgements and reject malformed/non-object payloads."""
     value = json.loads(message)
@@ -22,7 +31,7 @@ def forward(message):
         return False
     if not any(key != "timestamp" for key in value):
         return False
-    emit(value)
+    emit(hex_rnti(value))
     return True
 
 

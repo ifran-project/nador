@@ -66,6 +66,22 @@ def test_only_metric_objects_are_forwarded(adapter, capsys, message, forwarded):
     assert printed(capsys) == ([json.loads(message)] if forwarded else [])
 
 
+def test_the_c_rnti_of_each_ue_is_forwarded_in_hex_like_the_rnti_mapper(adapter, capsys):
+    message = {
+        "cells": [
+            {
+                "cell_metrics": {"pci": 1},
+                "ue_list": [{"pci": 1, "rnti": 17921, "cqi": 12}],
+                "event_list": [{"slot": 3, "rnti": 17921, "event_type": "ue_add"}],
+            }
+        ]
+    }
+    assert adapter.forward(json.dumps(message))
+    (cell,) = printed(capsys)[0]["cells"]
+    assert cell["ue_list"] == [{"pci": 1, "rnti": "4601", "cqi": 12}]
+    assert cell["event_list"][0]["rnti"] == 17921  # a field of the event, left as OCUDU sends it
+
+
 def test_the_adapter_subscribes_forwards_and_reports_its_health(adapter, capsys, monkeypatch):
     sent = []
     messages = ['{"cell": 1}', "not json", adapter.websocket.WebSocketTimeoutException(), ""]

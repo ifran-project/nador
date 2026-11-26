@@ -816,11 +816,11 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "ue_dl_brate{ran_component=~\"${ran_component:regex}\"}",
+          "expr": "(ue_dl_brate{ran_component=~\"${ran_component:regex}\"}) * on(ran_component, rnti) group_left(ue_name) topk by (ran_component, rnti) (1, max by (ran_component, rnti, ue_name) (ran_ue_info)) or on(ran_component, rnti) (ue_dl_brate{ran_component=~\"${ran_component:regex}\"})",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "interval": "",
-          "legendFormat": "{{ran_component}} · ue_rnti={{rnti}}",
+          "legendFormat": "{{ran_component}} · ue_rnti={{rnti}} {{ue_name}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -914,10 +914,10 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "ue_ul_brate{ran_component=~\"${ran_component:regex}\"}",
+          "expr": "(ue_ul_brate{ran_component=~\"${ran_component:regex}\"}) * on(ran_component, rnti) group_left(ue_name) topk by (ran_component, rnti) (1, max by (ran_component, rnti, ue_name) (ran_ue_info)) or on(ran_component, rnti) (ue_ul_brate{ran_component=~\"${ran_component:regex}\"})",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
-          "legendFormat": "{{ran_component}} · ue_rnti={{rnti}}",
+          "legendFormat": "{{ran_component}} · ue_rnti={{rnti}} {{ue_name}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -1197,10 +1197,10 @@
         {
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "100 * (ue_dl_nof_nok{ran_component=~\"${ran_component:regex}\"}) / clamp_min((ue_dl_nof_ok{ran_component=~\"${ran_component:regex}\"} + ue_dl_nof_nok{ran_component=~\"${ran_component:regex}\"}), 1)",
+          "expr": "(100 * (ue_dl_nof_nok{ran_component=~\"${ran_component:regex}\"}) / clamp_min((ue_dl_nof_ok{ran_component=~\"${ran_component:regex}\"} + ue_dl_nof_nok{ran_component=~\"${ran_component:regex}\"}), 1)) * on(ran_component, rnti) group_left(ue_name) topk by (ran_component, rnti) (1, max by (ran_component, rnti, ue_name) (ran_ue_info)) or on(ran_component, rnti) (100 * (ue_dl_nof_nok{ran_component=~\"${ran_component:regex}\"}) / clamp_min((ue_dl_nof_ok{ran_component=~\"${ran_component:regex}\"} + ue_dl_nof_nok{ran_component=~\"${ran_component:regex}\"}), 1))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
-          "legendFormat": "{{ran_component}} · ue_rnti={{rnti}}",
+          "legendFormat": "{{ran_component}} · ue_rnti={{rnti}} {{ue_name}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -1294,10 +1294,10 @@
         {
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "100 * (ue_ul_nof_nok{ran_component=~\"${ran_component:regex}\"}) / clamp_min((ue_ul_nof_ok{ran_component=~\"${ran_component:regex}\"} + ue_ul_nof_nok{ran_component=~\"${ran_component:regex}\"}), 1)",
+          "expr": "(100 * (ue_ul_nof_nok{ran_component=~\"${ran_component:regex}\"}) / clamp_min((ue_ul_nof_ok{ran_component=~\"${ran_component:regex}\"} + ue_ul_nof_nok{ran_component=~\"${ran_component:regex}\"}), 1)) * on(ran_component, rnti) group_left(ue_name) topk by (ran_component, rnti) (1, max by (ran_component, rnti, ue_name) (ran_ue_info)) or on(ran_component, rnti) (100 * (ue_ul_nof_nok{ran_component=~\"${ran_component:regex}\"}) / clamp_min((ue_ul_nof_ok{ran_component=~\"${ran_component:regex}\"} + ue_ul_nof_nok{ran_component=~\"${ran_component:regex}\"}), 1))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
-          "legendFormat": "{{ran_component}} · ue_rnti={{rnti}}",
+          "legendFormat": "{{ran_component}} · ue_rnti={{rnti}} {{ue_name}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -1390,10 +1390,10 @@
         {
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "ue_dl_mcs{ran_component=~\"${ran_component:regex}\"}",
+          "expr": "(ue_dl_mcs{ran_component=~\"${ran_component:regex}\"}) * on(ran_component, rnti) group_left(ue_name) topk by (ran_component, rnti) (1, max by (ran_component, rnti, ue_name) (ran_ue_info)) or on(ran_component, rnti) (ue_dl_mcs{ran_component=~\"${ran_component:regex}\"})",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
-          "legendFormat": "{{ran_component}} · ue_rnti={{rnti}}",
+          "legendFormat": "{{ran_component}} · ue_rnti={{rnti}} {{ue_name}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -1490,11 +1490,11 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "ue_ul_mcs{ran_component=~\"${ran_component:regex}\"}",
+          "expr": "(ue_ul_mcs{ran_component=~\"${ran_component:regex}\"}) * on(ran_component, rnti) group_left(ue_name) topk by (ran_component, rnti) (1, max by (ran_component, rnti, ue_name) (ran_ue_info)) or on(ran_component, rnti) (ue_ul_mcs{ran_component=~\"${ran_component:regex}\"})",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": true,
-          "legendFormat": "{{ran_component}} · ue_rnti={{rnti}}",
+          "legendFormat": "{{ran_component}} · ue_rnti={{rnti}} {{ue_name}}",
           "range": true,
           "refId": "B",
           "useBackend": false
@@ -1586,8 +1586,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "ue_dl_ri{ran_component=~\"${ran_component:regex}\"}",
-          "legendFormat": "{{ran_component}} · ue_rnti={{rnti}}",
+          "expr": "(ue_dl_ri{ran_component=~\"${ran_component:regex}\"}) * on(ran_component, rnti) group_left(ue_name) topk by (ran_component, rnti) (1, max by (ran_component, rnti, ue_name) (ran_ue_info)) or on(ran_component, rnti) (ue_dl_ri{ran_component=~\"${ran_component:regex}\"})",
+          "legendFormat": "{{ran_component}} · ue_rnti={{rnti}} {{ue_name}}",
           "range": true,
           "refId": "A"
         }
@@ -1678,8 +1678,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "ue_ul_ri{ran_component=~\"${ran_component:regex}\"}",
-          "legendFormat": "{{ran_component}} · ue_rnti={{rnti}}",
+          "expr": "(ue_ul_ri{ran_component=~\"${ran_component:regex}\"}) * on(ran_component, rnti) group_left(ue_name) topk by (ran_component, rnti) (1, max by (ran_component, rnti, ue_name) (ran_ue_info)) or on(ran_component, rnti) (ue_ul_ri{ran_component=~\"${ran_component:regex}\"})",
+          "legendFormat": "{{ran_component}} · ue_rnti={{rnti}} {{ue_name}}",
           "range": true,
           "refId": "A"
         }
@@ -1771,8 +1771,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "ue_cqi{ran_component=~\"${ran_component:regex}\"}",
-          "legendFormat": "{{ran_component}} · ue_rnti={{rnti}}",
+          "expr": "(ue_cqi{ran_component=~\"${ran_component:regex}\"}) * on(ran_component, rnti) group_left(ue_name) topk by (ran_component, rnti) (1, max by (ran_component, rnti, ue_name) (ran_ue_info)) or on(ran_component, rnti) (ue_cqi{ran_component=~\"${ran_component:regex}\"})",
+          "legendFormat": "{{ran_component}} · ue_rnti={{rnti}} {{ue_name}}",
           "range": true,
           "refId": "A"
         }
@@ -1937,9 +1937,9 @@
             "uid": "monitoring-prometheus"
           },
           "editorMode": "code",
-          "expr": "ue_pucch_snr_db{ran_component=~\"${ran_component:regex}\"}",
+          "expr": "(ue_pucch_snr_db{ran_component=~\"${ran_component:regex}\"}) * on(ran_component, rnti) group_left(ue_name) topk by (ran_component, rnti) (1, max by (ran_component, rnti, ue_name) (ran_ue_info)) or on(ran_component, rnti) (ue_pucch_snr_db{ran_component=~\"${ran_component:regex}\"})",
           "instant": false,
-          "legendFormat": "{{ran_component}} · ue_rnti={{rnti}}",
+          "legendFormat": "{{ran_component}} · ue_rnti={{rnti}} {{ue_name}}",
           "range": true,
           "refId": "A"
         }
@@ -2035,9 +2035,9 @@
             "uid": "monitoring-prometheus"
           },
           "editorMode": "code",
-          "expr": "ue_dl_bs{ran_component=~\"${ran_component:regex}\"}",
+          "expr": "(ue_dl_bs{ran_component=~\"${ran_component:regex}\"}) * on(ran_component, rnti) group_left(ue_name) topk by (ran_component, rnti) (1, max by (ran_component, rnti, ue_name) (ran_ue_info)) or on(ran_component, rnti) (ue_dl_bs{ran_component=~\"${ran_component:regex}\"})",
           "instant": false,
-          "legendFormat": "{{ran_component}} · ue_rnti={{rnti}}",
+          "legendFormat": "{{ran_component}} · ue_rnti={{rnti}} {{ue_name}}",
           "range": true,
           "refId": "A"
         }
@@ -2133,15 +2133,96 @@
             "uid": "monitoring-prometheus"
           },
           "editorMode": "code",
-          "expr": "ue_pusch_snr_db{ran_component=~\"${ran_component:regex}\"}",
+          "expr": "(ue_pusch_snr_db{ran_component=~\"${ran_component:regex}\"}) * on(ran_component, rnti) group_left(ue_name) topk by (ran_component, rnti) (1, max by (ran_component, rnti, ue_name) (ran_ue_info)) or on(ran_component, rnti) (ue_pusch_snr_db{ran_component=~\"${ran_component:regex}\"})",
           "instant": false,
-          "legendFormat": "{{ran_component}} · ue_rnti={{rnti}}",
+          "legendFormat": "{{ran_component}} · ue_rnti={{rnti}} {{ue_name}}",
           "range": true,
           "refId": "A"
         }
       ],
       "title": "PUSCH SNR per RNTI : $ran_component",
       "type": "timeseries"
+    },
+    {
+      "id": 45,
+      "title": "UE identities (RNTI ↔ IMSI ↔ UE)",
+      "description": "rnti-mapper: UE contexts of the RRC of each gNB / CU (OAI nrRRC_stats.log, OCUDU log) joined with the AMF and the ue-mapper-api inventory, and the UE names of the metamodel. imsi=\"ambiguous\": the same RAN UE NGAP id is used by several RRC nodes or bound to several IMSIs; \"unknown\": not yet known to the core.",
+      "type": "table",
+      "pluginVersion": "11.3.0",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "monitoring-prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 96
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "RAN component",
+            "desc": false
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "monitoring-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "max by (ran_node, ran_component, rnti, ran_ue_id, imsi, ue_name) (ran_ue_info{ran_component=~\"${ran_component:regex}\"})",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": true,
+              "__name__": true
+            },
+            "indexByName": {
+              "ran_component": 0,
+              "rnti": 1,
+              "ue_name": 2,
+              "imsi": 3,
+              "ran_ue_id": 4,
+              "ran_node": 5
+            },
+            "renameByName": {
+              "ran_component": "RAN component",
+              "rnti": "RNTI",
+              "ue_name": "UE",
+              "imsi": "IMSI",
+              "ran_ue_id": "RAN UE NGAP id",
+              "ran_node": "RRC node"
+            }
+          }
+        }
+      ]
     }
   ],
   "preload": false,
