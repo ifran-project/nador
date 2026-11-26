@@ -815,7 +815,7 @@
             "uid": "monitoring-prometheus"
           },
           "editorMode": "code",
-          "expr": "max by (ran_node, ran_component, rnti, ran_ue_id, imsi, ue_name) (ran_ue_info)",
+          "expr": "max by (ran_node, ran_component, rnti, pci, ran_ue_id, imsi, ue_name) (ran_ue_info)",
           "format": "table",
           "instant": true,
           "range": false,
@@ -1068,11 +1068,11 @@
         {
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "label_replace((oai_gnb_mac_dl_goodput_mbps{service=~\"${ran_component:regex}\"} * 1e6 > 0), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, rnti) group_left(ue_name) max by (ran_component, rnti, ue_name) (ran_ue_info) or on(service, rnti) (oai_gnb_mac_dl_goodput_mbps{service=~\"${ran_component:regex}\"} * 1e6 > 0)",
+          "expr": "label_replace((oai_gnb_mac_dl_goodput_mbps{service=~\"${ran_component:regex}\"} * 1e6 > 0), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, pci, rnti) group_left(ue_name) topk by (ran_component, pci, rnti) (1, max by (ran_component, pci, rnti, ue_name) (ran_ue_info{pci!=\"\"})) or on(service, pci, rnti) label_replace((oai_gnb_mac_dl_goodput_mbps{service=~\"${ran_component:regex}\"} * 1e6 > 0), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, rnti) group_left(ue_name) (max by (ran_component, rnti, ue_name) (ran_ue_info{pci=\"\"}) and on(ran_component, rnti) (count by (ran_component, rnti) (ran_ue_info) == 1)) or on(service, pci, rnti) (oai_gnb_mac_dl_goodput_mbps{service=~\"${ran_component:regex}\"} * 1e6 > 0)",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "interval": "",
-          "legendFormat": "{{service}} · ue_rnti={{rnti}} {{ue_name}}",
+          "legendFormat": "{{service}} · ue_rnti={{rnti}} pci={{pci}} {{ue_name}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -1166,10 +1166,10 @@
         {
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "label_replace((oai_gnb_mac_ul_goodput_mbps{service=~\"${ran_component:regex}\"} * 1e6 > 0), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, rnti) group_left(ue_name) max by (ran_component, rnti, ue_name) (ran_ue_info) or on(service, rnti) (oai_gnb_mac_ul_goodput_mbps{service=~\"${ran_component:regex}\"} * 1e6 > 0)",
+          "expr": "label_replace((oai_gnb_mac_ul_goodput_mbps{service=~\"${ran_component:regex}\"} * 1e6 > 0), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, pci, rnti) group_left(ue_name) topk by (ran_component, pci, rnti) (1, max by (ran_component, pci, rnti, ue_name) (ran_ue_info{pci!=\"\"})) or on(service, pci, rnti) label_replace((oai_gnb_mac_ul_goodput_mbps{service=~\"${ran_component:regex}\"} * 1e6 > 0), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, rnti) group_left(ue_name) (max by (ran_component, rnti, ue_name) (ran_ue_info{pci=\"\"}) and on(ran_component, rnti) (count by (ran_component, rnti) (ran_ue_info) == 1)) or on(service, pci, rnti) (oai_gnb_mac_ul_goodput_mbps{service=~\"${ran_component:regex}\"} * 1e6 > 0)",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
-          "legendFormat": "{{service}} · ue_rnti={{rnti}} {{ue_name}}",
+          "legendFormat": "{{service}} · ue_rnti={{rnti}} pci={{pci}} {{ue_name}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -1215,8 +1215,8 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "label_replace((oai_gnb_mac_ph{rnti!=\"\",service=~\"${ran_component:regex}\"}), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, rnti) group_left(ue_name) max by (ran_component, rnti, ue_name) (ran_ue_info) or on(service, rnti) (oai_gnb_mac_ph{rnti!=\"\",service=~\"${ran_component:regex}\"})",
-          "legendFormat": "{{service}} · ue_rnti={{rnti}} {{ue_name}}",
+          "expr": "label_replace((oai_gnb_mac_ph{rnti!=\"\",service=~\"${ran_component:regex}\"}), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, pci, rnti) group_left(ue_name) topk by (ran_component, pci, rnti) (1, max by (ran_component, pci, rnti, ue_name) (ran_ue_info{pci!=\"\"})) or on(service, pci, rnti) label_replace((oai_gnb_mac_ph{rnti!=\"\",service=~\"${ran_component:regex}\"}), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, rnti) group_left(ue_name) (max by (ran_component, rnti, ue_name) (ran_ue_info{pci=\"\"}) and on(ran_component, rnti) (count by (ran_component, rnti) (ran_ue_info) == 1)) or on(service, pci, rnti) (oai_gnb_mac_ph{rnti!=\"\",service=~\"${ran_component:regex}\"})",
+          "legendFormat": "{{service}} · ue_rnti={{rnti}} pci={{pci}} {{ue_name}}",
           "range": true,
           "refId": "A"
         }
@@ -1280,11 +1280,11 @@
           "disableTextWrap": false,
           "editorMode": "code",
           "exemplar": false,
-          "expr": "label_replace((oai_gnb_mac_nprb{service=~\"${ran_component:regex}\"} * on(namespace, service, rnti) group_left oai_gnb_mac_lcid_active{lcid=\"4\",service=~\"${ran_component:regex}\"} / on(namespace, service) group_left oai_gnb_l1_total_prbs{service=~\"${ran_component:regex}\"} * 100 > 0), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, rnti) group_left(ue_name) max by (ran_component, rnti, ue_name) (ran_ue_info) or on(service, rnti) (oai_gnb_mac_nprb{service=~\"${ran_component:regex}\"} * on(namespace, service, rnti) group_left oai_gnb_mac_lcid_active{lcid=\"4\",service=~\"${ran_component:regex}\"} / on(namespace, service) group_left oai_gnb_l1_total_prbs{service=~\"${ran_component:regex}\"} * 100 > 0)",
+          "expr": "label_replace((oai_gnb_mac_nprb{service=~\"${ran_component:regex}\"} * on(namespace, service, pci, rnti) group_left oai_gnb_mac_lcid_active{lcid=\"4\",service=~\"${ran_component:regex}\"} / on(namespace, service) group_left oai_gnb_l1_total_prbs{service=~\"${ran_component:regex}\"} * 100 > 0), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, pci, rnti) group_left(ue_name) topk by (ran_component, pci, rnti) (1, max by (ran_component, pci, rnti, ue_name) (ran_ue_info{pci!=\"\"})) or on(service, pci, rnti) label_replace((oai_gnb_mac_nprb{service=~\"${ran_component:regex}\"} * on(namespace, service, pci, rnti) group_left oai_gnb_mac_lcid_active{lcid=\"4\",service=~\"${ran_component:regex}\"} / on(namespace, service) group_left oai_gnb_l1_total_prbs{service=~\"${ran_component:regex}\"} * 100 > 0), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, rnti) group_left(ue_name) (max by (ran_component, rnti, ue_name) (ran_ue_info{pci=\"\"}) and on(ran_component, rnti) (count by (ran_component, rnti) (ran_ue_info) == 1)) or on(service, pci, rnti) (oai_gnb_mac_nprb{service=~\"${ran_component:regex}\"} * on(namespace, service, pci, rnti) group_left oai_gnb_mac_lcid_active{lcid=\"4\",service=~\"${ran_component:regex}\"} / on(namespace, service) group_left oai_gnb_l1_total_prbs{service=~\"${ran_component:regex}\"} * 100 > 0)",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": true,
-          "legendFormat": "{{service}} · ue_rnti={{rnti}} {{ue_name}}",
+          "legendFormat": "{{service}} · ue_rnti={{rnti}} pci={{pci}} {{ue_name}}",
           "range": false,
           "refId": "A",
           "useBackend": false
@@ -1446,10 +1446,10 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "label_replace((oai_gnb_mac_dl_bler{service=~\"${ran_component:regex}\"}), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, rnti) group_left(ue_name) max by (ran_component, rnti, ue_name) (ran_ue_info) or on(service, rnti) (oai_gnb_mac_dl_bler{service=~\"${ran_component:regex}\"})",
+          "expr": "label_replace((oai_gnb_mac_dl_bler{service=~\"${ran_component:regex}\"}), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, pci, rnti) group_left(ue_name) topk by (ran_component, pci, rnti) (1, max by (ran_component, pci, rnti, ue_name) (ran_ue_info{pci!=\"\"})) or on(service, pci, rnti) label_replace((oai_gnb_mac_dl_bler{service=~\"${ran_component:regex}\"}), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, rnti) group_left(ue_name) (max by (ran_component, rnti, ue_name) (ran_ue_info{pci=\"\"}) and on(ran_component, rnti) (count by (ran_component, rnti) (ran_ue_info) == 1)) or on(service, pci, rnti) (oai_gnb_mac_dl_bler{service=~\"${ran_component:regex}\"})",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
-          "legendFormat": "{{service}} · ue_rnti={{rnti}} {{ue_name}}",
+          "legendFormat": "{{service}} · ue_rnti={{rnti}} pci={{pci}} {{ue_name}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -1547,11 +1547,11 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "label_replace((oai_gnb_mac_ul_bler{service=~\"${ran_component:regex}\"}), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, rnti) group_left(ue_name) max by (ran_component, rnti, ue_name) (ran_ue_info) or on(service, rnti) (oai_gnb_mac_ul_bler{service=~\"${ran_component:regex}\"})",
+          "expr": "label_replace((oai_gnb_mac_ul_bler{service=~\"${ran_component:regex}\"}), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, pci, rnti) group_left(ue_name) topk by (ran_component, pci, rnti) (1, max by (ran_component, pci, rnti, ue_name) (ran_ue_info{pci!=\"\"})) or on(service, pci, rnti) label_replace((oai_gnb_mac_ul_bler{service=~\"${ran_component:regex}\"}), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, rnti) group_left(ue_name) (max by (ran_component, rnti, ue_name) (ran_ue_info{pci=\"\"}) and on(ran_component, rnti) (count by (ran_component, rnti) (ran_ue_info) == 1)) or on(service, pci, rnti) (oai_gnb_mac_ul_bler{service=~\"${ran_component:regex}\"})",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": true,
-          "legendFormat": "{{service}} · ue_rnti={{rnti}} {{ue_name}}",
+          "legendFormat": "{{service}} · ue_rnti={{rnti}} pci={{pci}} {{ue_name}}",
           "range": true,
           "refId": "B",
           "useBackend": false
@@ -1742,10 +1742,10 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "label_replace((oai_gnb_mac_dl_mcs{service=~\"${ran_component:regex}\"}), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, rnti) group_left(ue_name) max by (ran_component, rnti, ue_name) (ran_ue_info) or on(service, rnti) (oai_gnb_mac_dl_mcs{service=~\"${ran_component:regex}\"})",
+          "expr": "label_replace((oai_gnb_mac_dl_mcs{service=~\"${ran_component:regex}\"}), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, pci, rnti) group_left(ue_name) topk by (ran_component, pci, rnti) (1, max by (ran_component, pci, rnti, ue_name) (ran_ue_info{pci!=\"\"})) or on(service, pci, rnti) label_replace((oai_gnb_mac_dl_mcs{service=~\"${ran_component:regex}\"}), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, rnti) group_left(ue_name) (max by (ran_component, rnti, ue_name) (ran_ue_info{pci=\"\"}) and on(ran_component, rnti) (count by (ran_component, rnti) (ran_ue_info) == 1)) or on(service, pci, rnti) (oai_gnb_mac_dl_mcs{service=~\"${ran_component:regex}\"})",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
-          "legendFormat": "{{service}} · ue_rnti={{rnti}} {{ue_name}}",
+          "legendFormat": "{{service}} · ue_rnti={{rnti}} pci={{pci}} {{ue_name}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -1842,11 +1842,11 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "label_replace((oai_gnb_mac_ul_mcs{service=~\"${ran_component:regex}\"}), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, rnti) group_left(ue_name) max by (ran_component, rnti, ue_name) (ran_ue_info) or on(service, rnti) (oai_gnb_mac_ul_mcs{service=~\"${ran_component:regex}\"})",
+          "expr": "label_replace((oai_gnb_mac_ul_mcs{service=~\"${ran_component:regex}\"}), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, pci, rnti) group_left(ue_name) topk by (ran_component, pci, rnti) (1, max by (ran_component, pci, rnti, ue_name) (ran_ue_info{pci!=\"\"})) or on(service, pci, rnti) label_replace((oai_gnb_mac_ul_mcs{service=~\"${ran_component:regex}\"}), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, rnti) group_left(ue_name) (max by (ran_component, rnti, ue_name) (ran_ue_info{pci=\"\"}) and on(ran_component, rnti) (count by (ran_component, rnti) (ran_ue_info) == 1)) or on(service, pci, rnti) (oai_gnb_mac_ul_mcs{service=~\"${ran_component:regex}\"})",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": true,
-          "legendFormat": "{{service}} · ue_rnti={{rnti}} {{ue_name}}",
+          "legendFormat": "{{service}} · ue_rnti={{rnti}} pci={{pci}} {{ue_name}}",
           "range": true,
           "refId": "B",
           "useBackend": false
@@ -1943,9 +1943,9 @@
             "uid": "monitoring-prometheus"
           },
           "editorMode": "code",
-          "expr": "label_replace((oai_gnb_mac_cqi{service=~\"${ran_component:regex}\"}), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, rnti) group_left(ue_name) max by (ran_component, rnti, ue_name) (ran_ue_info) or on(service, rnti) (oai_gnb_mac_cqi{service=~\"${ran_component:regex}\"})",
+          "expr": "label_replace((oai_gnb_mac_cqi{service=~\"${ran_component:regex}\"}), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, pci, rnti) group_left(ue_name) topk by (ran_component, pci, rnti) (1, max by (ran_component, pci, rnti, ue_name) (ran_ue_info{pci!=\"\"})) or on(service, pci, rnti) label_replace((oai_gnb_mac_cqi{service=~\"${ran_component:regex}\"}), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, rnti) group_left(ue_name) (max by (ran_component, rnti, ue_name) (ran_ue_info{pci=\"\"}) and on(ran_component, rnti) (count by (ran_component, rnti) (ran_ue_info) == 1)) or on(service, pci, rnti) (oai_gnb_mac_cqi{service=~\"${ran_component:regex}\"})",
           "instant": false,
-          "legendFormat": "{{service}} · ue_rnti={{rnti}} {{ue_name}}",
+          "legendFormat": "{{service}} · ue_rnti={{rnti}} pci={{pci}} {{ue_name}}",
           "range": true,
           "refId": "A"
         }
@@ -2037,10 +2037,10 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "label_replace((oai_gnb_mac_dlsch_errors{service=~\"${ran_component:regex}\"}), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, rnti) group_left(ue_name) max by (ran_component, rnti, ue_name) (ran_ue_info) or on(service, rnti) (oai_gnb_mac_dlsch_errors{service=~\"${ran_component:regex}\"})",
+          "expr": "label_replace((oai_gnb_mac_dlsch_errors{service=~\"${ran_component:regex}\"}), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, pci, rnti) group_left(ue_name) topk by (ran_component, pci, rnti) (1, max by (ran_component, pci, rnti, ue_name) (ran_ue_info{pci!=\"\"})) or on(service, pci, rnti) label_replace((oai_gnb_mac_dlsch_errors{service=~\"${ran_component:regex}\"}), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, rnti) group_left(ue_name) (max by (ran_component, rnti, ue_name) (ran_ue_info{pci=\"\"}) and on(ran_component, rnti) (count by (ran_component, rnti) (ran_ue_info) == 1)) or on(service, pci, rnti) (oai_gnb_mac_dlsch_errors{service=~\"${ran_component:regex}\"})",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
-          "legendFormat": "{{service}} · ue_rnti={{rnti}} {{ue_name}}",
+          "legendFormat": "{{service}} · ue_rnti={{rnti}} pci={{pci}} {{ue_name}}",
           "range": true,
           "refId": "A",
           "useBackend": false
@@ -2137,12 +2137,12 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "label_replace((oai_gnb_mac_ulsch_errors{service=~\"${ran_component:regex}\"}), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, rnti) group_left(ue_name) max by (ran_component, rnti, ue_name) (ran_ue_info) or on(service, rnti) (oai_gnb_mac_ulsch_errors{service=~\"${ran_component:regex}\"})",
+          "expr": "label_replace((oai_gnb_mac_ulsch_errors{service=~\"${ran_component:regex}\"}), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, pci, rnti) group_left(ue_name) topk by (ran_component, pci, rnti) (1, max by (ran_component, pci, rnti, ue_name) (ran_ue_info{pci!=\"\"})) or on(service, pci, rnti) label_replace((oai_gnb_mac_ulsch_errors{service=~\"${ran_component:regex}\"}), \"ran_component\", \"$1\", \"service\", \"metrics-ran-(.+)\") * on(ran_component, rnti) group_left(ue_name) (max by (ran_component, rnti, ue_name) (ran_ue_info{pci=\"\"}) and on(ran_component, rnti) (count by (ran_component, rnti) (ran_ue_info) == 1)) or on(service, pci, rnti) (oai_gnb_mac_ulsch_errors{service=~\"${ran_component:regex}\"})",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": true,
           "instant": false,
-          "legendFormat": "{{service}} · ue_rnti={{rnti}} {{ue_name}}",
+          "legendFormat": "{{service}} · ue_rnti={{rnti}} pci={{pci}} {{ue_name}}",
           "range": true,
           "refId": "B",
           "useBackend": false
@@ -2189,7 +2189,7 @@
           "expr": "oai_gnb_rrc_ssb_arfcn{service=~\"${ran_component:regex}\"}",
           "instant": true,
           "range": false,
-          "legendFormat": "{{service}}",
+          "legendFormat": "{{service}} · pci={{pci}}",
           "refId": "A"
         }
       ]
@@ -2232,7 +2232,7 @@
           "expr": "oai_gnb_rrc_arfcn{service=~\"${ran_component:regex}\"}",
           "instant": true,
           "range": false,
-          "legendFormat": "{{service}}",
+          "legendFormat": "{{service}} · pci={{pci}}",
           "refId": "A"
         }
       ]
@@ -2275,7 +2275,7 @@
           "expr": "oai_gnb_rrc_scs_khz{service=~\"${ran_component:regex}\"}",
           "instant": true,
           "range": false,
-          "legendFormat": "{{service}}",
+          "legendFormat": "{{service}} · pci={{pci}}",
           "refId": "A"
         }
       ]

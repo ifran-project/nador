@@ -17,6 +17,14 @@ Changes up to 1.0.0 are listed in the [GitHub releases](https://github.com/ifran
   writes the C-RNTI in hex (`rnti="4601"`), as OCUDU logs it and the RNTI mapper reports it, instead of in decimal
   (`17921`); this also changes the `rnti` label of the exported OCUDU KPIs. With an OCUDU CU-CP and several DUs, the
   RNTI mapper names the DU of each UE (needs the rnti-mapper image of nador-images with the DU table).
+- OAI and OCUDU dashboards with several cells on one gNB or DU: a UE is named by its cell (`pci` of the RNTI mapper)
+  when the mapper knows it, else by its RNTI only when no other UE of the component has that RNTI, and never with a
+  guessed name. The OAI panels and the RRC ARFCN and SCS show the cell (`pci`) of each curve, and the UE identity table
+  its PCI. Needs the nador-images oai-gnb-metrics-parser 2026.w46-1 and rnti-mapper images with the cell labels;
+  with older images the panels show what they showed before.
+
+### Changed
+- The changelog check skips the image update pull requests that nador-images opens.
 
 ## [1.1.1] - 2026-11-25
 

@@ -2,6 +2,7 @@ name: Changelog
 
 # Every pull request into develop adds a line to CHANGELOG.md (see CONTRIBUTING.md). A pull request users do not
 # see (tests, CI, internal code) carries the no-changelog label instead; adding or removing it runs the check again.
+# The image updates that nador-images proposes (branch automation/images-<commit> of this repository) never need one.
 on:
   pull_request:
     branches: [develop]
@@ -16,7 +17,10 @@ concurrency:
 
 jobs:
   changelog:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
+    if: >-
+      ${{ !contains(github.event.pull_request.labels.*.name, 'no-changelog')
+      && !(startsWith(github.head_ref, 'automation/images-')
+      && github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1

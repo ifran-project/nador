@@ -107,6 +107,10 @@ Notes:
   With an OCUDU CU-CP and several DUs, it names the DU of each UE from the gNB-DU ID in the F1AP lines of the
   CU-CP: the `gnb_du_id` of the DU's `advanced_config` when it has one, else the `gnbDuId` of the meta model
   (see [Logs](logs.md)). The dashboard's RAN component selector then shows each DU's UEs by name.
+  An RNTI is unique only within a cell: with an OAI gNB or DU serving several cells (OAI 2026.w46 and later), the
+  per-UE metrics and the UE names carry the cell (`pci`), and a UE whose cell the mapper does not know is named only
+  when no other UE of its gNB or DU has its RNTI. OAI's L1 statistics (`oai_gnb_l1_*`) name no cell, so they are
+  right only with one cell per gNB or DU.
 
 ## Targets
 
