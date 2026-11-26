@@ -20,8 +20,10 @@ Changes up to 1.0.0 are listed in the [GitHub releases](https://github.com/ifran
 - OAI and OCUDU dashboards with several cells on one gNB or DU: a UE is named by its cell (`pci` of the RNTI mapper)
   when the mapper knows it, else by its RNTI only when no other UE of the component has that RNTI, and never with a
   guessed name. The OAI panels and the RRC ARFCN and SCS show the cell (`pci`) of each curve, and the UE identity table
-  its PCI. Needs the nador-images oai-gnb-metrics-parser 2026.w46-1 and rnti-mapper images with the cell labels;
-  with older images the panels show what they showed before.
+  its PCI. The uplink PRB saturation of a UE uses the PRBs of its cell when the gNB lists its cells. Needs the
+  nador-images oai-gnb-metrics-parser 2026.w46-1 and rnti-mapper images with the cell labels; with older images the
+  panels show what they showed before. What is per pod and per cell, and the one unsupported case (the L1 metrics of
+  an OAI pod with several cells), are in the profile guide.
 
 ### Changed
 - The changelog check skips the image update pull requests that nador-images opens.
