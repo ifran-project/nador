@@ -6,8 +6,7 @@ from pathlib import Path
 
 from ifran.models.deployment import DeploymentModel
 from ifran.models.provisioning import SSHInfo
-from ifran.utils.ansible import get_ansible_inventory_line
-from ifran.utils.utils import deep_merge
+from ifran.utils.ansible import get_ansible_inventory_line, get_merged_ssh_info
 
 # A forward gets its own connection, without multiplexing: in ssh the first value of an option wins, so these
 # come before the common arguments.
@@ -18,14 +17,9 @@ OPTIONS = ("BatchMode=yes", "ServerAliveInterval=30", "ServerAliveCountMax=3")
 def node_ssh(model: DeploymentModel, node: str) -> SSHInfo:
     """The SSH settings of a node: the deployment defaults (``params.ssh``) with the node's own settings on top.
 
-    The same merge IFRAN does for its inventory lines, so NADOR reaches a node the way IFRAN does.
+    IFRAN's own merge, the one of its inventory lines, so NADOR reaches a node the way IFRAN does.
     """
-    return SSHInfo.model_validate(
-        deep_merge(
-            model.params.ssh.model_dump(mode="json", exclude_unset=True),
-            model.nodes[node].ssh_info.model_dump(mode="json", exclude_unset=True),
-        )
-    )
+    return get_merged_ssh_info(model.nodes[node], model.params.ssh)
 
 
 def inventory_line(model: DeploymentModel, node: str) -> str:
