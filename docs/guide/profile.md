@@ -104,6 +104,9 @@ Notes:
 - **`ran_kpis` and `csi`** also deploy the RNTI mapper: it names the UE behind each RNTI in the dashboard
   panels, from the RRC of the OAI or OCUDU gNB, CU or CU-CP and the AMF. It reads the AMF log of an OAI, Open5GS
   or free5gc core, and prefers the UE mapper's inventory (deployed with a session metric) when there is one.
+  With an OCUDU CU-CP and several DUs, it names the DU of each UE from the gNB-DU ID in the F1AP lines of the
+  CU-CP: the `gnb_du_id` of the DU's `advanced_config` when it has one, else the `gnbDuId` of the meta model
+  (see [Logs](logs.md)). The dashboard's RAN component selector then shows each DU's UEs by name.
 
 ## Targets
 

@@ -85,6 +85,11 @@ ValueError: OCUDU log settings hide what monitoring reads (see the Logs guide):
 
 Components without their own `log` keep IFRAN's, which fits.
 
+With an OCUDU CU-CP and several DUs, the RNTI mapper also reads the F1AP lines of the CU-CP
+(`Tx PDU du=2 ue=15: UEContextSetupRequest`) to know the DU of each UE, so keep `f1ap_level` at `info` or `debug`
+on the CU-CP. NADOR does not refuse a lower level: the UEs are then named on the CU-CP instead of their DU. Two DUs
+of the same CU-CP need different gNB-DU IDs; when two would share one, NADOR names neither.
+
 ### OAI: `advanced_config.log_config`
 
 ```yaml

@@ -256,7 +256,9 @@ def _render_chart_values(
     model: MonitoringModel,
     targets: list[ResolvedTarget],
     probe_states: dict[str, bool],
+    *,
     ue_names: dict[str, str],
+    ocudu_dus: list[str],
 ) -> dict:
     """Render chart configuration before applying explicit user overrides."""
     chart = _chart_name(component)
@@ -271,7 +273,12 @@ def _render_chart_values(
     elif chart == "ocudu-metrics":
         context["ocudu_sources"] = ocudu_sources(model)
     elif chart == "rnti-mapper":
-        context |= {"ue_names": ue_names, "components": _enabled_components(model), "build_k8s_safe": build_k8s_safe}
+        context |= {
+            "ue_names": ue_names,
+            "ocudu_dus": ocudu_dus,
+            "components": _enabled_components(model),
+            "build_k8s_safe": build_k8s_safe,
+        }
     elif chart == "promtail":
         context["log_namespaces"] = _log_namespaces(model)
     elif chart == "kube-prometheus-stack":
@@ -316,6 +323,35 @@ def ue_names(metamodel: MetaModel | None) -> dict[str, str]:
     return {ue.config.supi: name for name, ue in metamodel.ues.items() if ue.config is not None}
 
 
+def ocudu_dus(metamodel: MetaModel | None, model: MonitoringModel) -> list[str]:
+    """``"<CU-CP> <gNB-DU ID> <DU>"`` of each OCUDU DU, for the rnti-mapper to name the DU of each UE.
+
+    The gNB-DU ID is the one the CU-CP logs in its F1AP lines (``du=``): ``advanced_config.gnb_du_id`` when it is set,
+    else ``gnbDuId`` of the meta model. The DUs of a CU-CP that would share an ID are left out: their UEs stay on the
+    CU-CP rather than on the wrong DU.
+    """
+    meta = metamodel.ran.components if metamodel is not None and metamodel.ran is not None else {}
+    ids: dict[str, dict[int, list[str]]] = {}
+    for name, component in model.ran.components.items():
+        if str(component.implementation) != "ocudu" or str(component.type) != "du" or name not in meta:
+            continue
+        config = meta[name].config
+        cu_cp = getattr(config, "cu_cp", None)
+        advanced = component.advanced_config
+        if advanced is not None and "gnb_du_id" in advanced.model_fields_set:
+            du_id = advanced.gnb_du_id
+        else:
+            du_id = getattr(config, "gnbDuId", None)
+        if cu_cp and du_id is not None:
+            ids.setdefault(cu_cp, {}).setdefault(int(du_id), []).append(name)
+    return [
+        f"{cu_cp} {du_id} {dus[0]}"
+        for cu_cp, by_id in sorted(ids.items())
+        for du_id, dus in sorted(by_id.items())
+        if len(dus) == 1
+    ]
+
+
 def _has_rrc(model: MonitoringModel) -> bool:
     """Whether an OAI or OCUDU gNB, CU or CU-CP runs the RRC: the rnti-mapper reads its UE contexts."""
     return any(
@@ -325,11 +361,15 @@ def _has_rrc(model: MonitoringModel) -> bool:
 
 
 def resolve_components(
-    model: MonitoringModel, targets: list[ResolvedTarget], ue_names: dict[str, str] | None = None
+    model: MonitoringModel,
+    targets: list[ResolvedTarget],
+    ue_names: dict[str, str] | None = None,
+    ocudu_dus: list[str] | None = None,
 ) -> dict[str, DeployedMonitoringComponent]:
     """Build enabled monitoring components and their Helm values in installation order.
 
-    ``ue_names`` maps an IMSI to the UE's name, for the rnti-mapper.
+    ``ue_names`` maps an IMSI to the UE's name and ``ocudu_dus`` names the DUs of the OCUDU CU-CPs
+    (from ``ocudu_dus()``), for the rnti-mapper.
     """
     monitoring = model.monitoring
     catalog = yaml.safe_load((ASSETS / "components.yaml").read_text())
@@ -358,7 +398,9 @@ def resolve_components(
             )
         component = DeployedMonitoringComponent.model_validate(data)
         component.namespace = monitoring.namespace
-        component.chart_values = _render_chart_values(component, model, targets, probe_states, ue_names or {})
+        component.chart_values = _render_chart_values(
+            component, model, targets, probe_states, ue_names=ue_names or {}, ocudu_dus=ocudu_dus or []
+        )
         if probe_kind(name) and component.chart_values.get("settings", {}).get("paused"):
             component.pod_selector = []
         if not component.chart_version:

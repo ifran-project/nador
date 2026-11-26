@@ -8,6 +8,16 @@ Changes up to 1.0.0 are listed in the [GitHub releases](https://github.com/ifran
 
 ## [Unreleased]
 
+### Fixed
+- OCUDU Grafana dashboard with several DUs or gNBs: a `RAN component` selector filters the RAN panels, each curve is
+  named after its component (`du01 · ue_rnti=...`), totals are given per component, and connected UEs are counted
+  per cell, since two DUs can give a UE the same RNTI. The CPU and memory panels show the DU, CU, CU-CP and CU-UP
+  pods as well as the gNB pod.
+- OCUDU UEs are named in the dashboard panels per RNTI and in a UE identity table, as with OAI. The OCUDU collector
+  writes the C-RNTI in hex (`rnti="4601"`), as OCUDU logs it and the RNTI mapper reports it, instead of in decimal
+  (`17921`); this also changes the `rnti` label of the exported OCUDU KPIs. With an OCUDU CU-CP and several DUs, the
+  RNTI mapper names the DU of each UE (needs the rnti-mapper image of nador-images with the DU table).
+
 ## [1.1.1] - 2026-11-25
 
 ### Fixed

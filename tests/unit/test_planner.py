@@ -6,9 +6,10 @@ and checks one rule.
 
 import pytest
 from metamodel_3gpp.models.metamodel import MetaModel
+from pydantic import BaseModel
 from support import TARGETS, manager, network, options, profile
 
-from nador.planner import REMOTE_CHARTS
+from nador.planner import REMOTE_CHARTS, ocudu_dus
 
 ALWAYS = {"integration", "prometheus", "grafana"}
 SESSION_STACK = {"redis", "ue-mapper-api", "monitoring-controller"}
@@ -64,8 +65,36 @@ def test_the_rnti_mapper_reads_the_rrc_and_names_the_ues():
     assert values["sources"] == [{"component": "gnb", "namespace": "ran", "selector": "app=oai-gnb", "type": "oai"}]
     assert values["core"] == {"type": "open5gs", "namespace": "core", "selector": "app=open5gs-amf", "container": "amf"}
     assert values["ueNames"] == ["001010000000001 ue1"]
+    assert values["ocuduDus"] == []  # OAI: the mapper reads the DU of each UE from the RRC statistics
     assert values["inventoryUrl"] == "http://ue-mapper-api.monitoring.svc.cluster.local:8080/inventory/ues"
     assert values["image"]["repository"] == "ghcr.io/ifran-project/nador-rnti-mapper"
+
+
+def test_the_rnti_mapper_names_the_dus_of_an_ocudu_cu_cp():
+    net = network(ran="ocudu", layout="cucp-cuup-2du")
+    csi = options("csi", components=["du01"])
+    mapper = manager(profile(metrics={"csi": csi}, targets=["amf", "smf", "upf"]), net).plan().components
+    assert mapper["rnti-mapper"].chart_values["ocuduDus"] == ["cucp 1 du01", "cucp 2 du02"]
+
+
+class DUAdvancedConfig(BaseModel):
+    """A DU advanced_config with gnb_du_id, as IFRAN's fhi72 branch has (released IFRAN: gNB only)."""
+
+    gnb_du_id: int = 0
+
+
+def test_the_gnb_du_id_of_the_advanced_config_wins_and_a_shared_id_names_no_du():
+    net = network(ran="ocudu", layout="cucp-cuup-2du")
+    du02 = net.deployment_model.ran.components["du02"]
+    object.__setattr__(du02, "advanced_config", DUAdvancedConfig(gnb_du_id=7))
+    assert ocudu_dus(net.metamodel, net.deployment_model) == ["cucp 1 du01", "cucp 7 du02"]
+    object.__setattr__(du02, "advanced_config", DUAdvancedConfig())  # not set: gnbDuId of the meta model
+    assert ocudu_dus(net.metamodel, net.deployment_model) == ["cucp 1 du01", "cucp 2 du02"]
+    object.__setattr__(du02, "advanced_config", DUAdvancedConfig(gnb_du_id=1))
+    assert ocudu_dus(net.metamodel, net.deployment_model) == []  # du01 and du02 would both be du=1
+    assert ocudu_dus(None, net.deployment_model) == []
+    oai = network(ran="oai", layout="cucp-cuup-2du")
+    assert ocudu_dus(oai.metamodel, oai.deployment_model) == []
 
 
 def test_ran_kpis_are_refused_for_a_ran_without_a_calculator():

@@ -23,3 +23,5 @@ core:
 inventoryUrl: {{ ('http://ue-mapper-api.' ~ monitoring.namespace ~ '.svc.cluster.local:8080/inventory/ues' if 'ue-mapper-api' in components else '') | tojson }}
 {# "IMSI name" strings: an IMSI as a map key or a bare value can be read as a number by YAML (Helm: 1.01e+12) #}
 ueNames: {{ ue_names.items() | map('join', ' ') | list | tojson }}
+{# "<CU-CP> <gNB-DU ID> <DU>": the DU of each UE of an OCUDU CU-CP, from the gNB-DU ID of its F1AP log lines #}
+ocuduDus: {{ ocudu_dus | tojson }}

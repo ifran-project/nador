@@ -13,6 +13,11 @@ data:
     {{- range .Values.sources }}
     {{ .component }} {{ .namespace }} {{ .selector }} {{ .type }}
     {{- end }}
+  # <CU-CP component> <gNB-DU ID> <DU component>
+  ocudu_dus: |
+    {{- range .Values.ocuduDus }}
+    {{ . }}
+    {{- end }}
   # IMSI name; unknown IMSIs are shown as the IMSI
   ue_names: |
     {{- range .Values.ueNames }}

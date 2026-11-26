@@ -11,3 +11,5 @@ core: {}
 inventoryUrl: ""
 # "IMSI name" strings (not a map: YAML readers may turn an IMSI key into a number)
 ueNames: []
+# "<CU-CP> <gNB-DU ID> <DU>" strings: names the DU of each UE of an OCUDU CU-CP (older rnti-mapper images ignore it)
+ocuduDus: []

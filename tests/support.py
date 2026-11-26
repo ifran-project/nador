@@ -77,6 +77,12 @@ RAN_LAYOUTS = {
         "cuup": {"type": "cu_up", "config": {"gnbId": 1}},
         "du": {"type": "du", "config": {"gnbId": 1, "gnbDuId": 1, "nrCellId": 1, "cu_cp": "cucp", "cu_up": "cuup"}},
     },
+    "cucp-cuup-2du": {
+        "cucp": {"type": "cu_cp", "config": {"gnbId": 1, "nrCellId": 1}},
+        "cuup": {"type": "cu_up", "config": {"gnbId": 1}},
+        "du01": {"type": "du", "config": {"gnbId": 1, "gnbDuId": 1, "nrCellId": 1, "cu_cp": "cucp", "cu_up": "cuup"}},
+        "du02": {"type": "du", "config": {"gnbId": 1, "gnbDuId": 2, "nrCellId": 2, "cu_cp": "cucp", "cu_up": "cuup"}},
+    },
 }
 
 
@@ -91,7 +97,8 @@ class Network:
 def network(*, ran: str = "oai", layout: str = "gnb", upfs: int = 1) -> Network:
     """An Open5GS core and an OAI, OCUDU or UERANSIM RAN on one node, already deployed.
 
-    ``layout`` is ``gnb`` (monolithic), ``cu-du`` (F1 split) or ``cucp-cuup-du`` (F1 and E1);
+    ``layout`` is ``gnb`` (monolithic), ``cu-du`` (F1 split), ``cucp-cuup-du`` (F1 and E1) or ``cucp-cuup-2du`` (two
+    DUs on one CU-CP);
     ``upfs`` adds UPFs named ``upf``, ``upf2``, ... Every component carries the namespace IFRAN
     records once it is installed.
     """
