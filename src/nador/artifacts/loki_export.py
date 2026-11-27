@@ -68,9 +68,10 @@ def count_lines(url, query, start, end):
     return int(float(result[0]["value"][1])) if result else 0
 
 
-def _query(url, selector, start_ns, end_ns, limit):
+def query_logs(url, selector, start_ns, end_ns, limit, *, direction="forward"):
+    """Log lines of a LogQL selector between two times (ns), oldest first; ``limit`` from the ``direction`` end."""
     params = urllib.parse.urlencode(
-        {"query": selector, "start": start_ns, "end": end_ns, "limit": limit, "direction": "forward"}
+        {"query": selector, "start": start_ns, "end": end_ns, "limit": limit, "direction": direction}
     )
     if urllib.parse.urlsplit(url).scheme not in ("http", "https"):
         raise ValueError(f"Expected an HTTP(S) Loki URL, got {url!r}")
@@ -108,7 +109,7 @@ def collect_logs(directory, *, url, selector, start, end, limit=5000, max_querie
     with (directory / "loki.jsonl").open("w", encoding="utf-8") as output:
         while pending and queries < max_queries:
             left, right = pending.pop()
-            page = _query(url, query, left, right, page_limit)
+            page = query_logs(url, query, left, right, page_limit)
             queries += 1
             if len(page) >= page_limit and right - left > 1:
                 # Reserve a query for every pending window before subdividing.

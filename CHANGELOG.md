@@ -26,6 +26,7 @@ Changes up to 1.0.0 are listed in the [GitHub releases](https://github.com/ifran
   an OAI pod with several cells), are in the profile guide.
 
 ### Added
+- Loki queries can read the newest lines first (`query_logs(direction="backward")`).
 - A warning when an OAI gNB or DU pod serves several cells, whose L1 metrics are then not per cell: the OAI
   dashboard's "Cells per gNB/DU pod" panel turns red, and `ExperimentRun` raises a `RuntimeWarning` and records it
   under `warnings` in `experiment_metadata.json`.
