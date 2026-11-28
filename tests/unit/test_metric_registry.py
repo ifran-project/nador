@@ -18,11 +18,18 @@ def test_every_named_query_is_described(registry):
     assert set(registry.queries) == {query["name"] for query in load_queries(None)}
 
 
-def test_every_metric_a_query_reads_is_described_unless_the_query_says_why_it_returns_nothing(registry):
-    for name, query in registry.queries.items():
-        unknown = [metric for metric in query.reads if registry.describe(metric) is None]
-        named = " ".join(query.problems)
-        assert all(metric in named for metric in unknown), (name, unknown)
+def test_every_metric_a_query_reads_is_exported(registry):
+    unknown = {
+        name: [metric for metric in query.reads if registry.describe(metric) is None]
+        for name, query in registry.queries.items()
+    }
+    assert {name: metrics for name, metrics in unknown.items() if metrics} == {}
+
+
+def test_a_query_that_returns_nothing_says_why(registry):
+    query = registry.queries["mac_throughput_total_bps"]
+    assert query.reads == ["mac_throughput"]
+    assert "no per-LCID byte counts" in query.problems[0]
 
 
 def test_the_series_of_a_histogram_are_described_by_the_histogram(registry):
@@ -58,9 +65,15 @@ def test_the_profile_metrics_named_as_producers_exist(registry):
 
 
 def test_the_entries_left_to_check_are_named_by_section(registry):
-    checked = registry.model_copy(deep=True)
-    checked.metrics["ue_cqi"].verified = True
-    left = checked.unverified()
-    assert "metrics.ue_cqi" not in left
-    assert "metrics.ue_dl_brate" in left
+    unchecked = registry.model_copy(deep=True)
+    unchecked.metrics["ue_cqi"].verified = False
+    left = unchecked.unverified()
+    assert "metrics.ue_cqi" in left
+    assert "metrics.ue_dl_brate" not in left
     assert "queries.n3_throughput_bps" in left
+
+
+def test_each_metric_checked_against_its_source_cites_it_first(registry):
+    for name, metric in registry.metrics.items():
+        if metric.verified:
+            assert metric.evidence[0].startswith("source: "), name

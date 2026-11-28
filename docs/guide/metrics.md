@@ -57,13 +57,22 @@ OCUDU reports each field once per reporting period, and NADOR's collector export
 - read it as it is, or as a ratio (BLER = nok / (ok + nok));
 - never use `rate()` on it.
 
-## Checking entries
+## How sure an entry is
 
-Every entry starts with `verified: false`. It was written from:
-- the exporters' help texts;
-- a catalog of the metrics two deployments exposed (OAI and OCUDU, November 2026);
-- OCUDU's field names;
-- NADOR's and nador-images' sources.
+Each metric entry was checked against the code that produces it, for the versions IFRAN deploys:
+- NADOR's probes: nador-images, at the commit `images.json` pins (and its `ml-extended` branch for the host
+  probes);
+- OAI 2026.w42: the stats files the OAI metrics parser reads;
+- OCUDU release_26_04: its JSON metrics;
+- Open5GS 2.8.0: its network functions' own metrics.
 
-Once you have checked an entry against the code or a running deployment, set `verified: true`.
-`registry.unverified()` lists what is left.
+The entry cites that code first in its `evidence` (`source: ...`) and is marked `verified: true`. Which way is
+good (`better`) is a judgment, not read from code.
+
+`caveats` say where a metric is wrong, empty or easy to misread. For example:
+- `mac_throughput` stays empty with OAI 2026.w42 to 2026.w47, which print no per-LCID byte counts;
+- OAI's HARQ rounds, errors and DTX counts are running totals since the UE connected, read with `increase()`;
+- with several cells in one OAI pod, its L1 metrics are not per cell.
+
+A query that returns nothing says why in its `problems`. `registry.unverified()` lists what no one has checked,
+such as the named queries.

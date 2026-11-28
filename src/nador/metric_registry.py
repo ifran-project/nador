@@ -42,6 +42,7 @@ class Metric(StrictBaseModel):
     unit: str | None = None
     meaning: str
     better: Literal["higher", "lower"] | None = Field(default=None, description="None when neither is better")
+    caveats: list[str] = Field(default_factory=list, description="Where it is wrong, empty or misleading")
     ue_labels: list[str] = Field(default_factory=list, description="The labels that identify a UE")
     labels: list[str] = Field(default_factory=list, description="Its other labels, besides where it was scraped")
     use: str | None = Field(default=None, description="How to aggregate it in PromQL")
