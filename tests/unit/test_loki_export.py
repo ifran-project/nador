@@ -6,7 +6,7 @@ import re
 import pytest
 
 from nador.artifacts import ExperimentRun, ran_log_filter
-from nador.artifacts.loki_export import collect_logs
+from nador.artifacts.loki_export import collect_logs, query_logs
 
 
 def logs_between(lines_per_second):
@@ -129,3 +129,17 @@ def test_the_chosen_lines_are_what_a_run_drops():
     patterns = ran_log_filter(["PHY", "MAC"])
     run = ExperimentRun("unused", loki_url="http://loki:3100", loki_drop=patterns)
     assert run.options.loki_drop == patterns
+
+
+def test_a_query_can_read_the_newest_lines_first(http):
+    asked = []
+
+    def answer(query):
+        asked.append(query["direction"])
+        return logs_between(1)(query)
+
+    http.routes["/loki/api/v1/query_range"] = answer
+    newest = query_logs(http.url, "{}", 0, 3_000_000_000, 2, direction="backward")
+    query_logs(http.url, "{}", 0, 3_000_000_000, 2)
+    assert asked == ["backward", "forward"]
+    assert len(newest) == 2
