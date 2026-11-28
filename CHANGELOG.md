@@ -9,6 +9,9 @@ Changes up to 1.0.0 are listed in the [GitHub releases](https://github.com/ifran
 ## [Unreleased]
 
 ### Fixed
+- The named queries `same_packet_upf_rtt_mean_ms`, `same_packet_gnb_rtt_mean_ms` and `same_packet_gap_mean_ms`
+  returned nothing: they read the packet pairer's histograms (`*_observed_ns`) now, as their 5 s versions do, instead
+  of its gauges.
 - OCUDU Grafana dashboard with several DUs or gNBs: a `RAN component` selector filters the RAN panels, each curve is
   named after its component (`du01 · ue_rnti=...`), totals are given per component, and connected UEs are counted
   per cell, since two DUs can give a UE the same RNTI. The CPU and memory panels show the DU, CU, CU-CP and CU-UP
@@ -26,6 +29,12 @@ Changes up to 1.0.0 are listed in the [GitHub releases](https://github.com/ifran
   an OAI pod with several cells), are in the profile guide.
 
 ### Added
+- A metric registry (`assets/metric_registry.yaml`, read with `nador.metric_registry.load_registry()`): what each
+  RAN, core and probe metric means, its unit, which way is good, the labels that identify a UE, how to aggregate it
+  and which profile metric collects it; the platform's metrics by family; and NADOR's named queries with the metrics
+  they read. Each metric was checked against the code that produces it (nador-images, OAI 2026.w42, OCUDU
+  release_26_04, Open5GS 2.8.0), which its entry cites, and `caveats` say where a metric is wrong or empty: for
+  example `mac_throughput` stays empty with OAI 2026.w42 to 2026.w47, which print no per-LCID byte counts.
 - Loki queries can read the newest lines first (`query_logs(direction="backward")`).
 - A warning when an OAI gNB or DU pod serves several cells, whose L1 metrics are then not per cell: the OAI
   dashboard's "Cells per gNB/DU pod" panel turns red, and `ExperimentRun` raises a `RuntimeWarning` and records it

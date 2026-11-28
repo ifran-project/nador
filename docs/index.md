@@ -13,6 +13,7 @@ explain each part in more depth, and the examples deploy complete scenarios.
 
 guide/how-it-works
 guide/profile
+guide/metrics
 guide/probes
 guide/experiments
 guide/logs
